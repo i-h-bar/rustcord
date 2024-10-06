@@ -1,16 +1,16 @@
+#![allow(warnings)]
 use std::env;
 
 use dotenv::dotenv;
-use serenity::{async_trait, Client};
 use serenity::all::{GatewayIntents, Message};
 use serenity::client::EventHandler;
 use serenity::prelude::*;
+use serenity::{async_trait, Client};
 
 mod mtg;
 mod utils;
 
 struct Handler;
-
 
 #[async_trait]
 impl EventHandler for Handler {
