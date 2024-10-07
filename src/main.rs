@@ -6,19 +6,19 @@ use std::time::Duration;
 
 use dotenv::dotenv;
 use regex::Regex;
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::Client;
 use serenity::all::{GatewayIntents, Message};
+use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
-use serenity::async_trait;
-use reqwest::Client;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 
 mod mtg;
 mod utils;
 
 struct Handler {
     http_client: Client,
-    card_regex: Regex
+    card_regex: Regex,
 }
 
 impl Handler {
@@ -33,7 +33,10 @@ impl Handler {
 
         let card_regex = Regex::new(r"\[\[(.*?)]]").expect("Invalid regex");
 
-        Self { http_client, card_regex }
+        Self {
+            http_client,
+            card_regex,
+        }
     }
 }
 

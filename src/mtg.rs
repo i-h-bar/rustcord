@@ -2,13 +2,12 @@ use serde::Deserialize;
 use serenity::all::Message;
 use serenity::prelude::*;
 
-use crate::{Handler, utils};
 use crate::mtg::response::CardResponse;
+use crate::{utils, Handler};
 
 mod response;
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
-
 
 impl Handler {
     pub async fn find_cards(&self, msg: &Message, ctx: &Context) {
@@ -17,7 +16,8 @@ impl Handler {
                 continue;
             };
             println!("Searching scryfall for \"{}\"", name.as_str());
-            let response = self.http_client
+            let response = self
+                .http_client
                 .get(format!("{}{}", SCRYFALL, name.as_str().replace(" ", "+")))
                 .send()
                 .await
@@ -40,16 +40,17 @@ impl Handler {
                 card.name
             );
 
-            let Ok(image) = self.http_client
+            let Ok(image) = self
+                .http_client
                 .get(card.image_uris.png)
                 .send()
                 .await
                 .expect("failed request")
                 .bytes()
                 .await
-                else {
-                    continue;
-                };
+            else {
+                continue;
+            };
             println!("Image found for - \"{}\".", card.name);
             utils::send_image(image, format!("{}.png", card.name), &msg, &ctx).await;
         }

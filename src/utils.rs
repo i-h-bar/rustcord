@@ -6,7 +6,12 @@ pub async fn send(content: &str, msg: &Message, ctx: &Context) {
     }
 }
 
-pub async fn send_image(image: impl Into<Vec<u8>>, image_name: String, msg: &Message, ctx: &Context) {
+pub async fn send_image(
+    image: impl Into<Vec<u8>>,
+    image_name: String,
+    msg: &Message,
+    ctx: &Context,
+) {
     let message = CreateMessage::new();
     let attachment = CreateAttachment::bytes(image, image_name);
     let message = message.add_file(attachment);
