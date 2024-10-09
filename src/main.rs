@@ -12,6 +12,8 @@ use serenity::all::{GatewayIntents, Message};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{Pool, Postgres};
 
 mod mtg;
 mod utils;
@@ -19,10 +21,11 @@ mod utils;
 struct Handler {
     http_client: Client,
     card_regex: Regex,
+    pg_pool: Pool<Postgres>,
 }
 
 impl Handler {
-    fn new() -> Self {
+    async fn new() -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT, HeaderValue::from_static("Rust Discord Bot"));
         let http_client = Client::builder()
@@ -33,9 +36,17 @@ impl Handler {
 
         let card_regex = Regex::new(r"\[\[(.*?)]]").expect("Invalid regex");
 
+        let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
+        let pg_pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(&uri)
+            .await
+            .expect("Failed Postgres connection");
+
         Self {
             http_client,
             card_regex,
+            pg_pool,
         }
     }
 }
@@ -61,7 +72,7 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let handler = Handler::new();
+    let handler = Handler::new().await;
     let mut client = serenity::Client::builder(&token, intents)
         .event_handler(handler)
         .await
