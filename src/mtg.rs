@@ -106,7 +106,7 @@ impl MTG {
                 .bind(&normalised_name)
                 .fetch_one(&self.pg_pool)
                 .await
-                .expect("Couldn't find card in db even though it was there before")
+                .expect("Couldn't find card in db even though it is in the card cache")
                 .get("png");
 
             println!(
