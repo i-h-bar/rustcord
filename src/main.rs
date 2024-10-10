@@ -5,7 +5,10 @@ use std::collections::HashSet;
 use std::env;
 use std::time::Duration;
 
+use crate::mtg::MTG;
 use dotenv::dotenv;
+use rayon::iter::IntoParallelIterator;
+use rayon::prelude::*;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::Client;
@@ -20,34 +23,13 @@ mod mtg;
 mod utils;
 
 struct Handler {
-    http_client: Client,
-    card_regex: Regex,
-    pg_pool: Pool<Postgres>
+    mtg: MTG,
 }
 
 impl Handler {
     async fn new() -> Self {
-        let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static("Rust Discord Bot"));
-        let http_client = Client::builder()
-            .default_headers(headers)
-            .timeout(Duration::new(30, 0))
-            .build()
-            .expect("Failed HTTP Client build");
-
-        let card_regex = Regex::new(r"\[\[(.*?)]]").expect("Invalid regex");
-
-        let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
-        let pg_pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&uri)
-            .await
-            .expect("Failed Postgres connection");
-
         Self {
-            http_client,
-            card_regex,
-            pg_pool
+            mtg: MTG::new().await,
         }
     }
 }
@@ -60,7 +42,7 @@ impl EventHandler for Handler {
         } else if msg.content == "!ping" {
             utils::send("Pong!", &msg, &ctx).await
         } else {
-            self.find_cards(&msg, &ctx).await;
+            self.mtg.find_cards(&msg, &ctx).await;
         }
     }
 }
