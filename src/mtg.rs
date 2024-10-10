@@ -100,7 +100,11 @@ impl MTG {
         let start = Instant::now();
 
         let normalised_name = name.to_lowercase();
-        if self.card_cache.lock().await.contains(&normalised_name) {
+        let contains = {
+            self.card_cache.lock().await.contains(&normalised_name)
+        };
+
+        if contains {
             println!("Found exact match in cache!");
             let image = sqlx::query(EXACT_MATCH)
                 .bind(&normalised_name)
@@ -135,6 +139,10 @@ impl MTG {
                     }
                 }
             } else {
+                println!("Error from response {}", response.status().as_str());
+                utils::send(
+                    &format!("Couldn't find a card matching '{}'", name), &msg, &ctx
+                ).await;
                 return None;
             };
 
