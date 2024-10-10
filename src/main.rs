@@ -22,8 +22,7 @@ mod utils;
 struct Handler {
     http_client: Client,
     card_regex: Regex,
-    pg_pool: Pool<Postgres>,
-    card_names: HashSet<String>,
+    pg_pool: Pool<Postgres>
 }
 
 impl Handler {
@@ -45,20 +44,10 @@ impl Handler {
             .await
             .expect("Failed Postgres connection");
 
-        let card_names: HashSet<String> = HashSet::from_iter(
-            sqlx::query("select name from cards")
-                .fetch_all(&pg_pool)
-                .await
-                .expect("Failed to get cards names")
-                .into_iter()
-                .map(|row| row.get("name")),
-        );
-
         Self {
             http_client,
             card_regex,
-            pg_pool,
-            card_names,
+            pg_pool
         }
     }
 }
