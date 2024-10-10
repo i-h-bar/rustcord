@@ -3,9 +3,7 @@ use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
 use sqlx::Executor;
-use bytes::Bytes;
 use uuid::Uuid;
-use base64::prelude::*;
 
 use crate::mtg::response::CardResponse;
 use crate::{utils, Handler};
