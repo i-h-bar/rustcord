@@ -69,6 +69,8 @@ impl Handler {
             return;
         };
         println!("Image found for - \"{}\".", &card.name);
+        let image = image.to_vec();
+
         utils::send_image(&image, &format!("{}.png", &card.name), &msg, &ctx).await;
         self.add_to_postgres(card, image).await;
     }
@@ -76,13 +78,12 @@ impl Handler {
     async fn add_to_postgres(
         &self,
         card: CardResponse,
-        image: Bytes,
+        image: Vec<u8>,
     ) {
-        let image_id = Uuid::new_v4().to_string();
-        let image_vec = image.to_vec();
-        let image_insert = sqlx::query(r#"INSERT INTO images (id, png) values (uuid($1), $2)"#)
+        let image_id = Uuid::new_v4();
+        let image_insert = sqlx::query(r#"INSERT INTO images (id, png) values ($1, $2)"#)
             .bind(&image_id)
-            .bind(&image_vec);
+            .bind(&image);
 
         let set_insert = sqlx::query(r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#)
             .bind(&card.set_id)

@@ -8,7 +8,7 @@ pub async fn send(content: &str, msg: &Message, ctx: &Context) {
 }
 
 pub async fn send_image(
-    image: &Bytes,
+    image: &Vec<u8>,
     image_name: &String,
     msg: &Message,
     ctx: &Context,
