@@ -2,21 +2,20 @@ use std::collections::HashSet;
 use std::env;
 use std::time::Duration;
 
-use rayon::prelude::*;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::postgres::PgPoolOptions;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::mtg::response::CardResponse;
-use crate::{utils, Handler};
+use crate::utils;
 
 mod response;
 
@@ -62,7 +61,7 @@ impl MTG {
 
         let card_cache = Mutex::new(
             cards_vec
-                .into_par_iter()
+                .into_iter()
                 .map(|row| row.get("name"))
                 .collect::<HashSet<String>>(),
         );
@@ -96,10 +95,10 @@ impl MTG {
         }
     }
 
-    async fn find_card(&self, name: &str, msg: &Message, ctx: &Context) -> Option<String> {
+    async fn find_card(&self, queried_name: &str, msg: &Message, ctx: &Context) -> Option<String> {
         let start = Instant::now();
 
-        let normalised_name = name.to_lowercase();
+        let normalised_name = queried_name.to_lowercase();
         let contains = {
             self.card_cache.lock().await.contains(&normalised_name)
         };
@@ -118,14 +117,14 @@ impl MTG {
                 normalised_name,
                 start.elapsed()
             );
-            utils::send_image(&image, &format!("{}.png", &name), &msg, &ctx).await;
+            utils::send_image(&image, &format!("{}.png", &queried_name), &msg, &ctx).await;
 
             None
         } else {
-            println!("Searching scryfall for \"{}\"", name);
+            println!("Searching scryfall for \"{}\"", queried_name);
             let response = self
                 .http_client
-                .get(format!("{}{}", SCRYFALL, name.replace(" ", "+")))
+                .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
                 .send()
                 .await
                 .expect("Failed request");
@@ -141,7 +140,7 @@ impl MTG {
             } else {
                 println!("Error from response {}", response.status().as_str());
                 utils::send(
-                    &format!("Couldn't find a card matching '{}'", name), &msg, &ctx
+                    &format!("Couldn't find a card matching '{}'", queried_name), &msg, &ctx,
                 ).await;
                 return None;
             };
@@ -159,10 +158,10 @@ impl MTG {
                 .expect("failed image request")
                 .bytes()
                 .await
-            else {
-                println!("Failed to retrieve image bytes");
-                return None;
-            };
+                else {
+                    println!("Failed to retrieve image bytes");
+                    return None;
+                };
             println!("Image found for - \"{}\".", &card.name);
             let image = image.to_vec();
 

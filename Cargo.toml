@@ -12,4 +12,3 @@ reqwest = { version = "0.12.8", features = ["json"] }
 serde = { version = "1.0.210", features = ["derive"] }
 sqlx = { version = "0.8.2", features = [ "runtime-tokio", "postgres", "uuid" ] }
 uuid = { version = "1.10.0", features = ["v4"] }
-rayon = "1.10.0"

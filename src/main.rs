@@ -1,23 +1,16 @@
 #![allow(warnings)]
 extern crate core;
 
-use std::collections::HashSet;
 use std::env;
-use std::time::Duration;
 
-use crate::mtg::MTG;
 use dotenv::dotenv;
-use rayon::iter::IntoParallelIterator;
-use rayon::prelude::*;
-use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-use reqwest::Client;
 use serenity::all::{GatewayIntents, Message};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
-use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::{Executor, Row};
+
+use crate::mtg::MTG;
 
 mod mtg;
 mod utils;
