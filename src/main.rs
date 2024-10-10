@@ -1,6 +1,7 @@
 #![allow(warnings)]
 extern crate core;
 
+use std::collections::HashSet;
 use std::env;
 use std::time::Duration;
 
@@ -13,7 +14,7 @@ use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Postgres};
+use sqlx::{Executor, Pool, Postgres, Row};
 
 mod mtg;
 mod utils;
@@ -22,6 +23,7 @@ struct Handler {
     http_client: Client,
     card_regex: Regex,
     pg_pool: Pool<Postgres>,
+    card_names: HashSet<String>,
 }
 
 impl Handler {
@@ -43,10 +45,20 @@ impl Handler {
             .await
             .expect("Failed Postgres connection");
 
+        let card_names: HashSet<String> = HashSet::from_iter(
+            sqlx::query("select name from cards")
+                .fetch_all(&pg_pool)
+                .await
+                .expect("Failed to get cards names")
+                .into_iter()
+                .map(|row| row.get("name")),
+        );
+
         Self {
             http_client,
             card_regex,
             pg_pool,
+            card_names,
         }
     }
 }
