@@ -15,8 +15,7 @@ const IMAGE_INSERT: &str = r#"INSERT INTO images (id, png) values ($1, $2) ON CO
 const SET_INSERT: &str =
     r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#;
 const CARD_INSERT: &str = r#"INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist) values (uuid($1), $2, $3, uuid($4), uuid($5), $6) ON CONFLICT DO NOTHING"#;
-const EXACT_MATCH: &str =
-    r#"select png from cards join images on cards.image_id = images.id where cards.name = $1"#;
+const EXACT_MATCH: &str = r#"select png from cards join images on cards.image_id = images.id where cards.name = $1"#;
 
 impl Handler {
     pub async fn find_cards(&self, msg: &Message, ctx: &Context) {
