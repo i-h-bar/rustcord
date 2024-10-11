@@ -1,12 +1,21 @@
+use std::collections::HashSet;
+use std::env;
+use std::time::Duration;
+
+use regex::Regex;
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::{Executor, Row};
+use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::postgres::PgPoolOptions;
+use tokio::sync::Mutex;
+use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::mtg::response::CardResponse;
-use crate::{utils, Handler};
+use crate::utils;
 
 mod response;
 
@@ -15,9 +24,55 @@ const IMAGE_INSERT: &str = r#"INSERT INTO images (id, png) values ($1, $2) ON CO
 const SET_INSERT: &str =
     r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#;
 const CARD_INSERT: &str = r#"INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist) values (uuid($1), $2, $3, uuid($4), uuid($5), $6) ON CONFLICT DO NOTHING"#;
+
 const EXACT_MATCH: &str = r#"select png from cards join images on cards.image_id = images.id where cards.name = $1"#;
 
-impl Handler {
+pub struct MTG {
+    http_client: reqwest::Client,
+    card_regex: Regex,
+    pg_pool: Pool<Postgres>,
+    card_cache: Mutex<HashSet<String>>,
+}
+
+impl MTG {
+    pub async fn new() -> Self {
+        let mut headers = HeaderMap::new();
+        headers.insert(USER_AGENT, HeaderValue::from_static("Rust Discord Bot"));
+        let http_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .timeout(Duration::new(30, 0))
+            .build()
+            .expect("Failed HTTP Client build");
+
+        let card_regex = Regex::new(r"\[\[(.*?)]]").expect("Invalid regex");
+
+        let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
+        let pg_pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(&uri)
+            .await
+            .expect("Failed Postgres connection");
+
+        let cards_vec = sqlx::query("select name from cards")
+            .fetch_all(&pg_pool)
+            .await
+            .expect("Failed to get cards names");
+
+        let card_cache = Mutex::new(
+            cards_vec
+                .into_iter()
+                .map(|row| row.get("name"))
+                .collect::<HashSet<String>>(),
+        );
+
+        Self {
+            http_client,
+            card_regex,
+            pg_pool,
+            card_cache,
+        }
+    }
+
     pub async fn find_cards(&self, msg: &Message, ctx: &Context) {
         let futures: Vec<_> = self
             .card_regex
@@ -31,24 +86,44 @@ impl Handler {
             })
             .collect();
 
-        join_all(futures).await;
+        for new_card in join_all(futures).await {
+            if let Some(card) = new_card {
+                self.card_cache.lock().await.insert(card);
+            }
+            println!("cache - {:#?}", self.card_cache)
+        }
     }
 
-    async fn find_card(&self, name: &str, msg: &Message, ctx: &Context) {
-        if self.card_names.contains(name) {
+    async fn find_card(&self, queried_name: &str, msg: &Message, ctx: &Context) -> Option<String> {
+        let start = Instant::now();
+
+        let normalised_name = queried_name.to_lowercase();
+        let contains = {
+            self.card_cache.lock().await.contains(&normalised_name)
+        };
+
+        if contains {
             println!("Found exact match in cache!");
             let image = sqlx::query(EXACT_MATCH)
-                .bind(&name)
+                .bind(&normalised_name)
                 .fetch_one(&self.pg_pool)
                 .await
-                .unwrap()
+                .expect("Couldn't find card in db even though it is in the card cache")
                 .get("png");
-            utils::send_image(&image, &format!("{}.png", &name), &msg, &ctx).await;
+
+            println!(
+                "Found '{}' locally in {:.2?}",
+                normalised_name,
+                start.elapsed()
+            );
+            utils::send_image(&image, &format!("{}.png", &queried_name), &msg, &ctx).await;
+
+            None
         } else {
-            println!("Searching scryfall for \"{}\"", name);
+            println!("Searching scryfall for \"{}\"", queried_name);
             let response = self
                 .http_client
-                .get(format!("{}{}", SCRYFALL, name.replace(" ", "+")))
+                .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
                 .send()
                 .await
                 .expect("Failed request");
@@ -58,11 +133,15 @@ impl Handler {
                     Ok(response) => response,
                     Err(why) => {
                         println!("Error getting card from scryfall - {why:?}");
-                        return;
+                        return None;
                     }
                 }
             } else {
-                return;
+                println!("Error from response {}", response.status().as_str());
+                utils::send(
+                    &format!("Couldn't find a card matching '{}'", queried_name), &msg, &ctx,
+                ).await;
+                return None;
             };
 
             println!(
@@ -78,42 +157,56 @@ impl Handler {
                 .expect("failed image request")
                 .bytes()
                 .await
-            else {
-                println!("Failed to retrieve image bytes");
-                return;
-            };
+                else {
+                    println!("Failed to retrieve image bytes");
+                    return None;
+                };
             println!("Image found for - \"{}\".", &card.name);
             let image = image.to_vec();
 
+            println!(
+                "Found from '{}' from scryfall in {:.2?}",
+                card.name,
+                start.elapsed()
+            );
             utils::send_image(&image, &format!("{}.png", &card.name), &msg, &ctx).await;
-            self.add_to_postgres(card, image).await;
+            self.add_to_postgres(&card, &image).await;
+
+            Some(card.name.to_lowercase())
         }
     }
 
-    async fn add_to_postgres(&self, card: CardResponse, image: Vec<u8>) {
+    async fn add_to_postgres(&self, card: &CardResponse, image: &Vec<u8>) {
         let image_id = Uuid::new_v4();
-        let image_insert = sqlx::query(IMAGE_INSERT).bind(&image_id).bind(&image);
+        if let Err(why) = sqlx::query(IMAGE_INSERT)
+            .bind(&image_id)
+            .bind(&image)
+            .execute(&self.pg_pool)
+            .await
+        {
+            println!("Failed images insert - {why}")
+        };
 
-        let set_insert = sqlx::query(SET_INSERT)
+        if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
             .bind(&card.set_name)
-            .bind(&card.set);
+            .bind(&card.set)
+            .execute(&self.pg_pool)
+            .await
+        {
+            println!("Failed set insert - {why}")
+        };
 
-        let card_insert = sqlx::query(CARD_INSERT)
+        if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.id)
-            .bind(&card.name)
+            .bind(&card.name.to_lowercase())
             .bind(&card.flavor_text)
             .bind(&card.set_id)
             .bind(&image_id)
-            .bind(&card.artist);
-
-        if let Err(why) = self.pg_pool.execute(image_insert).await {
-            println!("Failed images insert - {why}")
-        };
-        if let Err(why) = self.pg_pool.execute(set_insert).await {
-            println!("Failed set insert - {why}")
-        };
-        if let Err(why) = self.pg_pool.execute(card_insert).await {
+            .bind(&card.artist)
+            .execute(&self.pg_pool)
+            .await
+        {
             println!("Failed card insert - {why}")
         };
     }
