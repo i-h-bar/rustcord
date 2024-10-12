@@ -9,8 +9,8 @@ use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::postgres::PgPoolOptions;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -122,17 +122,18 @@ impl MTG {
                     &msg,
                     &ctx,
                 )
-                .await;
+                    .await;
                 return None;
             };
 
+            log::info!("Matched with - \"{}\". Now searching for image...", card.name);
             let Some(image) = self.search_scryfall_image(&card).await else {
                 utils::send(
                     &format!("Couldn't find a card matching '{queried_name}'"),
                     &msg,
                     &ctx,
                 )
-                .await;
+                    .await;
                 return None;
             };
 
@@ -149,10 +150,6 @@ impl MTG {
     }
 
     async fn search_scryfall_image(&self, card: &CardResponse) -> Option<Vec<u8>> {
-        log::info!(
-            "Matched with - \"{}\". Now searching for image...",
-            card.name
-        );
         let Ok(image) = self
             .http_client
             .get(&card.image_uris.png)
@@ -161,10 +158,10 @@ impl MTG {
             .expect("failed image request")
             .bytes()
             .await
-        else {
-            log::warn!("Failed to retrieve image bytes");
-            return None;
-        };
+            else {
+                log::warn!("Failed to retrieve image bytes");
+                return None;
+            };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
