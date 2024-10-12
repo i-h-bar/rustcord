@@ -9,8 +9,8 @@ use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::{Executor, Pool, Postgres, Row};
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -80,17 +80,15 @@ impl MTG {
             .card_regex
             .captures_iter(&msg.content)
             .filter_map(|capture| {
-                if let Some(name) = capture.get(1) {
-                    Some(self.find_card(name.as_str(), &msg, &ctx))
-                } else {
-                    None
-                }
+                let name = capture.get(1)?;
+                Some(self.find_card(name.as_str(), &msg, &ctx))
             })
             .collect();
 
         for new_card in join_all(futures).await {
             if let Some(card) = new_card {
                 self.card_cache.lock().await.insert(card);
+                log::info!("Local cache updated");
             }
         }
     }
@@ -107,10 +105,13 @@ impl MTG {
                 .bind(&normalised_name)
                 .fetch_one(&self.pg_pool)
                 .await
-                .expect("Couldn't find card in db even though it is in the card cache")
+                .ok()?
                 .get("png");
 
-            log::info!("Found '{normalised_name}' locally in {:.2?}", start.elapsed());
+            log::info!(
+                "Found '{normalised_name}' locally in {:.2?}",
+                start.elapsed()
+            );
             utils::send_image(&image, &format!("{queried_name}.png"), &msg, &ctx).await;
 
             None
@@ -120,7 +121,8 @@ impl MTG {
                     &format!("Couldn't find a card matching '{queried_name}'"),
                     &msg,
                     &ctx,
-                ).await;
+                )
+                .await;
                 return None;
             };
 
@@ -129,11 +131,16 @@ impl MTG {
                     &format!("Couldn't find a card matching '{queried_name}'"),
                     &msg,
                     &ctx,
-                ).await;
+                )
+                .await;
                 return None;
             };
 
-            log::info!("Found from '{}' from scryfall in {:.2?}", card.name, start.elapsed());
+            log::info!(
+                "Found '{}' from scryfall in {:.2?}",
+                card.name,
+                start.elapsed()
+            );
             utils::send_image(&image, &format!("{}.png", &card.name), &msg, &ctx).await;
             self.add_to_postgres(&card, &image).await;
 
@@ -142,7 +149,10 @@ impl MTG {
     }
 
     async fn search_scryfall_image(&self, card: &CardResponse) -> Option<Vec<u8>> {
-        log::info!("Matched with - \"{}\". Now searching for image...", card.name);
+        log::info!(
+            "Matched with - \"{}\". Now searching for image...",
+            card.name
+        );
         let Ok(image) = self
             .http_client
             .get(&card.image_uris.png)
@@ -151,10 +161,10 @@ impl MTG {
             .expect("failed image request")
             .bytes()
             .await
-            else {
-                log::warn!("Failed to retrieve image bytes");
-                return None;
-            };
+        else {
+            log::warn!("Failed to retrieve image bytes");
+            return None;
+        };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
@@ -178,7 +188,10 @@ impl MTG {
                 }
             }
         } else {
-            log::warn!("None 200 response from scryfall - {}", response.status().as_str());
+            log::warn!(
+                "None 200 response from scryfall - {}",
+                response.status().as_str()
+            );
             None
         }
     }
