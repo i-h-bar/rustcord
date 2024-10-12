@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct LegalitiesResponse {
     alchemy: String,
     brawl: String,
@@ -27,7 +27,7 @@ struct LegalitiesResponse {
     vintage: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub struct ImageURIResponse {
     art_crop: String,
     border_crop: String,
@@ -37,7 +37,7 @@ pub struct ImageURIResponse {
     small: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub struct CardResponse {
     pub(crate) artist: String,
     artist_ids: Vec<String>,

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::env;
 use std::time::Duration;
 
+use log;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
@@ -25,7 +26,8 @@ const SET_INSERT: &str =
     r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#;
 const CARD_INSERT: &str = r#"INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist) values (uuid($1), $2, $3, uuid($4), uuid($5), $6) ON CONFLICT DO NOTHING"#;
 
-const EXACT_MATCH: &str = r#"select png from cards join images on cards.image_id = images.id where cards.name = $1"#;
+const EXACT_MATCH: &str =
+    r#"select png from cards join images on cards.image_id = images.id where cards.name = $1"#;
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -90,7 +92,6 @@ impl MTG {
             if let Some(card) = new_card {
                 self.card_cache.lock().await.insert(card);
             }
-            println!("cache - {:#?}", self.card_cache)
         }
     }
 
@@ -98,12 +99,10 @@ impl MTG {
         let start = Instant::now();
 
         let normalised_name = queried_name.to_lowercase();
-        let contains = {
-            self.card_cache.lock().await.contains(&normalised_name)
-        };
+        let contains = { self.card_cache.lock().await.contains(&normalised_name) };
 
         if contains {
-            println!("Found exact match in cache!");
+            log::info!("Found exact match in cache for '{normalised_name}'!");
             let image = sqlx::query(EXACT_MATCH)
                 .bind(&normalised_name)
                 .fetch_one(&self.pg_pool)
@@ -111,16 +110,12 @@ impl MTG {
                 .expect("Couldn't find card in db even though it is in the card cache")
                 .get("png");
 
-            println!(
-                "Found '{}' locally in {:.2?}",
-                normalised_name,
-                start.elapsed()
-            );
-            utils::send_image(&image, &format!("{}.png", &queried_name), &msg, &ctx).await;
+            log::info!("Found '{normalised_name}' locally in {:.2?}", start.elapsed());
+            utils::send_image(&image, &format!("{queried_name}.png"), &msg, &ctx).await;
 
             None
         } else {
-            println!("Searching scryfall for \"{}\"", queried_name);
+            log::info!("Searching scryfall for '{queried_name}'");
             let response = self
                 .http_client
                 .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
@@ -132,23 +127,22 @@ impl MTG {
                 match response.json::<CardResponse>().await {
                     Ok(response) => response,
                     Err(why) => {
-                        println!("Error getting card from scryfall - {why:?}");
+                        log::warn!("Error getting card from scryfall - {why:?}");
                         return None;
                     }
                 }
             } else {
-                println!("Error from response {}", response.status().as_str());
+                log::warn!("Error from response {}", response.status().as_str());
                 utils::send(
-                    &format!("Couldn't find a card matching '{}'", queried_name), &msg, &ctx,
-                ).await;
+                    &format!("Couldn't find a card matching '{queried_name}'"),
+                    &msg,
+                    &ctx,
+                )
+                    .await;
                 return None;
             };
 
-            println!(
-                "Matched with - \"{}\". Now searching for image...",
-                card.name
-            );
-
+            log::info!("Matched with - \"{}\". Now searching for image...", card.name);
             let Ok(image) = self
                 .http_client
                 .get(&card.image_uris.png)
@@ -158,17 +152,13 @@ impl MTG {
                 .bytes()
                 .await
                 else {
-                    println!("Failed to retrieve image bytes");
+                    log::warn!("Failed to retrieve image bytes");
                     return None;
                 };
-            println!("Image found for - \"{}\".", &card.name);
+            log::info!("Image found for - \"{}\".", &card.name);
             let image = image.to_vec();
 
-            println!(
-                "Found from '{}' from scryfall in {:.2?}",
-                card.name,
-                start.elapsed()
-            );
+            log::info!("Found from '{}' from scryfall in {:.2?}", card.name, start.elapsed());
             utils::send_image(&image, &format!("{}.png", &card.name), &msg, &ctx).await;
             self.add_to_postgres(&card, &image).await;
 
@@ -184,7 +174,7 @@ impl MTG {
             .execute(&self.pg_pool)
             .await
         {
-            println!("Failed images insert - {why}")
+            log::warn!("Failed images insert - {why}")
         };
 
         if let Err(why) = sqlx::query(SET_INSERT)
@@ -194,7 +184,7 @@ impl MTG {
             .execute(&self.pg_pool)
             .await
         {
-            println!("Failed set insert - {why}")
+            log::warn!("Failed set insert - {why}")
         };
 
         if let Err(why) = sqlx::query(CARD_INSERT)
@@ -207,7 +197,7 @@ impl MTG {
             .execute(&self.pg_pool)
             .await
         {
-            println!("Failed card insert - {why}")
+            log::warn!("Failed card insert - {why}")
         };
     }
 }

@@ -4,7 +4,7 @@ extern crate core;
 use std::env;
 
 use dotenv::dotenv;
-use serenity::all::{GatewayIntents, Message};
+use serenity::all::{GatewayIntents, Message, Ready};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
@@ -38,11 +38,16 @@ impl EventHandler for Handler {
             self.mtg.find_cards(&msg, &ctx).await;
         }
     }
+
+    async fn ready(&self, _: Context, _: Ready) {
+        log::info!("Bot ready!")
+    }
 }
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    env_logger::init();
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
@@ -55,6 +60,6 @@ async fn main() {
         .expect("Error creating client");
 
     if let Err(why) = client.start().await {
-        println!("Error starting client - {why:?}")
+        log::error!("Error starting client - {why:?}")
     }
 }
