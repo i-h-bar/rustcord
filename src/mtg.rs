@@ -115,54 +115,71 @@ impl MTG {
 
             None
         } else {
-            log::info!("Searching scryfall for '{queried_name}'");
-            let response = self
-                .http_client
-                .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
-                .send()
-                .await
-                .expect("Failed request");
-
-            let card = if response.status().is_success() {
-                match response.json::<CardResponse>().await {
-                    Ok(response) => response,
-                    Err(why) => {
-                        log::warn!("Error getting card from scryfall - {why:?}");
-                        return None;
-                    }
-                }
-            } else {
-                log::warn!("Error from response {}", response.status().as_str());
+            let Some(card) = self.search_scryfall_card_data(&queried_name).await else {
                 utils::send(
                     &format!("Couldn't find a card matching '{queried_name}'"),
                     &msg,
                     &ctx,
-                )
-                    .await;
+                ).await;
                 return None;
             };
 
-            log::info!("Matched with - \"{}\". Now searching for image...", card.name);
-            let Ok(image) = self
-                .http_client
-                .get(&card.image_uris.png)
-                .send()
-                .await
-                .expect("failed image request")
-                .bytes()
-                .await
-                else {
-                    log::warn!("Failed to retrieve image bytes");
-                    return None;
-                };
-            log::info!("Image found for - \"{}\".", &card.name);
-            let image = image.to_vec();
+            let Some(image) = self.search_scryfall_image(&card).await else {
+                utils::send(
+                    &format!("Couldn't find a card matching '{queried_name}'"),
+                    &msg,
+                    &ctx,
+                ).await;
+                return None;
+            };
 
             log::info!("Found from '{}' from scryfall in {:.2?}", card.name, start.elapsed());
             utils::send_image(&image, &format!("{}.png", &card.name), &msg, &ctx).await;
             self.add_to_postgres(&card, &image).await;
 
             Some(card.name.to_lowercase())
+        }
+    }
+
+    async fn search_scryfall_image(&self, card: &CardResponse) -> Option<Vec<u8>> {
+        log::info!("Matched with - \"{}\". Now searching for image...", card.name);
+        let Ok(image) = self
+            .http_client
+            .get(&card.image_uris.png)
+            .send()
+            .await
+            .expect("failed image request")
+            .bytes()
+            .await
+            else {
+                log::warn!("Failed to retrieve image bytes");
+                return None;
+            };
+
+        log::info!("Image found for - \"{}\".", &card.name);
+        Some(image.to_vec())
+    }
+
+    async fn search_scryfall_card_data(&self, queried_name: &str) -> Option<CardResponse> {
+        log::info!("Searching scryfall for '{queried_name}'");
+        let response = self
+            .http_client
+            .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
+            .send()
+            .await
+            .expect("Failed request");
+
+        if response.status().is_success() {
+            match response.json::<CardResponse>().await {
+                Ok(response) => Some(response),
+                Err(why) => {
+                    log::warn!("Error getting card from scryfall - {why:?}");
+                    None
+                }
+            }
+        } else {
+            log::warn!("None 200 response from scryfall - {}", response.status().as_str());
+            None
         }
     }
 
