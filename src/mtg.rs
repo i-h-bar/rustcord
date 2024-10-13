@@ -9,14 +9,15 @@ use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::postgres::PgPoolOptions;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::mtg::response::CardResponse;
 use crate::utils;
+use crate::utils::fuzzy;
 
 mod response;
 
@@ -96,8 +97,7 @@ impl MTG {
             .card_regex
             .captures_iter(&msg)
             .filter_map(|capture| {
-                let name = capture.get(1)?;
-                Some(self.find_card(name.as_str()))
+                Some(self.find_card(capture.get(1)?.as_str()))
             })
             .collect();
 
@@ -111,52 +111,67 @@ impl MTG {
         let contains = { self.card_cache.lock().await.contains(&normalised_name) };
         if contains {
             log::info!("Found exact match in cache for '{normalised_name}'!");
-            let image = sqlx::query(EXACT_MATCH)
-                .bind(&normalised_name)
-                .fetch_one(&self.pg_pool)
-                .await
-                .ok()?
-                .get("png");
+            let image = self.fetch_local(&normalised_name).await?;
 
             log::info!(
                 "Found '{normalised_name}' locally in {:.2?}",
                 start.elapsed()
             );
 
-            Some(FoundCard {
+            return Some(FoundCard {
                 name: queried_name,
                 image,
                 new_card_info: None,
-            })
-        } else {
-            let card = self.search_scryfall_card_data(&queried_name).await?;
+            });
+        };
 
-            log::info!(
+        {
+            let cache = &*self.card_cache.lock().await;
+            let (matched, score) = fuzzy::best_match(&normalised_name, &*cache);
+            if score < 5 {
+                log::info!("Found a fuzzy in cache - '{}'", matched);
+                let image = self.fetch_local(&matched).await?;
+                log::info!(
+                "Found '{matched}' fuzzily in {:.2?}",
+                start.elapsed()
+            );
+
+                return Some(FoundCard {
+                    name: queried_name,
+                    image,
+                    new_card_info: None,
+                });
+            }
+        };
+
+
+        let card = self.search_scryfall_card_data(&queried_name).await?;
+
+        log::info!(
                 "Matched with - \"{}\". Now searching for image...",
                 card.name
             );
-            let image = self.search_scryfall_image(&card).await?;
+        let image = self.search_scryfall_image(&card).await?;
 
-            log::info!(
+        log::info!(
                 "Found '{}' from scryfall in {:.2?}",
                 card.name,
                 start.elapsed()
             );
 
-            Some(FoundCard {
-                name: queried_name,
-                image,
-                new_card_info: Some(CardInfo {
-                    id: card.id,
-                    name: card.name,
-                    set_name: card.set_name,
-                    set_code: card.set,
-                    set_id: card.set_id,
-                    artist: card.artist,
-                    flavour_text: card.flavor_text,
-                }),
-            })
-        }
+        Some(FoundCard {
+            name: queried_name,
+            image,
+            new_card_info: Some(CardInfo {
+                id: card.id,
+                name: card.name,
+                set_name: card.set_name,
+                set_code: card.set,
+                set_id: card.set_id,
+                artist: card.artist,
+                flavour_text: card.flavor_text,
+            }),
+        })
     }
 
     async fn search_scryfall_image(&self, card: &CardResponse) -> Option<Vec<u8>> {
@@ -168,10 +183,10 @@ impl MTG {
             .ok()?
             .bytes()
             .await
-        else {
-            log::warn!("Failed to retrieve image bytes");
-            return None;
-        };
+            else {
+                log::warn!("Failed to retrieve image bytes");
+                return None;
+            };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
@@ -237,7 +252,16 @@ impl MTG {
             log::warn!("Failed card insert - {why}")
         };
 
-        log::info!("Added {} to postrgres", card.name)
+        log::info!("Added {} to postgres", card.name)
+    }
+
+    async fn fetch_local(&self, matched: &str) -> Option<Vec<u8>> {
+        sqlx::query(EXACT_MATCH)
+            .bind(&matched)
+            .fetch_one(&self.pg_pool)
+            .await
+            .ok()?
+            .get("png")
     }
 
     pub async fn update_local_cache(&self, card: &CardInfo) {

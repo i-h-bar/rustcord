@@ -1,3 +1,5 @@
+pub(crate) mod fuzzy;
+
 use log;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 
