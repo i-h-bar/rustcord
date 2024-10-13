@@ -9,8 +9,8 @@ use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::{Executor, Pool, Postgres, Row};
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -96,9 +96,7 @@ impl MTG {
         let futures: Vec<_> = self
             .card_regex
             .captures_iter(&msg)
-            .filter_map(|capture| {
-                Some(self.find_card(capture.get(1)?.as_str()))
-            })
+            .filter_map(|capture| Some(self.find_card(capture.get(1)?.as_str())))
             .collect();
 
         join_all(futures).await
@@ -131,10 +129,7 @@ impl MTG {
             if score < 5 {
                 log::info!("Found a fuzzy in cache - '{}'", matched);
                 let image = self.fetch_local(&matched).await?;
-                log::info!(
-                "Found '{matched}' fuzzily in {:.2?}",
-                start.elapsed()
-            );
+                log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
                 return Some(FoundCard {
                     name: queried_name,
@@ -144,20 +139,19 @@ impl MTG {
             }
         };
 
-
         let card = self.search_scryfall_card_data(&queried_name).await?;
 
         log::info!(
-                "Matched with - \"{}\". Now searching for image...",
-                card.name
-            );
+            "Matched with - \"{}\". Now searching for image...",
+            card.name
+        );
         let image = self.search_scryfall_image(&card).await?;
 
         log::info!(
-                "Found '{}' from scryfall in {:.2?}",
-                card.name,
-                start.elapsed()
-            );
+            "Found '{}' from scryfall in {:.2?}",
+            card.name,
+            start.elapsed()
+        );
 
         Some(FoundCard {
             name: queried_name,
@@ -183,10 +177,10 @@ impl MTG {
             .ok()?
             .bytes()
             .await
-            else {
-                log::warn!("Failed to retrieve image bytes");
-                return None;
-            };
+        else {
+            log::warn!("Failed to retrieve image bytes");
+            return None;
+        };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
@@ -212,7 +206,8 @@ impl MTG {
         } else {
             log::warn!(
                 "None 200 response from scryfall: {} when searching for '{}'",
-                response.status().as_str(), queried_name
+                response.status().as_str(),
+                queried_name
             );
             None
         }
