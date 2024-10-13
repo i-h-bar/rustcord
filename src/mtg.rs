@@ -39,8 +39,8 @@ pub struct CardInfo {
     flavour_text: Option<String>,
 }
 
-pub struct FoundCard {
-    pub name: String,
+pub struct FoundCard<'a> {
+    pub name: &'a str,
     pub new_card_info: Option<CardInfo>,
     pub image: Vec<u8>,
 }
@@ -91,7 +91,7 @@ impl MTG {
         }
     }
 
-    pub async fn find_cards(&self, msg: &str) -> Vec<Option<FoundCard>> {
+    pub async fn find_cards<'a>(&'a self, msg: &'a str) -> Vec<Option<FoundCard<'a>>> {
         let futures: Vec<_> = self
             .card_regex
             .captures_iter(&msg)
@@ -104,7 +104,7 @@ impl MTG {
         join_all(futures).await
     }
 
-    async fn find_card(&self, queried_name: &str) -> Option<FoundCard> {
+    async fn find_card<'a>(&'a self, queried_name: &'a str) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
         let normalised_name = queried_name.to_lowercase();
@@ -124,22 +124,18 @@ impl MTG {
             );
 
             Some(FoundCard {
-                name: queried_name.to_string(),
+                name: queried_name,
                 image,
                 new_card_info: None,
             })
         } else {
-            let Some(card) = self.search_scryfall_card_data(&queried_name).await else {
-                return None;
-            };
+            let card = self.search_scryfall_card_data(&queried_name).await?;
 
             log::info!(
                 "Matched with - \"{}\". Now searching for image...",
                 card.name
             );
-            let Some(image) = self.search_scryfall_image(&card).await else {
-                return None;
-            };
+            let image = self.search_scryfall_image(&card).await?;
 
             log::info!(
                 "Found '{}' from scryfall in {:.2?}",
@@ -148,7 +144,7 @@ impl MTG {
             );
 
             Some(FoundCard {
-                name: card.name.to_lowercase(),
+                name: queried_name,
                 image,
                 new_card_info: Some(CardInfo {
                     id: card.id,
@@ -169,7 +165,7 @@ impl MTG {
             .get(&card.image_uris.png)
             .send()
             .await
-            .expect("failed image request")
+            .ok()?
             .bytes()
             .await
         else {
@@ -188,7 +184,7 @@ impl MTG {
             .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
             .send()
             .await
-            .expect("Failed request");
+            .ok()?;
 
         if response.status().is_success() {
             match response.json::<CardResponse>().await {
@@ -200,8 +196,8 @@ impl MTG {
             }
         } else {
             log::warn!(
-                "None 200 response from scryfall - {}",
-                response.status().as_str()
+                "None 200 response from scryfall: {} when searching for '{}'",
+                response.status().as_str(), queried_name
             );
             None
         }
@@ -245,7 +241,10 @@ impl MTG {
     }
 
     pub async fn update_local_cache(&self, card: &CardInfo) {
-        self.card_cache.lock().await.insert(card.name.to_lowercase());
+        self.card_cache
+            .lock()
+            .await
+            .insert(card.name.to_lowercase());
         log::info!("Added '{}' to local cache", card.name);
     }
 }

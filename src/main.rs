@@ -37,16 +37,17 @@ impl EventHandler for Handler {
         } else {
             for card in self.mtg.find_cards(&msg.content).await {
                 match card {
-                    None => { utils::send("Failed to find card :(", &msg, &ctx).await }
+                    None => utils::send("Failed to find card :(", &msg, &ctx).await,
                     Some(card) => {
-                        utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx).await;
+                        utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx)
+                            .await;
                         if let Some(card_info) = card.new_card_info {
                             self.mtg.add_to_postgres(&card_info, &card.image).await;
                             self.mtg.update_local_cache(&card_info).await;
                         }
                     }
                 }
-            };
+            }
         }
     }
 
@@ -65,7 +66,7 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     let handler = Handler::new().await;
-    let mut client = serenity::Client::builder(&token, intents)
+    let mut client = Client::builder(&token, intents)
         .event_handler(handler)
         .await
         .expect("Error creating client");
