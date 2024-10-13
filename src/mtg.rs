@@ -75,25 +75,29 @@ impl MTG {
         }
     }
 
-    pub async fn find_cards(&self, msg: &Message, ctx: &Context) {
+    pub async fn find_cards(&self, msg: &Message) -> Vec<Vec<u8>> {
         let futures: Vec<_> = self
             .card_regex
             .captures_iter(&msg.content)
             .filter_map(|capture| {
                 let name = capture.get(1)?;
-                Some(self.find_card(name.as_str(), &msg, &ctx))
+                Some(self.find_card(name.as_str()))
             })
             .collect();
 
-        for new_card in join_all(futures).await {
-            if let Some(card) = new_card {
-                self.card_cache.lock().await.insert(card);
+        let card_images: Vec<Vec<u8>> = Vec::with_capacity(futures.len());
+
+        for result in join_all(futures).await {
+            if let Some((name, image)) = result {
+                self.card_cache.lock().await.insert(name);
                 log::info!("Local cache updated");
             }
         }
+
+        card_images
     }
 
-    async fn find_card(&self, queried_name: &str, msg: &Message, ctx: &Context) -> Option<String> {
+    async fn find_card(&self, queried_name: &str) -> Option<(String, Vec<u8>)> {
         let start = Instant::now();
 
         let normalised_name = queried_name.to_lowercase();
@@ -112,17 +116,10 @@ impl MTG {
                 "Found '{normalised_name}' locally in {:.2?}",
                 start.elapsed()
             );
-            utils::send_image(&image, &format!("{queried_name}.png"), &msg, &ctx).await;
 
-            None
+            Some(image)
         } else {
             let Some(card) = self.search_scryfall_card_data(&queried_name).await else {
-                utils::send(
-                    &format!("Couldn't find a card matching '{queried_name}'"),
-                    &msg,
-                    &ctx,
-                )
-                    .await;
                 return None;
             };
 
