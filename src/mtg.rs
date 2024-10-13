@@ -9,8 +9,8 @@ use serde::Deserialize;
 use serenity::all::Message;
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::{Executor, Pool, Postgres, Row};
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -28,6 +28,22 @@ const CARD_INSERT: &str = r#"INSERT INTO cards (id, name, flavour_text, set_id, 
 
 const EXACT_MATCH: &str =
     r#"select png from cards join images on cards.image_id = images.id where cards.name = $1"#;
+
+pub struct CardInfo {
+    id: String,
+    name: String,
+    set_id: String,
+    set_name: String,
+    set_code: String,
+    artist: String,
+    flavour_text: Option<String>,
+}
+
+pub struct FoundCard {
+    pub name: String,
+    pub new_card_info: Option<CardInfo>,
+    pub image: Vec<u8>,
+}
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -75,34 +91,24 @@ impl MTG {
         }
     }
 
-    pub async fn find_cards(&self, msg: &Message) -> Vec<Vec<u8>> {
+    pub async fn find_cards(&self, msg: &str) -> Vec<Option<FoundCard>> {
         let futures: Vec<_> = self
             .card_regex
-            .captures_iter(&msg.content)
+            .captures_iter(&msg)
             .filter_map(|capture| {
                 let name = capture.get(1)?;
                 Some(self.find_card(name.as_str()))
             })
             .collect();
 
-        let card_images: Vec<Vec<u8>> = Vec::with_capacity(futures.len());
-
-        for result in join_all(futures).await {
-            if let Some((name, image)) = result {
-                self.card_cache.lock().await.insert(name);
-                log::info!("Local cache updated");
-            }
-        }
-
-        card_images
+        join_all(futures).await
     }
 
-    async fn find_card(&self, queried_name: &str) -> Option<(String, Vec<u8>)> {
+    async fn find_card(&self, queried_name: &str) -> Option<FoundCard> {
         let start = Instant::now();
 
         let normalised_name = queried_name.to_lowercase();
         let contains = { self.card_cache.lock().await.contains(&normalised_name) };
-
         if contains {
             log::info!("Found exact match in cache for '{normalised_name}'!");
             let image = sqlx::query(EXACT_MATCH)
@@ -117,20 +123,21 @@ impl MTG {
                 start.elapsed()
             );
 
-            Some(image)
+            Some(FoundCard {
+                name: queried_name.to_string(),
+                image,
+                new_card_info: None,
+            })
         } else {
             let Some(card) = self.search_scryfall_card_data(&queried_name).await else {
                 return None;
             };
 
-            log::info!("Matched with - \"{}\". Now searching for image...", card.name);
+            log::info!(
+                "Matched with - \"{}\". Now searching for image...",
+                card.name
+            );
             let Some(image) = self.search_scryfall_image(&card).await else {
-                utils::send(
-                    &format!("Couldn't find a card matching '{queried_name}'"),
-                    &msg,
-                    &ctx,
-                )
-                    .await;
                 return None;
             };
 
@@ -139,10 +146,20 @@ impl MTG {
                 card.name,
                 start.elapsed()
             );
-            utils::send_image(&image, &format!("{}.png", &card.name), &msg, &ctx).await;
-            self.add_to_postgres(&card, &image).await;
 
-            Some(card.name.to_lowercase())
+            Some(FoundCard {
+                name: card.name.to_lowercase(),
+                image,
+                new_card_info: Some(CardInfo {
+                    id: card.id,
+                    name: card.name,
+                    set_name: card.set_name,
+                    set_code: card.set,
+                    set_id: card.set_id,
+                    artist: card.artist,
+                    flavour_text: card.flavor_text,
+                }),
+            })
         }
     }
 
@@ -155,10 +172,10 @@ impl MTG {
             .expect("failed image request")
             .bytes()
             .await
-            else {
-                log::warn!("Failed to retrieve image bytes");
-                return None;
-            };
+        else {
+            log::warn!("Failed to retrieve image bytes");
+            return None;
+        };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
@@ -190,7 +207,7 @@ impl MTG {
         }
     }
 
-    async fn add_to_postgres(&self, card: &CardResponse, image: &Vec<u8>) {
+    pub async fn add_to_postgres(&self, card: &CardInfo, image: &Vec<u8>) {
         let image_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(IMAGE_INSERT)
             .bind(&image_id)
@@ -204,7 +221,7 @@ impl MTG {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
             .bind(&card.set_name)
-            .bind(&card.set)
+            .bind(&card.set_code)
             .execute(&self.pg_pool)
             .await
         {
@@ -214,7 +231,7 @@ impl MTG {
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.id)
             .bind(&card.name.to_lowercase())
-            .bind(&card.flavor_text)
+            .bind(&card.flavour_text)
             .bind(&card.set_id)
             .bind(&image_id)
             .bind(&card.artist)
@@ -223,5 +240,12 @@ impl MTG {
         {
             log::warn!("Failed card insert - {why}")
         };
+
+        log::info!("Added {} to postrgres", card.name)
+    }
+
+    pub async fn update_local_cache(&self, card: &CardInfo) {
+        self.card_cache.lock().await.insert(card.name.to_lowercase());
+        log::info!("Added '{}' to local cache", card.name);
     }
 }

@@ -35,7 +35,18 @@ impl EventHandler for Handler {
         } else if msg.content == "!ping" {
             utils::send("Pong!", &msg, &ctx).await
         } else {
-            self.mtg.find_cards(&msg, &ctx).await;
+            for card in self.mtg.find_cards(&msg.content).await {
+                match card {
+                    None => { utils::send("Failed to find card :(", &msg, &ctx).await }
+                    Some(card) => {
+                        utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx).await;
+                        if let Some(card_info) = card.new_card_info {
+                            self.mtg.add_to_postgres(&card_info, &card.image).await;
+                            self.mtg.update_local_cache(&card_info).await;
+                        }
+                    }
+                }
+            };
         }
     }
 
