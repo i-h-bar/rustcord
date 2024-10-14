@@ -56,7 +56,7 @@ mod tests {
         let a = vec!["sitting".to_string(), "kitten".to_string()];
         let b = "sitting";
 
-        assert_eq!(best_match(&b, &a), (a.get(0).unwrap(), 0));
+        assert_eq!(best_match(&b, &a).unwrap(), (a.get(0).unwrap(), 0));
     }
 
     #[test]
@@ -64,7 +64,7 @@ mod tests {
         let a = vec!["sitting".to_string(), "kitten".to_string()];
         let b = "setting";
 
-        assert_eq!(best_match(&b, &a), (a.get(0).unwrap(), 1));
+        assert_eq!(best_match(&b, &a).unwrap(), (a.get(0).unwrap(), 1));
     }
 
     #[test]
@@ -74,6 +74,6 @@ mod tests {
         a.insert("kitten".to_string());
         let b = "setting";
 
-        assert_eq!(best_match(&b, &a), (&"sitting".to_string(), 1));
+        assert_eq!(best_match(&b, &a).unwrap(), (&"sitting".to_string(), 1));
     }
 }
