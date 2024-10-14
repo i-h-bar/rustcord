@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use log;
 use regex::Regex;
+use reqwest::{Error, Response};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serenity::all::Message;
@@ -13,6 +14,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
+use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 
 use crate::mtg::response::CardResponse;
@@ -49,6 +51,7 @@ pub struct FoundCard<'a> {
 pub struct MTG {
     http_client: reqwest::Client,
     card_regex: Regex,
+    punc_regex: Regex,
     pg_pool: Pool<Postgres>,
     card_cache: Mutex<HashSet<String>>,
 }
@@ -63,7 +66,8 @@ impl MTG {
             .build()
             .expect("Failed HTTP Client build");
 
-        let card_regex = Regex::new(r"\[\[(.*?)]]").expect("Invalid regex");
+        let card_regex = Regex::new(r#"\[\[(.*?)]]"#).expect("Invalid regex");
+        let punc_regex = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
 
         let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
         let pg_pool = PgPoolOptions::new()
@@ -87,6 +91,7 @@ impl MTG {
         Self {
             http_client,
             card_regex,
+            punc_regex,
             pg_pool,
             card_cache,
         }
@@ -105,7 +110,8 @@ impl MTG {
     async fn find_card<'a>(&'a self, queried_name: &'a str) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
-        let normalised_name = queried_name.to_lowercase();
+        let normalised_name = self.normalise_card_name(&queried_name);
+        log::info!("'{}' normalised to '{}'", queried_name, normalised_name);
         let contains = { self.card_cache.lock().await.contains(&normalised_name) };
         if contains {
             log::info!("Found exact match in cache for '{normalised_name}'!");
@@ -124,22 +130,25 @@ impl MTG {
         };
 
         {
-            let cache = &*self.card_cache.lock().await;
-            let (matched, score) = fuzzy::best_match(&normalised_name, &*cache);
-            if score < 5 {
-                log::info!("Found a fuzzy in cache - '{}'", matched);
-                let image = self.fetch_local(&matched).await?;
-                log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
+            let cache = self.card_cache.lock().await;
+            if let Some((matched, score)) = fuzzy::best_match(&normalised_name, &*cache) {
+                if score < 6 {
+                    log::info!("Found a fuzzy in cache - '{}' with a score of {}", matched, score);
+                    let image = self.fetch_local(&matched).await?;
+                    log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
-                return Some(FoundCard {
-                    name: queried_name,
-                    image,
-                    new_card_info: None,
-                });
+                    return Some(FoundCard {
+                        name: queried_name,
+                        image,
+                        new_card_info: None,
+                    });
+                } else {
+                    log::info!("Could not find a fuzzy match for '{}'", normalised_name);
+                }
             }
         };
 
-        let card = self.search_scryfall_card_data(&queried_name).await?;
+        let card = self.search_scryfall_card_data(&normalised_name).await?;
 
         log::info!(
             "Matched with - \"{}\". Now searching for image...",
@@ -169,12 +178,19 @@ impl MTG {
     }
 
     async fn search_scryfall_image(&self, card: &CardResponse) -> Option<Vec<u8>> {
-        let Ok(image) = self
-            .http_client
-            .get(&card.image_uris.png)
-            .send()
-            .await
-            .ok()?
+        let Ok(image) = {
+            match self
+                .http_client
+                .get(&card.image_uris.png)
+                .send()
+                .await {
+                Ok(response) => response,
+                Err(why) => {
+                    log::warn!("Error grabbing image for '{}' because: {}", card.name, why);
+                    return None
+                }
+            }
+        }
             .bytes()
             .await
         else {
@@ -188,12 +204,17 @@ impl MTG {
 
     async fn search_scryfall_card_data(&self, queried_name: &str) -> Option<CardResponse> {
         log::info!("Searching scryfall for '{queried_name}'");
-        let response = self
+        let response = match self
             .http_client
             .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
             .send()
-            .await
-            .ok()?;
+            .await {
+            Ok(response) => response,
+            Err(why) => {
+                log::warn!("Error searching for '{}' because: {}", queried_name, why);
+                return None
+            }
+        };
 
         if response.status().is_success() {
             match response.json::<CardResponse>().await {
@@ -236,7 +257,7 @@ impl MTG {
 
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.id)
-            .bind(&card.name.to_lowercase())
+            .bind(&self.normalise_card_name(&card.name))
             .bind(&card.flavour_text)
             .bind(&card.set_id)
             .bind(&image_id)
@@ -263,7 +284,11 @@ impl MTG {
         self.card_cache
             .lock()
             .await
-            .insert(card.name.to_lowercase());
+            .insert(self.normalise_card_name(&card.name));
         log::info!("Added '{}' to local cache", card.name);
+    }
+
+    fn normalise_card_name(&self, name: &str) -> String {
+        self.punc_regex.replace(&name.nfkc().collect::<String>(), "").to_lowercase()
     }
 }

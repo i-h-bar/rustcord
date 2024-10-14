@@ -31,7 +31,7 @@ pub fn lev(a: &str, b: &str) -> usize {
 pub fn best_match<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
     a: &str,
     items: &'a I,
-) -> (&'a String, usize) {
+) -> Option<(&'a String, usize)> {
     items
         .par_iter()
         .map(|item: &String| {
@@ -39,7 +39,6 @@ pub fn best_match<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
             (item, dist)
         })
         .min_by(|(_, x), (_, y)| x.cmp(y))
-        .unwrap()
 }
 
 #[cfg(test)]
