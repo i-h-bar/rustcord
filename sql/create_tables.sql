@@ -60,3 +60,5 @@ create table cards(
     rules_id uuid references rules(id),
     artist varchar(50)
 );
+
+create extension pg_trgm;
