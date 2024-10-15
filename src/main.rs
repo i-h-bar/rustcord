@@ -10,7 +10,7 @@ use serenity::client::EventHandler;
 use serenity::prelude::*;
 use sqlx::{Executor, Row};
 
-use crate::mtg::MTG;
+use crate::mtg::search::MTG;
 
 mod mtg;
 mod utils;
