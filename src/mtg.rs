@@ -131,7 +131,7 @@ impl MTG {
 
         {
             let cache = self.card_cache.lock().await;
-            if let Some((matched, score)) = fuzzy::best_match(&normalised_name, &*cache) {
+            if let Some((matched, score)) = fuzzy::best_match_lev(&normalised_name, &*cache) {
                 if score < 6 {
                     log::info!("Found a fuzzy in cache - '{}' with a score of {}", matched, score);
                     let image = self.fetch_local(&matched).await?;
