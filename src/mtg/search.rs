@@ -10,14 +10,14 @@ use serde::Deserialize;
 use serenity::all::{Cache, Message};
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::postgres::PgPoolOptions;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
-use crate::mtg::{ImageURIs, Scryfall};
 
+use crate::mtg::{CardFace, ImageURIs, Legalities, Scryfall};
 use crate::utils;
 use crate::utils::fuzzy;
 
@@ -46,16 +46,99 @@ select png from cardsjoin images on cards.image_id = images.id where cards.name 
 "#;
 
 
+pub struct NewCardInfo {
+    card_id: String,
+    image_id: Uuid,
+    rules_id: Uuid,
+    legalities_id: Uuid,
+    name: String,
+    flavour_text: Option<String>,
+    set_id: String,
+    set_name: String,
+    set_code: String,
+    artist: String,
+    legalities: Legalities,
+    colour_identity: Vec<String>,
+    mana_cost: Option<String>,
+    cmc: f32,
+    power: Option<String>,
+    toughness: Option<String>,
+    loyalty: Option<String>,
+    defence: Option<String>,
+    type_line: String,
+    oracle_text: Option<String>,
+    keywords: Option<Vec<String>>,
+}
+
+impl NewCardInfo {
+    fn from_scryfall(card: Scryfall, face: Option<usize>) -> Option<Self> {
+        match face {
+            Some(face) => {
+                let faces = card.card_faces.clone()?;
+                let face = faces.get(face)?;
+
+                Some(Self {
+                    card_id: Uuid::new_v4().to_string(),
+                    image_id: Uuid::new_v4(),
+                    rules_id: Uuid::new_v4(),
+                    legalities_id: Uuid::new_v4(),
+                    name: utils::normalise(&face.name),
+                    flavour_text: face.flavor_text.to_owned(),
+                    set_id: card.set_id,
+                    set_name: card.set_name,
+                    set_code: card.set,
+                    artist: face.artist.to_string(),
+                    legalities: card.legalities,
+                    colour_identity: card.color_identity,
+                    mana_cost: face.mana_cost.to_owned(),
+                    cmc: card.cmc,
+                    power: face.power.to_owned(),
+                    toughness: face.toughness.to_owned(),
+                    loyalty: face.loyalty.to_owned(),
+                    defence: face.defence.to_owned(),
+                    type_line: face.type_line.to_string(),
+                    oracle_text: face.oracle_text.to_owned(),
+                    keywords: face.keywords.to_owned(),
+                })
+            }
+            None => {
+                Some(Self {
+                    card_id: card.id,
+                    image_id: Uuid::new_v4(),
+                    rules_id: Uuid::new_v4(),
+                    legalities_id: Uuid::new_v4(),
+                    name: utils::normalise(&card.name),
+                    flavour_text: card.flavor_text,
+                    set_id: card.set_id,
+                    set_name: card.set_name,
+                    set_code: card.set,
+                    artist: card.artist,
+                    legalities: card.legalities,
+                    colour_identity: card.color_identity,
+                    mana_cost: card.mana_cost,
+                    cmc: card.cmc,
+                    power: card.power,
+                    toughness: card.toughness,
+                    loyalty: card.loyalty,
+                    defence: card.defence,
+                    type_line: card.type_line,
+                    oracle_text: card.oracle_text,
+                    keywords: card.keywords,
+                })
+            }
+        }
+    }
+}
+
 pub struct FoundCard<'a> {
     pub name: &'a str,
-    pub new_card_info: Option<Scryfall>,
+    pub new_card_info: Option<NewCardInfo>,
     pub image: Vec<u8>,
 }
 
 pub struct MTG {
     http_client: reqwest::Client,
     card_regex: Regex,
-    punc_regex: Regex,
     pg_pool: Pool<Postgres>,
     card_cache: Mutex<HashSet<String>>,
 }
@@ -71,7 +154,6 @@ impl MTG {
             .expect("Failed HTTP Client build");
 
         let card_regex = Regex::new(r#"\[\[(.*?)]]"#).expect("Invalid regex");
-        let punc_regex = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
 
         let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
         let pg_pool = PgPoolOptions::new()
@@ -95,7 +177,6 @@ impl MTG {
         Self {
             http_client,
             card_regex,
-            punc_regex,
             pg_pool,
             card_cache,
         }
@@ -114,7 +195,7 @@ impl MTG {
     async fn find_card<'a>(&'a self, queried_name: &'a str) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
-        let normalised_name = self.normalise_card_name(&queried_name);
+        let normalised_name = utils::normalise(&queried_name);
         log::info!("'{}' normalised to '{}'", queried_name, normalised_name);
         let contains = { self.card_cache.lock().await.contains(&normalised_name) };
         if contains {
@@ -153,28 +234,54 @@ impl MTG {
         };
 
         let card = self.search_scryfall_card_data(&normalised_name).await?;
+        match &card.card_faces {
+            Some(card_faces) => {
+                let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
+                let face_1 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(1)?;
 
-        log::info!(
-            "Matched with - \"{}\". Now searching for image...",
-            card.name
-        );
-        let image = self.search_scryfall_image(&card, &queried_name).await?;
+                let lev_0 = fuzzy::lev(&queried_name, &face_0.name);
+                let lev_1 = fuzzy::lev(&queried_name, &face_1.name);
 
-        log::info!(
-            "Found '{}' from scryfall in {:.2?}",
-            card.name,
-            start.elapsed()
-        );
+                let (image, face) = if lev_0 < lev_1 {
+                    (self.search_single_faced_image(&card, &face_0.image_uris).await?, 0)
+                } else {
+                    (self.search_single_faced_image(&card, &face_1.image_uris).await?, 1)
+                };
+                log::info!(
+                    "Found '{}' from scryfall in {:.2?}",
+                    card.name,
+                    start.elapsed()
+                );
 
-        Some(FoundCard {
-            name: queried_name,
-            image,
-            new_card_info: Some(card),
-        })
+                Some(FoundCard {
+                    name: queried_name,
+                    image,
+                    new_card_info: Some(NewCardInfo::from_scryfall(card, Some(face))?),
+                })
+            }
+            None => {
+                log::info!(
+                    "Matched with - \"{}\". Now searching for image...",
+                    card.name
+                );
+                let image = self.search_single_faced_image(&card, card.image_uris.as_ref()?).await?;
+                log::info!(
+                    "Found '{}' from scryfall in {:.2?}",
+                    card.name,
+                    start.elapsed()
+                );
+
+                Some(FoundCard {
+                    name: queried_name,
+                    image,
+                    new_card_info: Some(NewCardInfo::from_scryfall(card, None)?),
+                })
+            }
+        }
     }
 
     async fn search_single_faced_image(
-        &self, card: &Scryfall, image_uris: &ImageURIs
+        &self, card: &Scryfall, image_uris: &ImageURIs,
     ) -> Option<Vec<u8>> {
         let Ok(image) = {
             match self
@@ -185,7 +292,7 @@ impl MTG {
                 Ok(response) => response,
                 Err(why) => {
                     log::warn!("Error grabbing image for '{}' because: {}", card.name, why);
-                    return None
+                    return None;
                 }
             }
         }
@@ -200,21 +307,14 @@ impl MTG {
         Some(image.to_vec())
     }
 
-    async fn search_dual_faced_image(&self, card: &Scryfall, queried_name: &str) -> Option<Vec<u8>> {
+    async fn search_dual_faced_image<'a>(&'a self, card: &'a Scryfall, queried_name: &str) -> Option<(Vec<u8>, &'a CardFace)> {
         let lev_0 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(0)?.name);
         let lev_1 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(1)?.name);
 
         if lev_0 < lev_1 {
-            self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(0)?.image_uris).await
+            Some((self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(0)?.image_uris).await?, card.card_faces.as_ref()?.get(0)?))
         } else {
-            self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(1)?.image_uris).await
-        }
-    }
-
-    async fn search_scryfall_image(&self, card: &Scryfall, queried_name: &str) -> Option<Vec<u8>> {
-        match &card.image_uris {
-            Some(image_uris) => { self.search_single_faced_image(&card, &image_uris).await }
-            None => { self.search_dual_faced_image(&card, &queried_name).await }
+            Some((self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(1)?.image_uris).await?, card.card_faces.as_ref()?.get(1)?))
         }
     }
 
@@ -228,7 +328,7 @@ impl MTG {
             Ok(response) => response,
             Err(why) => {
                 log::warn!("Error searching for '{}' because: {}", queried_name, why);
-                return None
+                return None;
             }
         };
 
@@ -250,7 +350,7 @@ impl MTG {
         }
     }
 
-    pub async fn add_to_postgres(&self, card: &Scryfall, image: &Vec<u8>) {
+    pub async fn add_to_postgres(&self, card: &NewCardInfo, image: &Vec<u8>) {
         let legalities_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(LEGALITIES_INSERT)
             .bind(&legalities_id)
@@ -284,7 +384,7 @@ impl MTG {
         let rules_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
-            .bind(&card.color_identity)
+            .bind(&card.colour_identity)
             .bind(&card.cmc)
             .bind(&card.power)
             .bind(&card.toughness)
@@ -314,7 +414,7 @@ impl MTG {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
             .bind(&card.set_name)
-            .bind(&card.set)
+            .bind(&card.set_code)
             .execute(&self.pg_pool)
             .await
         {
@@ -322,9 +422,9 @@ impl MTG {
         };
 
         if let Err(why) = sqlx::query(CARD_INSERT)
-            .bind(&card.id)
-            .bind(&self.normalise_card_name(&card.name))
-            .bind(&card.flavor_text)
+            .bind(&card.card_id)
+            .bind(&card.name)
+            .bind(&card.flavour_text)
             .bind(&card.set_id)
             .bind(&image_id)
             .bind(&card.artist)
@@ -347,15 +447,11 @@ impl MTG {
             .get("png")
     }
 
-    pub async fn update_local_cache(&self, card: &Scryfall) {
+    pub async fn update_local_cache(&self, card: &NewCardInfo) {
         self.card_cache
             .lock()
             .await
-            .insert(self.normalise_card_name(&card.name));
+            .insert(card.name.to_string());
         log::info!("Added '{}' to local cache", card.name);
-    }
-
-    fn normalise_card_name(&self, name: &str) -> String {
-        self.punc_regex.replace(&name.nfkc().collect::<String>(), "").to_lowercase()
     }
 }

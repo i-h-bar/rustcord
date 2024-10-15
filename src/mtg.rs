@@ -29,7 +29,7 @@ struct Legalities {
     vintage: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct ImageURIs {
     art_crop: String,
     border_crop: String,
@@ -39,13 +39,13 @@ struct ImageURIs {
     small: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct CardFace {
     object: String,
     name: String,
-    mana_cost: String,
+    mana_cost: Option<String>,
     type_line: String,
-    oracle_text: String,
+    oracle_text: Option<String>,
     colors: Vec<String>,
     defence: Option<String>,
     power: Option<String>,
@@ -54,6 +54,8 @@ struct CardFace {
     artist: String,
     artist_id: String,
     illustration_id: String,
+    flavor_text: Option<String>,
+    keywords: Option<Vec<String>>,
     image_uris: ImageURIs
 }
 
@@ -85,7 +87,7 @@ pub struct Scryfall {
     illustration_id: Option<String>,
     image_status: String,
     image_uris: Option<ImageURIs>,
-    keywords: Vec<String>,
+    keywords: Option<Vec<String>>,
     lang: String,
     layout: String,
     legalities: Legalities,
