@@ -16,7 +16,7 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
-use crate::mtg::{ImageURIResponse, Scryfall};
+use crate::mtg::{ImageURIs, Scryfall};
 
 use crate::utils;
 use crate::utils::fuzzy;
@@ -158,7 +158,7 @@ impl MTG {
             "Matched with - \"{}\". Now searching for image...",
             card.name
         );
-        let image = self.search_scryfall_image(&card).await?;
+        let image = self.search_scryfall_image(&card, &queried_name).await?;
 
         log::info!(
             "Found '{}' from scryfall in {:.2?}",
@@ -174,7 +174,7 @@ impl MTG {
     }
 
     async fn search_single_faced_image(
-        &self, card: &Scryfall, image_uris: &ImageURIResponse
+        &self, card: &Scryfall, image_uris: &ImageURIs
     ) -> Option<Vec<u8>> {
         let Ok(image) = {
             match self
@@ -200,14 +200,21 @@ impl MTG {
         Some(image.to_vec())
     }
 
-    async fn search_dual_faced_image(&self, card: &Scryfall) -> Option<Vec<u8>> {
-        None
+    async fn search_dual_faced_image(&self, card: &Scryfall, queried_name: &str) -> Option<Vec<u8>> {
+        let lev_0 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(0)?.name);
+        let lev_1 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(1)?.name);
+
+        if lev_0 < lev_1 {
+            self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(0)?.image_uris).await
+        } else {
+            self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(1)?.image_uris).await
+        }
     }
 
-    async fn search_scryfall_image(&self, card: &Scryfall) -> Option<Vec<u8>> {
+    async fn search_scryfall_image(&self, card: &Scryfall, queried_name: &str) -> Option<Vec<u8>> {
         match &card.image_uris {
             Some(image_uris) => { self.search_single_faced_image(&card, &image_uris).await }
-            None => { self.search_dual_faced_image(&card).await }
+            None => { self.search_dual_faced_image(&card, &queried_name).await }
         }
     }
 

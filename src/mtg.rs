@@ -4,7 +4,7 @@ use serde::Deserialize;
 pub mod search;
 
 #[derive(Deserialize)]
-struct LegalitiesResponse {
+struct Legalities {
     alchemy: String,
     brawl: String,
     commander: String,
@@ -30,7 +30,7 @@ struct LegalitiesResponse {
 }
 
 #[derive(Deserialize)]
-struct ImageURIResponse {
+struct ImageURIs {
     art_crop: String,
     border_crop: String,
     large: String,
@@ -40,12 +40,31 @@ struct ImageURIResponse {
 }
 
 #[derive(Deserialize)]
+struct CardFace {
+    object: String,
+    name: String,
+    mana_cost: String,
+    type_line: String,
+    oracle_text: String,
+    colors: Vec<String>,
+    defence: Option<String>,
+    power: Option<String>,
+    toughness: Option<String>,
+    loyalty: Option<String>,
+    artist: String,
+    artist_id: String,
+    illustration_id: String,
+    image_uris: ImageURIs
+}
+
+#[derive(Deserialize)]
 pub struct Scryfall {
     artist: String,
     artist_ids: Vec<String>,
     booster: bool,
     border_color: String,
     card_back_id: Option<String>,
+    card_faces: Option<Vec<CardFace>>,
     cardmarket_id: Option<u32>,
     cmc: f32,
     collector_number: String,
@@ -65,11 +84,11 @@ pub struct Scryfall {
     id: String,
     illustration_id: Option<String>,
     image_status: String,
-    image_uris: Option<ImageURIResponse>,
+    image_uris: Option<ImageURIs>,
     keywords: Vec<String>,
     lang: String,
     layout: String,
-    legalities: LegalitiesResponse,
+    legalities: Legalities,
     mana_cost: Option<String>,
     mtgo_foil_id: Option<u32>,
     mtgo_id: Option<u32>,
@@ -78,7 +97,7 @@ pub struct Scryfall {
     nonfoil: bool,
     object: String,
     oracle_id: String,
-    oracle_text: String,
+    oracle_text: Option<String>,
     oversized: bool,
     penny_rank: Option<u32>,
     power: Option<String>,
