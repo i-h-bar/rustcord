@@ -43,6 +43,7 @@ impl EventHandler for Handler {
                             utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx)
                                 .await;
                             if let Some(card_info) = card.new_card_info {
+                                log::info!("{:#?}", card_info);
                                 self.mtg.add_to_postgres(&card_info, &card.image).await;
                                 self.mtg.update_local_cache(&card_info).await;
                             }
