@@ -71,7 +71,7 @@ pub struct NewCardInfo {
 }
 
 impl NewCardInfo {
-    fn from_scryfall(card: Scryfall, face: Option<usize>) -> Option<Self> {
+    fn from_scryfall(card: &Scryfall, face: Option<usize>) -> Option<Self> {
         match face {
             Some(face) => {
                 let faces = card.card_faces.clone()?;
@@ -84,12 +84,12 @@ impl NewCardInfo {
                     legalities_id: Uuid::new_v4(),
                     name: utils::normalise(&face.name),
                     flavour_text: face.flavor_text.to_owned(),
-                    set_id: card.set_id,
-                    set_name: card.set_name,
-                    set_code: card.set,
+                    set_id: card.set_id.to_owned(),
+                    set_name: card.set_name.to_owned(),
+                    set_code: card.set.to_owned(),
                     artist: face.artist.to_string(),
-                    legalities: card.legalities,
-                    colour_identity: card.color_identity,
+                    legalities: card.legalities.to_owned(),
+                    colour_identity: card.color_identity.to_owned(),
                     mana_cost: face.mana_cost.to_owned(),
                     cmc: card.cmc,
                     power: face.power.to_owned(),
@@ -103,27 +103,27 @@ impl NewCardInfo {
             }
             None => {
                 Some(Self {
-                    card_id: card.id,
+                    card_id: card.id.to_owned(),
                     image_id: Uuid::new_v4(),
                     rules_id: Uuid::new_v4(),
                     legalities_id: Uuid::new_v4(),
                     name: utils::normalise(&card.name),
-                    flavour_text: card.flavor_text,
-                    set_id: card.set_id,
-                    set_name: card.set_name,
-                    set_code: card.set,
-                    artist: card.artist,
-                    legalities: card.legalities,
-                    colour_identity: card.color_identity,
-                    mana_cost: card.mana_cost,
+                    flavour_text: card.flavor_text.to_owned(),
+                    set_id: card.set_id.to_owned(),
+                    set_name: card.set_name.to_owned(),
+                    set_code: card.set.to_owned(),
+                    artist: card.artist.to_owned(),
+                    legalities: card.legalities.to_owned(),
+                    colour_identity: card.color_identity.to_owned(),
+                    mana_cost: card.mana_cost.to_owned(),
                     cmc: card.cmc,
-                    power: card.power,
-                    toughness: card.toughness,
-                    loyalty: card.loyalty,
-                    defence: card.defence,
-                    type_line: card.type_line,
-                    oracle_text: card.oracle_text,
-                    keywords: card.keywords,
+                    power: card.power.to_owned(),
+                    toughness: card.toughness.to_owned(),
+                    loyalty: card.loyalty.to_owned(),
+                    defence: card.defence.to_owned(),
+                    type_line: card.type_line.to_owned(),
+                    oracle_text: card.oracle_text.to_owned(),
+                    keywords: card.keywords.to_owned(),
                 })
             }
         }
@@ -239,25 +239,30 @@ impl MTG {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
                 let face_1 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(1)?;
 
-                let lev_0 = fuzzy::lev(&queried_name, &face_0.name);
-                let lev_1 = fuzzy::lev(&queried_name, &face_1.name);
 
-                let (image, face) = if lev_0 < lev_1 {
-                    (self.search_single_faced_image(&card, &face_0.image_uris).await?, 0)
-                } else {
-                    (self.search_single_faced_image(&card, &face_1.image_uris).await?, 1)
-                };
+                let images = join_all(
+                    vec![self.search_single_faced_image(&card, &face_0.image_uris),
+                         self.search_single_faced_image(&card, &face_1.image_uris)]
+                ).await;
+
                 log::info!(
-                    "Found '{}' from scryfall in {:.2?}",
+                    "Found 2 sided card '{}' from scryfall in {:.2?}",
                     card.name,
                     start.elapsed()
                 );
 
-                Some(vec![FoundCard {
-                    name: queried_name,
-                    image,
-                    new_card_info: Some(NewCardInfo::from_scryfall(card, Some(face))?),
-                }])
+                let mut cards = Vec::with_capacity(2);
+                for (face, image) in images.into_iter().enumerate() {
+                    cards.push(
+                        FoundCard {
+                            name: queried_name,
+                            image: image?,
+                            new_card_info: Some(NewCardInfo::from_scryfall(&card, Some(face))?),
+                        }
+                    )
+                }
+
+                Some(cards)
             }
             None => {
                 log::info!(
@@ -274,7 +279,7 @@ impl MTG {
                 Some(vec![FoundCard {
                     name: queried_name,
                     image,
-                    new_card_info: Some(NewCardInfo::from_scryfall(card, None)?),
+                    new_card_info: Some(NewCardInfo::from_scryfall(&card, None)?),
                 }])
             }
         }
@@ -449,7 +454,6 @@ impl MTG {
             }
             Ok(row) => row.get("png")
         }
-
     }
 
     pub async fn update_local_cache(&self, card: &NewCardInfo) {

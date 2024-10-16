@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 pub mod search;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Legalities {
     alchemy: String,
     brawl: String,
