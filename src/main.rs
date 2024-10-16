@@ -38,13 +38,16 @@ impl EventHandler for Handler {
             for card in self.mtg.find_cards(&msg.content).await {
                 match card {
                     None => utils::send("Failed to find card :(", &msg, &ctx).await,
-                    Some(card) => {
-                        utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx)
-                            .await;
-                        if let Some(card_info) = card.new_card_info {
-                            self.mtg.add_to_postgres(&card_info, &card.image).await;
-                            self.mtg.update_local_cache(&card_info).await;
+                    Some(cards) => {
+                        for card in cards {
+                            utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx)
+                                .await;
+                            if let Some(card_info) = card.new_card_info {
+                                self.mtg.add_to_postgres(&card_info, &card.image).await;
+                                self.mtg.update_local_cache(&card_info).await;
+                            }
                         }
+
                     }
                 }
             }

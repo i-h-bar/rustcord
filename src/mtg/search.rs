@@ -42,7 +42,7 @@ INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id)
 values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7) ON CONFLICT DO NOTHING"#;
 
 const EXACT_MATCH: &str = r#"
-select png from cardsjoin images on cards.image_id = images.id where cards.name = $1
+select png from cards join images on cards.image_id = images.id where cards.name = $1
 "#;
 
 
@@ -182,7 +182,7 @@ impl MTG {
         }
     }
 
-    pub async fn find_cards<'a>(&'a self, msg: &'a str) -> Vec<Option<FoundCard<'a>>> {
+    pub async fn find_cards<'a>(&'a self, msg: &'a str) -> Vec<Option<Vec<FoundCard<'a>>>> {
         let futures: Vec<_> = self
             .card_regex
             .captures_iter(&msg)
@@ -192,7 +192,7 @@ impl MTG {
         join_all(futures).await
     }
 
-    async fn find_card<'a>(&'a self, queried_name: &'a str) -> Option<FoundCard<'a>> {
+    async fn find_card<'a>(&'a self, queried_name: &'a str) -> Option<Vec<FoundCard<'a>>> {
         let start = Instant::now();
 
         let normalised_name = utils::normalise(&queried_name);
@@ -207,11 +207,11 @@ impl MTG {
                 start.elapsed()
             );
 
-            return Some(FoundCard {
+            return Some(vec![FoundCard {
                 name: queried_name,
                 image,
                 new_card_info: None,
-            });
+            }]);
         };
 
         {
@@ -222,11 +222,11 @@ impl MTG {
                     let image = self.fetch_local(&matched).await?;
                     log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
-                    return Some(FoundCard {
+                    return Some(vec![FoundCard {
                         name: queried_name,
                         image,
                         new_card_info: None,
-                    });
+                    }]);
                 } else {
                     log::info!("Could not find a fuzzy match for '{}'", normalised_name);
                 }
@@ -253,11 +253,11 @@ impl MTG {
                     start.elapsed()
                 );
 
-                Some(FoundCard {
+                Some(vec![FoundCard {
                     name: queried_name,
                     image,
                     new_card_info: Some(NewCardInfo::from_scryfall(card, Some(face))?),
-                })
+                }])
             }
             None => {
                 log::info!(
@@ -271,11 +271,11 @@ impl MTG {
                     start.elapsed()
                 );
 
-                Some(FoundCard {
+                Some(vec![FoundCard {
                     name: queried_name,
                     image,
                     new_card_info: Some(NewCardInfo::from_scryfall(card, None)?),
-                })
+                }])
             }
         }
     }
@@ -439,12 +439,17 @@ impl MTG {
     }
 
     async fn fetch_local(&self, matched: &str) -> Option<Vec<u8>> {
-        sqlx::query(EXACT_MATCH)
+        match sqlx::query(EXACT_MATCH)
             .bind(&matched)
             .fetch_one(&self.pg_pool)
-            .await
-            .ok()?
-            .get("png")
+            .await {
+            Err(why) => {
+                log::warn!("Failed card fetch - {why}");
+                None
+            }
+            Ok(row) => row.get("png")
+        }
+
     }
 
     pub async fn update_local_cache(&self, card: &NewCardInfo) {
