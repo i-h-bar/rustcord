@@ -38,8 +38,8 @@ const IMAGE_INSERT: &str = r#"INSERT INTO images (id, png) values ($1, $2) ON CO
 const SET_INSERT: &str =
     r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#;
 const CARD_INSERT: &str = r#"
-INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id)
-values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7) ON CONFLICT DO NOTHING"#;
+INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id, other_side)
+values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8)) ON CONFLICT DO NOTHING"#;
 
 const EXACT_MATCH: &str = r#"
 select png from cards join images on cards.image_id = images.id where cards.name = $1
@@ -69,6 +69,7 @@ pub struct NewCardInfo {
     type_line: String,
     oracle_text: Option<String>,
     keywords: Option<Vec<String>>,
+    other_side: Option<String>
 }
 
 impl NewCardInfo {
@@ -95,13 +96,16 @@ impl NewCardInfo {
             type_line: card.type_line.to_owned(),
             oracle_text: card.oracle_text.to_owned(),
             keywords: card.keywords.to_owned(),
+            other_side: None
         }
     }
-    fn new_card_side(card: &Scryfall, side: usize) -> Option<Self> {
+    fn new_card_side(card: &Scryfall, side: usize, side_ids: &Vec<Uuid>) -> Option<Self> {
         let face = card.card_faces.as_ref()?.get(side)?.clone();
+        let card_id = side_ids.get(side)?.to_string();
+        let other_side = side_ids.get((side + 1) % 2)?.to_string();
 
         Some(Self {
-            card_id: Uuid::new_v4().to_string(),
+            card_id,
             image_id: Uuid::new_v4(),
             rules_id: Uuid::new_v4(),
             legalities_id: Uuid::new_v4(),
@@ -122,6 +126,7 @@ impl NewCardInfo {
             type_line: face.type_line,
             oracle_text: face.oracle_text,
             keywords: face.keywords,
+            other_side: Some(other_side)
         })
     }
 }
@@ -134,6 +139,8 @@ pub struct FoundCard<'a> {
 
 impl<'a> FoundCard<'a> {
     fn new_2_faced_card(name: &'a str, card: Scryfall, images: Vec<Option<Vec<u8>>>) -> Vec<Self> {
+        let side_ids = vec![Uuid::new_v4(), Uuid::new_v4()];
+
         images
             .into_iter()
             .enumerate()
@@ -141,7 +148,7 @@ impl<'a> FoundCard<'a> {
                 Some(Self{
                     name,
                     image: image?,
-                    new_card_info: NewCardInfo::new_card_side(&card, i)
+                    new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids)
                 })
             })
             .collect()
@@ -432,6 +439,7 @@ impl MTG {
             .bind(&image_id)
             .bind(&card.artist)
             .bind(&rules_id)
+            .bind(&card.other_side)
             .execute(&self.pg_pool)
             .await
         {

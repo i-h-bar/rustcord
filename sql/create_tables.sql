@@ -58,7 +58,8 @@ create table cards(
     set_id uuid references sets(id),
     image_id uuid references images(id),
     rules_id uuid references rules(id),
-    artist varchar(50)
+    artist varchar(50),
+    other_side uuid
 );
 
 create extension pg_trgm;
