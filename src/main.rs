@@ -9,11 +9,13 @@ use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
 use sqlx::{Executor, Row};
+use crate::db::PSQL;
 
 use crate::mtg::search::MTG;
 
 mod mtg;
 mod utils;
+mod db;
 
 struct Handler {
     mtg: MTG,
@@ -48,8 +50,16 @@ impl EventHandler for Handler {
                             )
                             .await;
                             if let Some(card_info) = card.new_card_info {
-                                log::info!("{:#?}", card_info);
-                                self.mtg.add_to_postgres(&card_info, &card.image).await;
+                                match PSQL::get() {
+                                    Some(pool) => pool.add_card(&card_info, &card.image).await,
+                                    None => {
+                                        log::warn!(
+                                            "Could not insert '{}' into db because", card_info.name
+                                        )
+                                    }
+
+                                }
+
                                 self.mtg.update_local_cache(&card_info).await;
                             }
                         }
@@ -68,6 +78,8 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv().ok();
     env_logger::init();
+    PSQL::init().await;
+
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES

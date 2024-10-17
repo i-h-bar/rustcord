@@ -1,13 +1,22 @@
 pub(crate) mod fuzzy;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use log;
 use regex::Regex;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 use unicode_normalization::UnicodeNormalization;
 
-lazy_static! {
-    static ref PUNC_REGEX: Regex = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
+
+pub static REGEX_COLLECTION: Lazy<RegexCollection> = Lazy::new(|| {
+    let punctuation_removal = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
+    let cards = Regex::new(r#"\[\[(.*?)]]"#).expect("Invalid regex");
+    RegexCollection { punctuation_removal, cards }
+});
+
+
+pub struct RegexCollection {
+    pub punctuation_removal: Regex,
+    pub cards: Regex
 }
 
 pub async fn send(content: &str, msg: &Message, ctx: &Context) {
@@ -36,7 +45,8 @@ pub async fn send_image(image: &Vec<u8>, image_name: &String, msg: &Message, ctx
 }
 
 pub fn normalise(name: &str) -> String {
-    PUNC_REGEX
+    REGEX_COLLECTION
+        .punctuation_removal
         .replace(&name.nfkc().collect::<String>(), "")
         .to_lowercase()
 }
