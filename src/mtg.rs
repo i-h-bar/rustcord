@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 pub mod search;
 
@@ -56,7 +56,7 @@ struct CardFace {
     illustration_id: String,
     flavor_text: Option<String>,
     keywords: Option<Vec<String>>,
-    image_uris: ImageURIs
+    image_uris: ImageURIs,
 }
 
 #[derive(Deserialize)]

@@ -6,7 +6,7 @@ use regex::Regex;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 use unicode_normalization::UnicodeNormalization;
 
-lazy_static!{
+lazy_static! {
     static ref PUNC_REGEX: Regex = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
 }
 
@@ -35,7 +35,8 @@ pub async fn send_image(image: &Vec<u8>, image_name: &String, msg: &Message, ctx
     }
 }
 
-
 pub fn normalise(name: &str) -> String {
-    PUNC_REGEX.replace(&name.nfkc().collect::<String>(), "").to_lowercase()
+    PUNC_REGEX
+        .replace(&name.nfkc().collect::<String>(), "")
+        .to_lowercase()
 }

@@ -1,17 +1,21 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 
 use log;
+use rayon::iter::IntoParallelRefIterator;
 use regex::Regex;
-use reqwest::{Error, Response};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::{Error, Response};
 use serde::Deserialize;
 use serenity::all::{Cache, Message};
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::{Executor, Pool, Postgres, Row};
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use unicode_normalization::UnicodeNormalization;
@@ -42,9 +46,8 @@ INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id, o
 values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8)) ON CONFLICT DO NOTHING"#;
 
 const EXACT_MATCH: &str = r#"
-select png from cards join images on cards.image_id = images.id where cards.name = $1
+select png from cards join images on cards.image_id = images.id where cards.id = uuid($1) or cards.other_side = uuid($1)
 "#;
-
 
 #[derive(Debug)]
 pub struct NewCardInfo {
@@ -69,7 +72,7 @@ pub struct NewCardInfo {
     type_line: String,
     oracle_text: Option<String>,
     keywords: Option<Vec<String>>,
-    other_side: Option<String>
+    other_side: Option<String>,
 }
 
 impl NewCardInfo {
@@ -96,7 +99,7 @@ impl NewCardInfo {
             type_line: card.type_line.to_owned(),
             oracle_text: card.oracle_text.to_owned(),
             keywords: card.keywords.to_owned(),
-            other_side: None
+            other_side: None,
         }
     }
     fn new_card_side(card: &Scryfall, side: usize, side_ids: &Vec<Uuid>) -> Option<Self> {
@@ -126,7 +129,7 @@ impl NewCardInfo {
             type_line: face.type_line,
             oracle_text: face.oracle_text,
             keywords: face.keywords,
-            other_side: Some(other_side)
+            other_side: Some(other_side),
         })
     }
 }
@@ -145,21 +148,32 @@ impl<'a> FoundCard<'a> {
             .into_iter()
             .enumerate()
             .filter_map(|(i, image)| {
-                Some(Self{
+                Some(Self {
                     name,
                     image: image?,
-                    new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids)
+                    new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids),
                 })
             })
             .collect()
     }
 
     fn new_card(name: &'a str, card: Scryfall, image: Vec<u8>) -> Vec<Self> {
-        vec![Self { name, image, new_card_info: Some(NewCardInfo::new_card(&card)) }]
+        vec![Self {
+            name,
+            image,
+            new_card_info: Some(NewCardInfo::new_card(&card)),
+        }]
     }
 
-    fn existing_card(name: &'a str, image: Vec<u8>) -> Vec<Self> {
-        vec![Self { name, image, new_card_info: None }]
+    fn existing_card(name: &'a str, images: Vec<Vec<u8>>) -> Vec<Self> {
+        images
+            .into_iter()
+            .map(|image| Self {
+                name,
+                image,
+                new_card_info: None,
+            })
+            .collect()
     }
 }
 
@@ -167,7 +181,7 @@ pub struct MTG {
     http_client: reqwest::Client,
     card_regex: Regex,
     pg_pool: Pool<Postgres>,
-    card_cache: Mutex<HashSet<String>>,
+    card_cache: Mutex<HashMap<String, String>>,
 }
 
 impl MTG {
@@ -189,7 +203,7 @@ impl MTG {
             .await
             .expect("Failed Postgres connection");
 
-        let cards_vec = sqlx::query("select name from cards")
+        let cards_vec = sqlx::query("select cards.name, cards.id from cards")
             .fetch_all(&pg_pool)
             .await
             .expect("Failed to get cards names");
@@ -197,8 +211,8 @@ impl MTG {
         let card_cache = Mutex::new(
             cards_vec
                 .into_iter()
-                .map(|row| row.get("name"))
-                .collect::<HashSet<String>>(),
+                .map(|row| (row.get("name"), row.get::<Uuid, &str>("id").to_string()))
+                .collect::<HashMap<String, String>>(),
         );
 
         Self {
@@ -224,28 +238,33 @@ impl MTG {
 
         let normalised_name = utils::normalise(&queried_name);
         log::info!("'{}' normalised to '{}'", queried_name, normalised_name);
-        let contains = { self.card_cache.lock().await.contains(&normalised_name) };
-        if contains {
+
+        if let Some(id) = { self.card_cache.lock().await.get(&normalised_name) } {
             log::info!("Found exact match in cache for '{normalised_name}'!");
-            let image = self.fetch_local(&normalised_name).await?;
+            let images = self.fetch_local(&id).await?;
 
             log::info!(
                 "Found '{normalised_name}' locally in {:.2?}",
                 start.elapsed()
             );
 
-            return Some(FoundCard::existing_card(queried_name, image));
+            return Some(FoundCard::existing_card(queried_name, images));
         };
 
         {
-            let cache = self.card_cache.lock().await;
-            if let Some((matched, score)) = fuzzy::best_match_lev(&normalised_name, &*cache) {
+            if let Some(((matched, id), score)) =
+                { fuzzy::best_match_lev_keys(&normalised_name, &*(self.card_cache.lock().await)) }
+            {
                 if score < 6 {
-                    log::info!("Found a fuzzy in cache - '{}' with a score of {}", matched, score);
-                    let image = self.fetch_local(&matched).await?;
+                    log::info!(
+                        "Found a fuzzy in cache - '{}' with a score of {}",
+                        matched,
+                        score
+                    );
+                    let images = self.fetch_local(&id).await?;
                     log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
-                    return Some(FoundCard::existing_card(queried_name, image));
+                    return Some(FoundCard::existing_card(queried_name, images));
                 } else {
                     log::info!("Could not find a fuzzy match for '{}'", normalised_name);
                 }
@@ -258,18 +277,17 @@ impl MTG {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
                 let face_1 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(1)?;
 
-
-                let images = join_all(
-                    vec![self.search_single_faced_image(&card, &face_0.image_uris),
-                         self.search_single_faced_image(&card, &face_1.image_uris)]
-                ).await;
+                let images = join_all(vec![
+                    self.search_single_faced_image(&card, &face_0.image_uris),
+                    self.search_single_faced_image(&card, &face_1.image_uris),
+                ])
+                .await;
 
                 log::info!(
                     "Found 2 sided card '{}' from scryfall in {:.2?}",
                     card.name,
                     start.elapsed()
                 );
-
 
                 Some(FoundCard::new_2_faced_card(queried_name, card, images))
             }
@@ -278,7 +296,9 @@ impl MTG {
                     "Matched with - \"{}\". Now searching for image...",
                     card.name
                 );
-                let image = self.search_single_faced_image(&card, card.image_uris.as_ref()?).await?;
+                let image = self
+                    .search_single_faced_image(&card, card.image_uris.as_ref()?)
+                    .await?;
                 log::info!(
                     "Found '{}' from scryfall in {:.2?}",
                     card.name,
@@ -291,14 +311,12 @@ impl MTG {
     }
 
     async fn search_single_faced_image(
-        &self, card: &Scryfall, image_uris: &ImageURIs,
+        &self,
+        card: &Scryfall,
+        image_uris: &ImageURIs,
     ) -> Option<Vec<u8>> {
         let Ok(image) = {
-            match self
-                .http_client
-                .get(&image_uris.png)
-                .send()
-                .await {
+            match self.http_client.get(&image_uris.png).send().await {
                 Ok(response) => response,
                 Err(why) => {
                     log::warn!("Error grabbing image for '{}' because: {}", card.name, why);
@@ -306,25 +324,43 @@ impl MTG {
                 }
             }
         }
-            .bytes()
-            .await
-            else {
-                log::warn!("Failed to retrieve image bytes");
-                return None;
-            };
+        .bytes()
+        .await
+        else {
+            log::warn!("Failed to retrieve image bytes");
+            return None;
+        };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
     }
 
-    async fn search_dual_faced_image<'a>(&'a self, card: &'a Scryfall, queried_name: &str) -> Option<(Vec<u8>, &'a CardFace)> {
+    async fn search_dual_faced_image<'a>(
+        &'a self,
+        card: &'a Scryfall,
+        queried_name: &str,
+    ) -> Option<(Vec<u8>, &'a CardFace)> {
         let lev_0 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(0)?.name);
         let lev_1 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(1)?.name);
 
         if lev_0 < lev_1 {
-            Some((self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(0)?.image_uris).await?, card.card_faces.as_ref()?.get(0)?))
+            Some((
+                self.search_single_faced_image(
+                    &card,
+                    &card.card_faces.as_ref()?.get(0)?.image_uris,
+                )
+                .await?,
+                card.card_faces.as_ref()?.get(0)?,
+            ))
         } else {
-            Some((self.search_single_faced_image(&card, &card.card_faces.as_ref()?.get(1)?.image_uris).await?, card.card_faces.as_ref()?.get(1)?))
+            Some((
+                self.search_single_faced_image(
+                    &card,
+                    &card.card_faces.as_ref()?.get(1)?.image_uris,
+                )
+                .await?,
+                card.card_faces.as_ref()?.get(1)?,
+            ))
         }
     }
 
@@ -334,7 +370,8 @@ impl MTG {
             .http_client
             .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
             .send()
-            .await {
+            .await
+        {
             Ok(response) => response,
             Err(why) => {
                 log::warn!("Error searching for '{}' because: {}", queried_name, why);
@@ -387,7 +424,8 @@ impl MTG {
             .bind(&card.legalities.timeless)
             .bind(&card.legalities.vintage)
             .execute(&self.pg_pool)
-            .await {
+            .await
+        {
             log::warn!("Failed legalities insert - {why}")
         }
 
@@ -406,10 +444,10 @@ impl MTG {
             .bind(&card.mana_cost)
             .bind(&legalities_id)
             .execute(&self.pg_pool)
-            .await {
+            .await
+        {
             log::warn!("Failed legalities insert - {why}")
         }
-
 
         let image_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(IMAGE_INSERT)
@@ -449,16 +487,17 @@ impl MTG {
         log::info!("Added {} to postgres", card.name)
     }
 
-    async fn fetch_local(&self, matched: &str) -> Option<Vec<u8>> {
+    async fn fetch_local(&self, matched: &str) -> Option<Vec<Vec<u8>>> {
         match sqlx::query(EXACT_MATCH)
             .bind(&matched)
-            .fetch_one(&self.pg_pool)
-            .await {
+            .fetch_all(&self.pg_pool)
+            .await
+        {
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
                 None
             }
-            Ok(row) => row.get("png")
+            Ok(rows) => rows.into_iter().map(|row| row.get("png")).collect(),
         }
     }
 
@@ -466,7 +505,7 @@ impl MTG {
         self.card_cache
             .lock()
             .await
-            .insert(card.name.to_string());
+            .insert(card.name.to_string(), card.card_id.to_string());
         log::info!("Added '{}' to local cache", card.name);
     }
 }

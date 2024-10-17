@@ -1,5 +1,6 @@
 use rayon::prelude::*;
 use std::cmp;
+use std::collections::HashMap;
 
 pub fn lev(a: &str, b: &str) -> usize {
     if a.is_empty() {
@@ -37,6 +38,19 @@ pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
         .map(|item: &String| {
             let dist = lev(&a, &item);
             (item, dist)
+        })
+        .min_by(|(_, x), (_, y)| x.cmp(y))
+}
+
+pub fn best_match_lev_keys<'a>(
+    a: &str,
+    items: &'a HashMap<String, String>,
+) -> Option<((&'a String, &'a String), usize)> {
+    items
+        .par_iter()
+        .map(|(k, v)| {
+            let dist = lev(&a, &k);
+            ((k, v), dist)
         })
         .min_by(|(_, x), (_, y)| x.cmp(y))
 }
