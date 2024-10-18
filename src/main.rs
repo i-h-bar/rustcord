@@ -3,19 +3,19 @@ extern crate core;
 
 use std::env;
 
+use crate::db::PSQL;
 use dotenv::dotenv;
 use serenity::all::{GatewayIntents, Message, Ready};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
 use sqlx::{Executor, Row};
-use crate::db::PSQL;
 
 use crate::mtg::search::MTG;
 
+mod db;
 mod mtg;
 mod utils;
-mod db;
 
 struct Handler {
     mtg: MTG,
@@ -54,10 +54,10 @@ impl EventHandler for Handler {
                                     Some(pool) => pool.add_card(&card_info, &card.image).await,
                                     None => {
                                         log::warn!(
-                                            "Could not insert '{}' into db because", card_info.name
+                                            "Could not insert '{}' into db because",
+                                            card_info.name
                                         )
                                     }
-
                                 }
 
                                 self.mtg.update_local_cache(&card_info).await;

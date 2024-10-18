@@ -30,7 +30,7 @@ select png from cards join images on cards.image_id = images.id where cards.id =
 "#;
 
 impl PSQL {
-    pub async fn add_card(&self, card: &NewCardInfo, image: &Vec<u8>) {
+    async fn add_to_legalities(&self, card: &NewCardInfo) -> Uuid {
         let legalities_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(LEGALITIES_INSERT)
             .bind(&legalities_id)
@@ -62,6 +62,10 @@ impl PSQL {
             log::warn!("Failed legalities insert - {why}")
         }
 
+        legalities_id
+    }
+
+    async fn add_to_rules(&self, card: &NewCardInfo, legalities_id: &Uuid) -> Uuid {
         let rules_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
@@ -82,6 +86,10 @@ impl PSQL {
             log::warn!("Failed legalities insert - {why}")
         }
 
+        rules_id
+    }
+
+    async fn add_to_images(&self, image: &Vec<u8>) -> Uuid {
         let image_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(IMAGE_INSERT)
             .bind(&image_id)
@@ -92,6 +100,10 @@ impl PSQL {
             log::warn!("Failed images insert - {why}")
         };
 
+        image_id
+    }
+
+    async fn add_to_sets(&self, card: &NewCardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
             .bind(&card.set_name)
@@ -101,7 +113,9 @@ impl PSQL {
         {
             log::warn!("Failed set insert - {why}")
         };
+    }
 
+    async fn add_to_cards(&self, card: &NewCardInfo, image_id: &Uuid, rules_id: &Uuid) {
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.card_id)
             .bind(&card.name)
@@ -116,6 +130,14 @@ impl PSQL {
         {
             log::warn!("Failed card insert - {why}")
         };
+    }
+
+    pub async fn add_card(&self, card: &NewCardInfo, image: &Vec<u8>) {
+        let legalities_id = self.add_to_legalities(&card).await;
+        let rules_id = self.add_to_rules(&card, &legalities_id).await;
+        let image_id = self.add_to_images(&image).await;
+        self.add_to_sets(&card).await;
+        self.add_to_cards(&card, &image_id, &rules_id).await;
 
         log::info!("Added {} to postgres", card.name)
     }
@@ -137,12 +159,12 @@ impl PSQL {
     pub async fn names_and_ids(&self) -> HashMap<String, String> {
         match sqlx::query("select cards.name, cards.id from cards")
             .fetch_all(&self.pool)
-            .await {
-            Ok(rows) => {
-                rows.into_iter()
-                    .map(|row| (row.get("name"), row.get::<Uuid, &str>("id").to_string()))
-                    .collect::<HashMap<String, String>>()
-            }
+            .await
+        {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| (row.get("name"), row.get::<Uuid, &str>("id").to_string()))
+                .collect::<HashMap<String, String>>(),
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
                 HashMap::new()

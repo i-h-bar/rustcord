@@ -1,4 +1,3 @@
-use crate::mtg::NewCardInfo;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::hash::Hash;
@@ -21,14 +20,14 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
-use crate::db::PSQL;
 
+use crate::db::PSQL;
+use crate::mtg::NewCardInfo;
 use crate::mtg::{CardFace, FoundCard, ImageURIs, Legalities, Scryfall};
 use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
-
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -45,7 +44,10 @@ impl MTG {
             .build()
             .expect("Failed HTTP Client build");
 
-        let cards_map = PSQL::get().expect("Could not retrieve instance of DB").names_and_ids().await;
+        let cards_map = PSQL::get()
+            .expect("Could not retrieve instance of DB")
+            .names_and_ids()
+            .await;
         let card_cache = Mutex::new(cards_map);
 
         Self {
@@ -104,6 +106,23 @@ impl MTG {
             }
         };
 
+        let card = self
+            .find_from_scryfall(&queried_name, &normalised_name)
+            .await?;
+        log::info!(
+            "Found match for '{}' from scryfall in {:.2?}",
+            queried_name,
+            start.elapsed()
+        );
+
+        Some(card)
+    }
+
+    async fn find_from_scryfall<'a>(
+        &'a self,
+        queried_name: &'a str,
+        normalised_name: &str,
+    ) -> Option<Vec<FoundCard>> {
         let card = self.search_scryfall_card_data(&normalised_name).await?;
         match &card.card_faces {
             Some(card_faces) => {
@@ -116,13 +135,7 @@ impl MTG {
                 ])
                 .await;
 
-                log::info!(
-                    "Found 2 sided card '{}' from scryfall in {:.2?}",
-                    card.name,
-                    start.elapsed()
-                );
-
-                Some(FoundCard::new_2_faced_card(queried_name, card, images))
+                Some(FoundCard::new_2_faced_card(queried_name, &card, images))
             }
             None => {
                 log::info!(
@@ -132,13 +145,8 @@ impl MTG {
                 let image = self
                     .search_single_faced_image(&card, card.image_uris.as_ref()?)
                     .await?;
-                log::info!(
-                    "Found '{}' from scryfall in {:.2?}",
-                    card.name,
-                    start.elapsed()
-                );
 
-                Some(FoundCard::new_card(queried_name, card, image))
+                Some(FoundCard::new_card(queried_name, &card, image))
             }
         }
     }

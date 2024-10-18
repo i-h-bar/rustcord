@@ -1,12 +1,10 @@
+use crate::utils;
 use serde::Deserialize;
 use std::collections::HashMap;
 use uuid::Uuid;
-use crate::utils;
 
-pub mod search;
 mod db;
-
-
+pub mod search;
 
 #[derive(Debug)]
 pub struct NewCardInfo {
@@ -100,7 +98,7 @@ pub struct FoundCard<'a> {
 }
 
 impl<'a> FoundCard<'a> {
-    fn new_2_faced_card(name: &'a str, card: Scryfall, images: Vec<Option<Vec<u8>>>) -> Vec<Self> {
+    fn new_2_faced_card(name: &'a str, card: &Scryfall, images: Vec<Option<Vec<u8>>>) -> Vec<Self> {
         let side_ids = vec![Uuid::new_v4(), Uuid::new_v4()];
 
         images
@@ -116,7 +114,7 @@ impl<'a> FoundCard<'a> {
             .collect()
     }
 
-    fn new_card(name: &'a str, card: Scryfall, image: Vec<u8>) -> Vec<Self> {
+    fn new_card(name: &'a str, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
         vec![Self {
             name,
             image,
@@ -135,7 +133,6 @@ impl<'a> FoundCard<'a> {
             .collect()
     }
 }
-
 
 #[derive(Deserialize, Clone, Debug)]
 struct Legalities {

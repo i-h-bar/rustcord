@@ -1,20 +1,21 @@
 use once_cell::sync::OnceCell;
-use std::env;
-use sqlx::{Pool, Postgres};
 use sqlx::postgres::PgPoolOptions;
-
+use sqlx::{Pool, Postgres};
+use std::env;
 
 static DB_INSTANCE: OnceCell<PSQL> = OnceCell::new();
 
 #[derive(Debug)]
 pub struct PSQL {
-    pub(crate) pool: Pool<Postgres>
+    pub(crate) pool: Pool<Postgres>,
 }
 
 impl PSQL {
     pub async fn init() {
         let instance = Self::new().await;
-        DB_INSTANCE.set(instance).expect("Could not initialise DB once cell");
+        DB_INSTANCE
+            .set(instance)
+            .expect("Could not initialise DB once cell");
     }
 
     async fn new() -> Self {

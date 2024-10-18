@@ -1,22 +1,23 @@
 pub(crate) mod fuzzy;
 
-use once_cell::sync::Lazy;
 use log;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 use unicode_normalization::UnicodeNormalization;
 
-
 pub static REGEX_COLLECTION: Lazy<RegexCollection> = Lazy::new(|| {
     let punctuation_removal = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
     let cards = Regex::new(r#"\[\[(.*?)]]"#).expect("Invalid regex");
-    RegexCollection { punctuation_removal, cards }
+    RegexCollection {
+        punctuation_removal,
+        cards,
+    }
 });
-
 
 pub struct RegexCollection {
     pub punctuation_removal: Regex,
-    pub cards: Regex
+    pub cards: Regex,
 }
 
 pub async fn send(content: &str, msg: &Message, ctx: &Context) {
