@@ -4,7 +4,7 @@ use sqlx::Row;
 use uuid::Uuid;
 
 use crate::db::PSQL;
-use crate::mtg::NewCardInfo;
+use crate::mtg::{FoundCard, NewCardInfo};
 
 const LEGALITIES_INSERT: &str = r#"
 INSERT INTO legalities
@@ -132,14 +132,16 @@ impl PSQL {
         };
     }
 
-    pub async fn add_card(&self, card: &NewCardInfo, image: &Vec<u8>) {
-        let legalities_id = self.add_to_legalities(&card).await;
-        let rules_id = self.add_to_rules(&card, &legalities_id).await;
-        let image_id = self.add_to_images(&image).await;
-        self.add_to_sets(&card).await;
-        self.add_to_cards(&card, &image_id, &rules_id).await;
+    pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>) {
+        if let Some(card_info) = &card.new_card_info {
+            let legalities_id = self.add_to_legalities(&card_info).await;
+            let rules_id = self.add_to_rules(&card_info, &legalities_id).await;
+            let image_id = self.add_to_images(&card.image).await;
+            self.add_to_sets(&card_info).await;
+            self.add_to_cards(&card_info, &image_id, &rules_id).await;
 
-        log::info!("Added {} to postgres", card.name)
+            log::info!("Added {} to postgres", card_info.name)
+        }
     }
 
     pub async fn fetch_card(&self, id: &str) -> Option<Vec<Vec<u8>>> {

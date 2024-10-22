@@ -8,22 +8,22 @@ use std::time::Duration;
 use log;
 use rayon::iter::IntoParallelRefIterator;
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::{Error, Response};
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
 use serenity::all::{Cache, Message};
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, Pool, Postgres, Row};
+use sqlx::postgres::PgPoolOptions;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 
 use crate::db::PSQL;
-use crate::mtg::NewCardInfo;
 use crate::mtg::{CardFace, FoundCard, ImageURIs, Legalities, Scryfall};
+use crate::mtg::NewCardInfo;
 use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
@@ -81,14 +81,14 @@ impl MTG {
                 start.elapsed()
             );
 
-            return Some(FoundCard::existing_card(queried_name, images));
+            return Some(FoundCard::existing_card(queried_name, images, 0));
         };
 
         {
             if let Some(((matched, id), score)) =
                 { fuzzy::best_match_lev_keys(&normalised_name, &*(self.card_cache.lock().await)) }
             {
-                if score < 4 {
+                if score < 5 {
                     log::info!(
                         "Found a fuzzy in cache - '{}' with a score of {}",
                         matched,
@@ -99,7 +99,7 @@ impl MTG {
 
                     log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
-                    return Some(FoundCard::existing_card(queried_name, images));
+                    return Some(FoundCard::existing_card(queried_name, images, score));
                 } else {
                     log::info!("Could not find a fuzzy match for '{}'", normalised_name);
                 }
@@ -118,6 +118,25 @@ impl MTG {
         Some(card)
     }
 
+    pub async fn find_possible_better_match<'a>(
+        &'a self,
+        cache_found: &FoundCard<'a>,
+    ) -> Option<Vec<FoundCard<'a>>> {
+        let normalised_name = utils::normalise(&cache_found.queried_name);
+        let card_faces = self
+            .find_from_scryfall(&cache_found.queried_name, &normalised_name)
+            .await?;
+
+        for face in card_faces.iter() {
+            if fuzzy::lev(&normalised_name, &face.new_card_info.as_ref()?.name) < cache_found.score
+            {
+                return Some(card_faces);
+            }
+        }
+
+        None
+    }
+
     async fn find_from_scryfall<'a>(
         &'a self,
         queried_name: &'a str,
@@ -133,7 +152,7 @@ impl MTG {
                     self.search_single_faced_image(&card, &face_0.image_uris),
                     self.search_single_faced_image(&card, &face_1.image_uris),
                 ])
-                .await;
+                    .await;
 
                 Some(FoundCard::new_2_faced_card(queried_name, &card, images))
             }
@@ -165,12 +184,12 @@ impl MTG {
                 }
             }
         }
-        .bytes()
-        .await
-        else {
-            log::warn!("Failed to retrieve image bytes");
-            return None;
-        };
+            .bytes()
+            .await
+            else {
+                log::warn!("Failed to retrieve image bytes");
+                return None;
+            };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
@@ -190,7 +209,7 @@ impl MTG {
                     &card,
                     &card.card_faces.as_ref()?.get(0)?.image_uris,
                 )
-                .await?,
+                    .await?,
                 card.card_faces.as_ref()?.get(0)?,
             ))
         } else {
@@ -199,7 +218,7 @@ impl MTG {
                     &card,
                     &card.card_faces.as_ref()?.get(1)?.image_uris,
                 )
-                .await?,
+                    .await?,
                 card.card_faces.as_ref()?.get(1)?,
             ))
         }
@@ -229,20 +248,30 @@ impl MTG {
                 }
             }
         } else {
-            log::warn!(
-                "None 200 response from scryfall: {} when searching for '{}'",
-                response.status().as_str(),
-                queried_name
-            );
+            match response.status().as_u16() {
+                404 => {
+                    log::info!("Could not find card from scryfall with the name '{}'", queried_name)
+                }
+                status => {
+                    log::warn!(
+                        "None 200 response from scryfall: {} when searching for '{}'",
+                        status,
+                        queried_name
+                    );
+                }
+            }
+
             None
         }
     }
 
-    pub async fn update_local_cache(&self, card: &NewCardInfo) {
-        self.card_cache
-            .lock()
-            .await
-            .insert(card.name.to_string(), card.card_id.to_string());
-        log::info!("Added '{}' to local cache", card.name);
+    pub async fn update_local_cache<'a>(&self, card: &FoundCard<'a>) {
+        if let Some(new_card) = &card.new_card_info {
+            self.card_cache
+                .lock()
+                .await
+                .insert(new_card.name.to_string(), new_card.card_id.to_string());
+            log::info!("Added '{}' to local cache", new_card.name);
+        }
     }
 }

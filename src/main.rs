@@ -3,7 +3,6 @@ extern crate core;
 
 use std::env;
 
-use crate::db::PSQL;
 use dotenv::dotenv;
 use serenity::all::{GatewayIntents, Message, Ready};
 use serenity::async_trait;
@@ -11,6 +10,7 @@ use serenity::client::EventHandler;
 use serenity::prelude::*;
 use sqlx::{Executor, Row};
 
+use crate::db::PSQL;
 use crate::mtg::search::MTG;
 
 mod db;
@@ -38,33 +38,7 @@ impl EventHandler for Handler {
             utils::send("Pong!", &msg, &ctx).await
         } else {
             for card in self.mtg.find_cards(&msg.content).await {
-                match card {
-                    None => utils::send("Failed to find card :(", &msg, &ctx).await,
-                    Some(cards) => {
-                        for card in cards {
-                            utils::send_image(
-                                &card.image,
-                                &format!("{}.png", card.name),
-                                &msg,
-                                &ctx,
-                            )
-                            .await;
-                            if let Some(card_info) = card.new_card_info {
-                                match PSQL::get() {
-                                    Some(pool) => pool.add_card(&card_info, &card.image).await,
-                                    None => {
-                                        log::warn!(
-                                            "Could not insert '{}' into db because",
-                                            card_info.name
-                                        )
-                                    }
-                                }
-
-                                self.mtg.update_local_cache(&card_info).await;
-                            }
-                        }
-                    }
-                }
+                self.card_response(&card, &msg, &ctx).await;
             }
         }
     }

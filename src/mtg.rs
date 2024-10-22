@@ -1,10 +1,68 @@
-use crate::utils;
-use serde::Deserialize;
 use std::collections::HashMap;
+
+use serde::Deserialize;
+use serenity::all::{Context, Message};
 use uuid::Uuid;
+
+use crate::{Handler, utils};
+use crate::db::PSQL;
 
 mod db;
 pub mod search;
+
+
+impl Handler {
+    async fn add_to_local_stores<'a>(&'a self, card_face: &FoundCard<'a>) {
+        if let Some(pool) = PSQL::get() {
+            pool.add_card(&card_face).await;
+        }
+        self.mtg.update_local_cache(&card_face).await;
+    }
+
+    pub async fn card_response<'a>(&'a self, card: &Option<Vec<FoundCard<'a>>>, msg: &Message, ctx: &Context) {
+        match card {
+            None => utils::send("Failed to find card :(", &msg, &ctx).await,
+            Some(card) => {
+                for card_face in card {
+                    utils::send_image(
+                        &card_face.image,
+                        &format!("{}.png", card_face.queried_name),
+                        None,
+                        &msg,
+                        &ctx,
+                    )
+                        .await;
+
+                    self.add_to_local_stores(&card_face).await;
+                }
+
+                if let Some(card_face) = card.get(0) {
+                    if card_face.score > 3 {
+                        log::info!("Score is high searching scryfall for potential better match");
+                        if let Some(better_card) =
+                            self.mtg.find_possible_better_match(&card_face).await
+                        {
+                            for better_face in better_card.iter() {
+                                log::info!("Better match found from scryfall");
+                                utils::send_image(
+                                    &better_face.image,
+                                    &format!("{}.png", better_face.queried_name),
+                                    Some("I found a better match on further searches: "),
+                                    &msg,
+                                    &ctx,
+                                )
+                                    .await;
+
+                                self.add_to_local_stores(&better_face).await;
+                            }
+                        };
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub struct NewCardInfo {
@@ -92,13 +150,18 @@ impl NewCardInfo {
 }
 
 pub struct FoundCard<'a> {
-    pub name: &'a str,
+    pub queried_name: &'a str,
     pub new_card_info: Option<NewCardInfo>,
     pub image: Vec<u8>,
+    pub score: usize,
 }
 
 impl<'a> FoundCard<'a> {
-    fn new_2_faced_card(name: &'a str, card: &Scryfall, images: Vec<Option<Vec<u8>>>) -> Vec<Self> {
+    fn new_2_faced_card(
+        queried_name: &'a str,
+        card: &Scryfall,
+        images: Vec<Option<Vec<u8>>>,
+    ) -> Vec<Self> {
         let side_ids = vec![Uuid::new_v4(), Uuid::new_v4()];
 
         images
@@ -106,29 +169,32 @@ impl<'a> FoundCard<'a> {
             .enumerate()
             .filter_map(|(i, image)| {
                 Some(Self {
-                    name,
+                    queried_name,
                     image: image?,
                     new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids),
+                    score: 0,
                 })
             })
             .collect()
     }
 
-    fn new_card(name: &'a str, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
+    fn new_card(queried_name: &'a str, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
         vec![Self {
-            name,
+            queried_name,
             image,
             new_card_info: Some(NewCardInfo::new_card(&card)),
+            score: 0,
         }]
     }
 
-    fn existing_card(name: &'a str, images: Vec<Vec<u8>>) -> Vec<Self> {
+    fn existing_card(queried_name: &'a str, images: Vec<Vec<u8>>, score: usize) -> Vec<Self> {
         images
             .into_iter()
             .map(|image| Self {
-                name,
+                queried_name,
                 image,
                 new_card_info: None,
+                score,
             })
             .collect()
     }
