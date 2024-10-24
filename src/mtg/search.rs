@@ -34,7 +34,7 @@ pub struct MTG {
     card_cache: Mutex<HashMap<String, String>>,
 }
 
-impl MTG {
+impl<'a> MTG {
     pub async fn new() -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT, HeaderValue::from_static("Rust Discord Bot"));
@@ -56,7 +56,7 @@ impl MTG {
         }
     }
 
-    pub async fn find_cards<'a>(&'a self, msg: &'a str) -> Vec<Option<Vec<FoundCard<'a>>>> {
+    pub async fn find_cards(&'a self, msg: &'a str) -> Vec<Option<Vec<FoundCard<'a>>>> {
         let futures: Vec<_> = REGEX_COLLECTION
             .cards
             .captures_iter(&msg)
@@ -66,7 +66,7 @@ impl MTG {
         join_all(futures).await
     }
 
-    async fn find_card<'a>(&'a self, queried_name: &'a str) -> Option<Vec<FoundCard<'a>>> {
+    async fn find_card(&'a self, queried_name: &'a str) -> Option<Vec<FoundCard<'a>>> {
         let start = Instant::now();
 
         let normalised_name = utils::normalise(&queried_name);
@@ -118,7 +118,7 @@ impl MTG {
         Some(card)
     }
 
-    pub async fn find_possible_better_match<'a>(
+    pub async fn find_possible_better_match(
         &'a self,
         cache_found: &FoundCard<'a>,
     ) -> Option<Vec<FoundCard<'a>>> {
@@ -137,7 +137,7 @@ impl MTG {
         None
     }
 
-    async fn find_from_scryfall<'a>(
+    async fn find_from_scryfall(
         &'a self,
         queried_name: &'a str,
         normalised_name: &str,
@@ -195,7 +195,7 @@ impl MTG {
         Some(image.to_vec())
     }
 
-    async fn search_dual_faced_image<'a>(
+    async fn search_dual_faced_image(
         &'a self,
         card: &'a Scryfall,
         queried_name: &str,
@@ -265,7 +265,7 @@ impl MTG {
         }
     }
 
-    pub async fn update_local_cache<'a>(&self, card: &FoundCard<'a>) {
+    pub async fn update_local_cache(&self, card: &FoundCard<'a>) {
         if let Some(new_card) = &card.new_card_info {
             self.card_cache
                 .lock()

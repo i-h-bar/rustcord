@@ -11,15 +11,15 @@ mod db;
 pub mod search;
 
 
-impl Handler {
-    async fn add_to_local_stores<'a>(&'a self, card_face: &FoundCard<'a>) {
+impl<'a> Handler {
+    async fn add_to_local_stores(&'a self, card_face: &FoundCard<'a>) {
         if let Some(pool) = PSQL::get() {
             pool.add_card(&card_face).await;
         }
         self.mtg.update_local_cache(&card_face).await;
     }
 
-    pub async fn card_response<'a>(&'a self, card: &Option<Vec<FoundCard<'a>>>, msg: &Message, ctx: &Context) {
+    pub async fn card_response(&'a self, card: &Option<Vec<FoundCard<'a>>>, msg: &Message, ctx: &Context) {
         match card {
             None => utils::send("Failed to find card :(", &msg, &ctx).await,
             Some(card) => {
