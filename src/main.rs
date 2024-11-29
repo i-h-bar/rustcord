@@ -10,8 +10,10 @@ use serenity::client::EventHandler;
 use serenity::prelude::*;
 use sqlx::{Executor, Row};
 
+use crate::db::PSQL;
 use crate::mtg::search::MTG;
 
+mod db;
 mod mtg;
 mod utils;
 
@@ -36,20 +38,7 @@ impl EventHandler for Handler {
             utils::send("Pong!", &msg, &ctx).await
         } else {
             for card in self.mtg.find_cards(&msg.content).await {
-                match card {
-                    None => utils::send("Failed to find card :(", &msg, &ctx).await,
-                    Some(cards) => {
-                        for card in cards {
-                            utils::send_image(&card.image, &format!("{}.png", card.name), &msg, &ctx)
-                                .await;
-                            if let Some(card_info) = card.new_card_info {
-                                self.mtg.add_to_postgres(&card_info, &card.image).await;
-                                self.mtg.update_local_cache(&card_info).await;
-                            }
-                        }
-
-                    }
-                }
+                self.card_response(&card, &msg, &ctx).await;
             }
         }
     }
@@ -63,6 +52,8 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv().ok();
     env_logger::init();
+    PSQL::init().await;
+
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
