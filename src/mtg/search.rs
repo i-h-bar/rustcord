@@ -69,12 +69,11 @@ impl<'a> MTG {
             )
             .collect();
 
-        let futures = queries.into_iter().map(| query | self.find_card(&query));
-
+        let futures = queries.into_iter().map(| query | self.find_card(query));
         join_all(futures).await
     }
 
-    async fn find_card(&'a self, query: &'a QueryParams<'a>) -> Option<Vec<FoundCard<'a>>> {
+    async fn find_card(&'a self, query: QueryParams<'a>) -> Option<Vec<FoundCard<'a>>> {
         let start = Instant::now();
 
         if let Some(id) = { self.card_cache.lock().await.get(&query.name) } {
@@ -113,7 +112,7 @@ impl<'a> MTG {
         };
 
         let card = self
-            .find_from_scryfall(&query)
+            .find_from_scryfall(query.clone())
             .await?;
         log::info!(
             "Found match for '{}' from scryfall in {:.2?}",
@@ -126,10 +125,10 @@ impl<'a> MTG {
 
     pub async fn find_possible_better_match(
         &'a self,
-        cache_found: &FoundCard<'a>,
+        cache_found: &'a FoundCard<'a>
     ) -> Option<Vec<FoundCard<'a>>> {
         let card_faces = self
-            .find_from_scryfall(&cache_found.query)
+            .find_from_scryfall(cache_found.query.clone())
             .await?;
 
         for face in card_faces.iter() {
@@ -144,7 +143,7 @@ impl<'a> MTG {
 
     async fn find_from_scryfall(
         &'a self,
-        query: &'a QueryParams<'a>
+        query: QueryParams<'a>
     ) -> Option<Vec<FoundCard>> {
         let card = self.search_scryfall_card_data(&query.name).await?;
         match &card.card_faces {
@@ -158,7 +157,7 @@ impl<'a> MTG {
                 ])
                     .await;
 
-                Some(FoundCard::new_2_faced_card(query, &card, images))
+                Some(FoundCard::new_2_faced_card(query.clone(), &card, images))
             }
             None => {
                 log::info!(
@@ -169,7 +168,7 @@ impl<'a> MTG {
                     .search_single_faced_image(&card, card.image_uris.as_ref()?)
                     .await?;
 
-                Some(FoundCard::new_card(query, &card, image))
+                Some(FoundCard::new_card(query.clone(), &card, image))
             }
         }
     }
