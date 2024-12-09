@@ -27,7 +27,7 @@ impl<'a> Handler {
                 for card_face in card {
                     utils::send_image(
                         &card_face.image,
-                        &format!("{}.png", card_face.query.name),
+                        &format!("{}.png", card_face.name),
                         None,
                         &msg,
                         &ctx,
@@ -47,7 +47,7 @@ impl<'a> Handler {
                                 log::info!("Better match found from scryfall");
                                 utils::send_image(
                                     &better_face.image,
-                                    &format!("{}.png", better_face.query.raw_name),
+                                    &format!("{}.png", better_face.raw_name),
                                     Some("I found a better match on further searches: "),
                                     &msg,
                                     &ctx,
@@ -185,7 +185,8 @@ impl<'a> QueryParams<'a> {
 }
 
 pub struct FoundCard<'a> {
-    pub query: &'a QueryParams<'a>,
+    pub name: &'a str,
+    pub raw_name: &'a str,
     pub new_card_info: Option<NewCardInfo>,
     pub image: Vec<u8>,
     pub score: usize,
@@ -193,7 +194,7 @@ pub struct FoundCard<'a> {
 
 impl<'a> FoundCard<'a> {
     fn new_2_faced_card(
-        query: &'a QueryParams<'a>,
+        query: &'a QueryParams<'_>,
         card: &Scryfall,
         images: Vec<Option<Vec<u8>>>,
     ) -> Vec<Self> {
@@ -204,7 +205,8 @@ impl<'a> FoundCard<'a> {
             .enumerate()
             .filter_map(|(i, image)| {
                 Some(Self {
-                    query,
+                    name: &query.name,
+                    raw_name: query.raw_name,
                     image: image?,
                     new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids),
                     score: 0,
@@ -213,20 +215,22 @@ impl<'a> FoundCard<'a> {
             .collect()
     }
 
-    fn new_card(query: &'a QueryParams<'a>, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
+    fn new_card(query: &'a QueryParams<'_>, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
         vec![Self {
-            query,
+            name: &query.name,
+            raw_name: query.raw_name,
             image,
             new_card_info: Some(NewCardInfo::new_card(&card)),
             score: 0,
         }]
     }
 
-    fn existing_card(query: &'a QueryParams<'a>, images: Vec<Vec<u8>>, score: usize) -> Vec<Self> {
+    fn existing_card(query: &'a QueryParams<'_>, images: Vec<Vec<u8>>, score: usize) -> Vec<Self> {
         images
             .into_iter()
             .map(|image| Self {
-                query,
+                name: &query.name,
+                raw_name: query.raw_name,
                 image,
                 new_card_info: None,
                 score,
