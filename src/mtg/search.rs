@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use log;
 use rayon::iter::IntoParallelRefIterator;
-use regex::Regex;
+use regex::{Captures, Regex};
 use reqwest::{Error, Response};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serde::Deserialize;
@@ -22,12 +22,14 @@ use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 
 use crate::db::PSQL;
-use crate::mtg::{CardFace, FoundCard, ImageURIs, Legalities, Scryfall};
+use crate::mtg::{CardFace, FoundCard, ImageURIs, Legalities, QueryParams, Scryfall};
 use crate::mtg::NewCardInfo;
 use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
+
+
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -56,37 +58,41 @@ impl<'a> MTG {
         }
     }
 
-    pub async fn find_cards(&'a self, msg: &'a str) -> Vec<Option<Vec<FoundCard<'a>>>> {
-        let futures: Vec<_> = REGEX_COLLECTION
+    pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<Vec<FoundCard<'a>>>> {
+        let queries: Vec<_> = REGEX_COLLECTION
             .cards
             .captures_iter(&msg)
-            .filter_map(|capture| Some(self.find_card(capture.get(1)?.as_str())))
+            .filter_map(
+                |capture| {
+                    Some(QueryParams::from(capture)?)
+                }
+            )
             .collect();
+
+        let futures = queries.into_iter().map(| query | self.find_card(&query));
 
         join_all(futures).await
     }
 
-    async fn find_card(&'a self, queried_name: &'a str) -> Option<Vec<FoundCard<'a>>> {
+    async fn find_card(&'a self, query: &'a QueryParams<'a>) -> Option<Vec<FoundCard<'a>>> {
         let start = Instant::now();
 
-        let normalised_name = utils::normalise(&queried_name);
-        log::info!("'{}' normalised to '{}'", queried_name, normalised_name);
-
-        if let Some(id) = { self.card_cache.lock().await.get(&normalised_name) } {
-            log::info!("Found exact match in cache for '{normalised_name}'!");
+        if let Some(id) = { self.card_cache.lock().await.get(&query.name) } {
+            log::info!("Found exact match in cache for '{}'!", query.name);
             let images = PSQL::get()?.fetch_card(&id).await?;
 
             log::info!(
-                "Found '{normalised_name}' locally in {:.2?}",
+                "Found '{}' locally in {:.2?}",
+                query.name,
                 start.elapsed()
             );
 
-            return Some(FoundCard::existing_card(queried_name, images, 0));
+            return Some(FoundCard::existing_card(query, images, 0));
         };
 
         {
             if let Some(((matched, id), score)) =
-                { fuzzy::best_match_lev_keys(&normalised_name, &*(self.card_cache.lock().await)) }
+                { fuzzy::best_match_lev_keys(&query.name, &*(self.card_cache.lock().await)) }
             {
                 if score < 5 {
                     log::info!(
@@ -99,19 +105,19 @@ impl<'a> MTG {
 
                     log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
-                    return Some(FoundCard::existing_card(queried_name, images, score));
+                    return Some(FoundCard::existing_card(query, images, score));
                 } else {
-                    log::info!("Could not find a fuzzy match for '{}'", normalised_name);
+                    log::info!("Could not find a fuzzy match for '{}'", query.name);
                 }
             }
         };
 
         let card = self
-            .find_from_scryfall(&queried_name, &normalised_name)
+            .find_from_scryfall(&query)
             .await?;
         log::info!(
             "Found match for '{}' from scryfall in {:.2?}",
-            queried_name,
+            query.raw_name,
             start.elapsed()
         );
 
@@ -122,13 +128,12 @@ impl<'a> MTG {
         &'a self,
         cache_found: &FoundCard<'a>,
     ) -> Option<Vec<FoundCard<'a>>> {
-        let normalised_name = utils::normalise(&cache_found.queried_name);
         let card_faces = self
-            .find_from_scryfall(&cache_found.queried_name, &normalised_name)
+            .find_from_scryfall(&cache_found.query)
             .await?;
 
         for face in card_faces.iter() {
-            if fuzzy::lev(&normalised_name, &face.new_card_info.as_ref()?.name) < cache_found.score
+            if fuzzy::lev(&cache_found.query.name, &face.new_card_info.as_ref()?.name) < cache_found.score
             {
                 return Some(card_faces);
             }
@@ -139,10 +144,9 @@ impl<'a> MTG {
 
     async fn find_from_scryfall(
         &'a self,
-        queried_name: &'a str,
-        normalised_name: &str,
+        query: &'a QueryParams<'a>
     ) -> Option<Vec<FoundCard>> {
-        let card = self.search_scryfall_card_data(&normalised_name).await?;
+        let card = self.search_scryfall_card_data(&query.name).await?;
         match &card.card_faces {
             Some(card_faces) => {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
@@ -154,7 +158,7 @@ impl<'a> MTG {
                 ])
                     .await;
 
-                Some(FoundCard::new_2_faced_card(queried_name, &card, images))
+                Some(FoundCard::new_2_faced_card(query, &card, images))
             }
             None => {
                 log::info!(
@@ -165,7 +169,7 @@ impl<'a> MTG {
                     .search_single_faced_image(&card, card.image_uris.as_ref()?)
                     .await?;
 
-                Some(FoundCard::new_card(queried_name, &card, image))
+                Some(FoundCard::new_card(query, &card, image))
             }
         }
     }

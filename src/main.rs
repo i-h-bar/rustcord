@@ -37,7 +37,7 @@ impl EventHandler for Handler {
         } else if msg.content == "!ping" {
             utils::send("Pong!", &msg, &ctx).await
         } else {
-            for card in self.mtg.find_cards(&msg.content).await {
+            for card in self.mtg.parse_message(&msg.content).await {
                 self.card_response(&card, &msg, &ctx).await;
             }
         }

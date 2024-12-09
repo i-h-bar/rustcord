@@ -8,7 +8,7 @@ use unicode_normalization::UnicodeNormalization;
 
 pub static REGEX_COLLECTION: Lazy<RegexCollection> = Lazy::new(|| {
     let punctuation_removal = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
-    let cards = Regex::new(r#"\[\[(.*?)]]"#).expect("Invalid regex");
+    let cards = Regex::new(r#"(?i)\[\[(.*?)(:?\|(:?set=(.*?)?)?)?(:?\|(:?artist=(.*?)?)?)?]]"#).expect("Invalid regex");
     RegexCollection {
         punctuation_removal,
         cards,

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use regex::Captures;
 
 use serde::Deserialize;
 use serenity::all::{Context, Message};
@@ -26,7 +27,7 @@ impl<'a> Handler {
                 for card_face in card {
                     utils::send_image(
                         &card_face.image,
-                        &format!("{}.png", card_face.queried_name),
+                        &format!("{}.png", card_face.query.name),
                         None,
                         &msg,
                         &ctx,
@@ -46,7 +47,7 @@ impl<'a> Handler {
                                 log::info!("Better match found from scryfall");
                                 utils::send_image(
                                     &better_face.image,
-                                    &format!("{}.png", better_face.queried_name),
+                                    &format!("{}.png", better_face.query.raw_name),
                                     Some("I found a better match on further searches: "),
                                     &msg,
                                     &ctx,
@@ -149,8 +150,42 @@ impl NewCardInfo {
     }
 }
 
+struct QueryParams<'a> {
+    name: String,
+    raw_name: &'a str,
+    set_code: Option<&'a str>,
+    set_name: Option<&'a str>,
+    artist: Option<&'a str>
+}
+
+
+impl<'a> QueryParams<'a> {
+    fn from(capture: Captures<'a>) -> Option<Self> {
+        let raw_name = capture.get(1)?.as_str();
+        let name = utils::normalise(&raw_name);
+        let (set_code, set_name) = match capture.get(4) {
+            Some(set) => {
+                let set = set.as_str();
+                if set.chars().count() == 3 {
+                    (Some(set), None)
+                } else {
+                    (None, Some(set))
+                }
+            },
+            None => (None, None)
+        };
+
+        let artist = match capture.get(7) {
+            Some(artist) => Some(artist.as_str()),
+            None => None
+        };
+
+        Some( Self { name, raw_name, artist, set_code, set_name } )
+    }
+}
+
 pub struct FoundCard<'a> {
-    pub queried_name: &'a str,
+    pub query: &'a QueryParams<'a>,
     pub new_card_info: Option<NewCardInfo>,
     pub image: Vec<u8>,
     pub score: usize,
@@ -158,7 +193,7 @@ pub struct FoundCard<'a> {
 
 impl<'a> FoundCard<'a> {
     fn new_2_faced_card(
-        queried_name: &'a str,
+        query: &'a QueryParams<'a>,
         card: &Scryfall,
         images: Vec<Option<Vec<u8>>>,
     ) -> Vec<Self> {
@@ -169,7 +204,7 @@ impl<'a> FoundCard<'a> {
             .enumerate()
             .filter_map(|(i, image)| {
                 Some(Self {
-                    queried_name,
+                    query,
                     image: image?,
                     new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids),
                     score: 0,
@@ -178,20 +213,20 @@ impl<'a> FoundCard<'a> {
             .collect()
     }
 
-    fn new_card(queried_name: &'a str, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
+    fn new_card(query: &'a QueryParams<'a>, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
         vec![Self {
-            queried_name,
+            query,
             image,
             new_card_info: Some(NewCardInfo::new_card(&card)),
             score: 0,
         }]
     }
 
-    fn existing_card(queried_name: &'a str, images: Vec<Vec<u8>>, score: usize) -> Vec<Self> {
+    fn existing_card(query: &'a QueryParams<'a>, images: Vec<Vec<u8>>, score: usize) -> Vec<Self> {
         images
             .into_iter()
             .map(|image| Self {
-                queried_name,
+                query,
                 image,
                 new_card_info: None,
                 score,
