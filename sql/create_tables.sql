@@ -1,11 +1,11 @@
 
-create table sets(
+create table sets (
     id uuid primary key,
     name varchar(150),
     code char(3)
 );
 
-create table images(
+create table images (
     id uuid primary key,
     png bytea
 );
@@ -51,7 +51,7 @@ create table rules (
     legalities_id uuid references legalities(id)
 );
 
-create table cards(
+create table cards (
     id uuid primary key,
     name varchar(150),
     flavour_text text,
