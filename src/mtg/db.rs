@@ -4,7 +4,7 @@ use sqlx::Row;
 use uuid::Uuid;
 
 use crate::db::PSQL;
-use crate::mtg::{FoundCard, CardInfo};
+use crate::mtg::{CardInfo, FoundCard};
 
 const LEGALITIES_INSERT: &str = r#"
 INSERT INTO legalities
@@ -148,7 +148,7 @@ impl PSQL {
                 self.add_to_images(&back_image).await
             } else {
                 log::warn!("Could not add the back image as there was none to add");
-                return
+                return;
             };
 
             let legalities_id = self.add_to_legalities(&card_info).await;

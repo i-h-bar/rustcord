@@ -6,8 +6,8 @@ use serde::Deserialize;
 use serenity::all::{Context, Message};
 use uuid::Uuid;
 
-use crate::{Handler, utils};
 use crate::db::PSQL;
+use crate::{utils, Handler};
 
 mod db;
 pub mod search;
@@ -36,7 +36,7 @@ impl<'a> Handler {
                     &msg,
                     &ctx,
                 )
-                    .await;
+                .await;
 
                 if let Some(image) = &card.back_image {
                     utils::send_image(
@@ -46,15 +46,13 @@ impl<'a> Handler {
                         &msg,
                         &ctx,
                     )
-                        .await;
+                    .await;
                 }
                 self.add_to_local_stores(&card).await;
 
                 if card.score > 3 {
                     log::info!("Score is high searching scryfall for potential better match");
-                    if let Some(better_card) =
-                        self.mtg.find_possible_better_match(&card).await
-                    {
+                    if let Some(better_card) = self.mtg.find_possible_better_match(&card).await {
                         log::info!("Better match found from scryfall");
                         utils::send_image(
                             &better_card.image,
@@ -63,7 +61,7 @@ impl<'a> Handler {
                             &msg,
                             &ctx,
                         )
-                            .await;
+                        .await;
 
                         if let Some(image) = &better_card.back_image {
                             utils::send_image(
@@ -73,7 +71,7 @@ impl<'a> Handler {
                                 &msg,
                                 &ctx,
                             )
-                                .await;
+                            .await;
                         }
 
                         self.add_to_local_stores(&better_card).await;
@@ -83,7 +81,6 @@ impl<'a> Handler {
         }
     }
 }
-
 
 pub struct CardInfo {
     card_id: String,
@@ -109,7 +106,12 @@ pub struct CardInfo {
 }
 
 impl CardInfo {
-    fn new_back(card: &Scryfall, front: &CardInfo, card_id: String, other_side: &String) -> Option<Self> {
+    fn new_back(
+        card: &Scryfall,
+        front: &CardInfo,
+        card_id: String,
+        other_side: &String,
+    ) -> Option<Self> {
         let face = card.card_faces.as_ref()?.get(1)?;
 
         Some(Self {
@@ -252,11 +254,15 @@ impl<'a> FoundCard<'a> {
         }
     }
 
-    fn existing_card(query: Arc<QueryParams<'a>>, images: Vec<Vec<u8>>, score: usize) -> Option<Self> {
+    fn existing_card(
+        query: Arc<QueryParams<'a>>,
+        images: Vec<Vec<u8>>,
+        score: usize,
+    ) -> Option<Self> {
         let font_image = images.get(0)?.to_owned();
         let back_image = match images.get(1) {
             Some(image) => Some(image.to_owned()),
-            None => None
+            None => None,
         };
 
         Some(Self {

@@ -107,12 +107,11 @@ impl<'a> MTG {
             .find_from_scryfall(Arc::clone(&cache_found.query))
             .await?;
 
-        if fuzzy::lev(&cache_found.query.name, &card.front.as_ref()?.name) < cache_found.score
-        {
+        if fuzzy::lev(&cache_found.query.name, &card.front.as_ref()?.name) < cache_found.score {
             return Some(card);
         } else if let Some(back) = &card.back {
             if fuzzy::lev(&cache_found.query.name, &back.name) < cache_found.score {
-                return Some(card)
+                return Some(card);
             }
         }
 
@@ -223,7 +222,11 @@ impl<'a> MTG {
                 .lock()
                 .await
                 .insert(new_card.name.to_string(), new_card.card_id.to_string());
-            log::info!("Added '{}' - {} to local cache", new_card.name, new_card.card_id);
+            log::info!(
+                "Added '{}' - {} to local cache",
+                new_card.name,
+                new_card.card_id
+            );
         }
 
         if let Some(new_card) = &card.back {
@@ -231,7 +234,11 @@ impl<'a> MTG {
                 .lock()
                 .await
                 .insert(new_card.name.to_string(), new_card.card_id.to_string());
-            log::info!("Added '{}' - {} to local cache", new_card.name, new_card.card_id);
+            log::info!(
+                "Added '{}' - {} to local cache",
+                new_card.name,
+                new_card.card_id
+            );
         }
     }
 }
