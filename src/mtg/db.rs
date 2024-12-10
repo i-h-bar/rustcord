@@ -4,7 +4,7 @@ use sqlx::Row;
 use uuid::Uuid;
 
 use crate::db::PSQL;
-use crate::mtg::{FoundCard, NewCardInfo};
+use crate::mtg::{FoundCard, CardInfo};
 
 const LEGALITIES_INSERT: &str = r#"
 INSERT INTO legalities
@@ -30,7 +30,7 @@ select png from cards join images on cards.image_id = images.id where cards.id =
 "#;
 
 impl PSQL {
-    async fn add_to_legalities(&self, card: &NewCardInfo) -> Uuid {
+    async fn add_to_legalities(&self, card: &CardInfo) -> Uuid {
         let legalities_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(LEGALITIES_INSERT)
             .bind(&legalities_id)
@@ -65,7 +65,7 @@ impl PSQL {
         legalities_id
     }
 
-    async fn add_to_rules(&self, card: &NewCardInfo, legalities_id: &Uuid) -> Uuid {
+    async fn add_to_rules(&self, card: &CardInfo, legalities_id: &Uuid) -> Uuid {
         let rules_id = Uuid::new_v4();
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
@@ -103,7 +103,7 @@ impl PSQL {
         image_id
     }
 
-    async fn add_to_sets(&self, card: &NewCardInfo) {
+    async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
             .bind(&card.set_name)
@@ -115,7 +115,7 @@ impl PSQL {
         };
     }
 
-    async fn add_to_cards(&self, card: &NewCardInfo, image_id: &Uuid, rules_id: &Uuid) {
+    async fn add_to_cards(&self, card: &CardInfo, image_id: &Uuid, rules_id: &Uuid) {
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.card_id)
             .bind(&card.name)
@@ -133,10 +133,26 @@ impl PSQL {
     }
 
     pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>) {
-        if let Some(card_info) = &card.new_card_info {
+        if let Some(card_info) = &card.front {
             let legalities_id = self.add_to_legalities(&card_info).await;
             let rules_id = self.add_to_rules(&card_info, &legalities_id).await;
             let image_id = self.add_to_images(&card.image).await;
+            self.add_to_sets(&card_info).await;
+            self.add_to_cards(&card_info, &image_id, &rules_id).await;
+
+            log::info!("Added {} to postgres", card_info.name)
+        }
+
+        if let Some(card_info) = &card.back {
+            let image_id = if let Some(back_image) = &card.back_image {
+                self.add_to_images(&back_image).await
+            } else {
+                log::warn!("Could not add the back image as there was none to add");
+                return
+            };
+
+            let legalities_id = self.add_to_legalities(&card_info).await;
+            let rules_id = self.add_to_rules(&card_info, &legalities_id).await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
 

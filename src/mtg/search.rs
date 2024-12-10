@@ -8,28 +8,26 @@ use std::time::Duration;
 use log;
 use rayon::iter::IntoParallelRefIterator;
 use regex::{Captures, Regex};
-use reqwest::{Error, Response};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::{Error, Response};
 use serde::Deserialize;
 use serenity::all::{Cache, Message};
 use serenity::futures::future::join_all;
 use serenity::prelude::*;
-use sqlx::{Executor, Pool, Postgres, Row};
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 
 use crate::db::PSQL;
+use crate::mtg::CardInfo;
 use crate::mtg::{CardFace, FoundCard, ImageURIs, Legalities, QueryParams, Scryfall};
-use crate::mtg::NewCardInfo;
 use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
-
-
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -58,35 +56,30 @@ impl<'a> MTG {
         }
     }
 
-    pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<Vec<FoundCard<'a>>>> {
+    pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<FoundCard<'a>>> {
         let queries: Vec<_> = REGEX_COLLECTION
             .cards
             .captures_iter(&msg)
-            .filter_map(
-                |capture| {
-                    Some(QueryParams::from(capture)?)
-                }
-            )
+            .filter_map(|capture| Some(Arc::new(QueryParams::from(capture)?)))
             .collect();
 
-        let futures = queries.into_iter().map(| query | self.find_card(query));
+        let futures = queries
+            .into_iter()
+            .map(|query| self.find_card(Arc::clone(&query)));
+
         join_all(futures).await
     }
 
-    async fn find_card(&'a self, query: QueryParams<'a>) -> Option<Vec<FoundCard<'a>>> {
+    async fn find_card(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
         if let Some(id) = { self.card_cache.lock().await.get(&query.name) } {
             log::info!("Found exact match in cache for '{}'!", query.name);
             let images = PSQL::get()?.fetch_card(&id).await?;
 
-            log::info!(
-                "Found '{}' locally in {:.2?}",
-                query.name,
-                start.elapsed()
-            );
+            log::info!("Found '{}' locally in {:.2?}", query.name, start.elapsed());
 
-            return Some(FoundCard::existing_card(query, images, 0));
+            return FoundCard::existing_card(query, images, 0);
         };
 
         {
@@ -104,16 +97,14 @@ impl<'a> MTG {
 
                     log::info!("Found '{matched}' fuzzily in {:.2?}", start.elapsed());
 
-                    return Some(FoundCard::existing_card(query, images, score));
+                    return FoundCard::existing_card(query, images, score);
                 } else {
                     log::info!("Could not find a fuzzy match for '{}'", query.name);
                 }
             }
         };
 
-        let card = self
-            .find_from_scryfall(query.clone())
-            .await?;
+        let card = self.find_from_scryfall(Arc::clone(&query)).await?;
         log::info!(
             "Found match for '{}' from scryfall in {:.2?}",
             query.raw_name,
@@ -125,26 +116,25 @@ impl<'a> MTG {
 
     pub async fn find_possible_better_match(
         &'a self,
-        cache_found: &'a FoundCard<'a>
-    ) -> Option<Vec<FoundCard<'a>>> {
-        let card_faces = self
-            .find_from_scryfall(cache_found.query.clone())
+        cache_found: &'a FoundCard<'a>,
+    ) -> Option<FoundCard<'a>> {
+        let card = self
+            .find_from_scryfall(Arc::clone(&cache_found.query))
             .await?;
 
-        for face in card_faces.iter() {
-            if fuzzy::lev(&cache_found.query.name, &face.new_card_info.as_ref()?.name) < cache_found.score
-            {
-                return Some(card_faces);
+        if fuzzy::lev(&cache_found.query.name, &card.front.as_ref()?.name) < cache_found.score
+        {
+            return Some(card);
+        } else if let Some(back) = &card.back {
+            if fuzzy::lev(&cache_found.query.name, &back.name) < cache_found.score {
+                return Some(card)
             }
         }
 
         None
     }
 
-    async fn find_from_scryfall(
-        &'a self,
-        query: QueryParams<'a>
-    ) -> Option<Vec<FoundCard>> {
+    async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard> {
         let card = self.search_scryfall_card_data(&query.name).await?;
         match &card.card_faces {
             Some(card_faces) => {
@@ -155,9 +145,9 @@ impl<'a> MTG {
                     self.search_single_faced_image(&card, &face_0.image_uris),
                     self.search_single_faced_image(&card, &face_1.image_uris),
                 ])
-                    .await;
+                .await;
 
-                Some(FoundCard::new_2_faced_card(query.clone(), &card, images))
+                FoundCard::new_2_faced_card(Arc::clone(&query), &card, images)
             }
             None => {
                 log::info!(
@@ -168,7 +158,7 @@ impl<'a> MTG {
                     .search_single_faced_image(&card, card.image_uris.as_ref()?)
                     .await?;
 
-                Some(FoundCard::new_card(query.clone(), &card, image))
+                Some(FoundCard::new_card(Arc::clone(&query), &card, image))
             }
         }
     }
@@ -187,12 +177,12 @@ impl<'a> MTG {
                 }
             }
         }
-            .bytes()
-            .await
-            else {
-                log::warn!("Failed to retrieve image bytes");
-                return None;
-            };
+        .bytes()
+        .await
+        else {
+            log::warn!("Failed to retrieve image bytes");
+            return None;
+        };
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
@@ -212,7 +202,7 @@ impl<'a> MTG {
                     &card,
                     &card.card_faces.as_ref()?.get(0)?.image_uris,
                 )
-                    .await?,
+                .await?,
                 card.card_faces.as_ref()?.get(0)?,
             ))
         } else {
@@ -221,7 +211,7 @@ impl<'a> MTG {
                     &card,
                     &card.card_faces.as_ref()?.get(1)?.image_uris,
                 )
-                    .await?,
+                .await?,
                 card.card_faces.as_ref()?.get(1)?,
             ))
         }
@@ -253,7 +243,10 @@ impl<'a> MTG {
         } else {
             match response.status().as_u16() {
                 404 => {
-                    log::info!("Could not find card from scryfall with the name '{}'", queried_name)
+                    log::info!(
+                        "Could not find card from scryfall with the name '{}'",
+                        queried_name
+                    )
                 }
                 status => {
                     log::warn!(
@@ -269,12 +262,20 @@ impl<'a> MTG {
     }
 
     pub async fn update_local_cache(&self, card: &FoundCard<'a>) {
-        if let Some(new_card) = &card.new_card_info {
+        if let Some(new_card) = &card.front {
             self.card_cache
                 .lock()
                 .await
                 .insert(new_card.name.to_string(), new_card.card_id.to_string());
-            log::info!("Added '{}' to local cache", new_card.name);
+            log::info!("Added '{}' - {} to local cache", new_card.name, new_card.card_id);
+        }
+
+        if let Some(new_card) = &card.back {
+            self.card_cache
+                .lock()
+                .await
+                .insert(new_card.name.to_string(), new_card.card_id.to_string());
+            log::info!("Added '{}' - {} to local cache", new_card.name, new_card.card_id);
         }
     }
 }

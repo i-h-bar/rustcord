@@ -8,7 +8,8 @@ use unicode_normalization::UnicodeNormalization;
 
 pub static REGEX_COLLECTION: Lazy<RegexCollection> = Lazy::new(|| {
     let punctuation_removal = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
-    let cards = Regex::new(r#"(?i)\[\[(.*?)(:?\|(:?set=(.*?)?)?)?(:?\|(:?artist=(.*?)?)?)?]]"#).expect("Invalid regex");
+    let cards = Regex::new(r#"(?i)\[\[(.*?)(:?\|(:?set=(.*?)?)?)?(:?\|(:?artist=(.*?)?)?)?]]"#)
+        .expect("Invalid regex");
     RegexCollection {
         punctuation_removal,
         cards,
@@ -31,7 +32,13 @@ pub async fn send(content: &str, msg: &Message, ctx: &Context) {
     }
 }
 
-pub async fn send_image(image: &Vec<u8>, image_name: &String, content: Option<&str>, msg: &Message, ctx: &Context) {
+pub async fn send_image(
+    image: &Vec<u8>,
+    image_name: &String,
+    content: Option<&str>,
+    msg: &Message,
+    ctx: &Context,
+) {
     let message = if let Some(content) = content {
         let message = CreateMessage::new();
         message.content(content)
