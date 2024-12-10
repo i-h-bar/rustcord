@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use rayon::prelude::*;
 use std::cmp;
 use std::collections::HashMap;

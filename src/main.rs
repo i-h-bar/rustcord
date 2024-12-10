@@ -1,4 +1,3 @@
-#![allow(warnings)]
 extern crate core;
 
 use std::env;
@@ -8,7 +7,6 @@ use serenity::all::{GatewayIntents, Message, Ready};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
-use sqlx::{Executor, Row};
 
 use crate::db::PSQL;
 use crate::mtg::search::MTG;

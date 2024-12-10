@@ -1,30 +1,15 @@
-use std::collections::{HashMap, HashSet};
-use std::env;
-use std::hash::Hash;
-use std::marker::PhantomData;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use log;
-use rayon::iter::IntoParallelRefIterator;
-use regex::{Captures, Regex};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-use reqwest::{Error, Response};
-use serde::Deserialize;
-use serenity::all::{Cache, Message};
 use serenity::futures::future::join_all;
-use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
-use sqlx::{Executor, Pool, Postgres, Row};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
-use unicode_normalization::UnicodeNormalization;
-use uuid::Uuid;
 
 use crate::db::PSQL;
-use crate::mtg::CardInfo;
-use crate::mtg::{CardFace, FoundCard, ImageURIs, Legalities, QueryParams, Scryfall};
-use crate::utils;
+use crate::mtg::{CardFace, FoundCard, ImageURIs, QueryParams, Scryfall};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
@@ -186,35 +171,6 @@ impl<'a> MTG {
 
         log::info!("Image found for - \"{}\".", &card.name);
         Some(image.to_vec())
-    }
-
-    async fn search_dual_faced_image(
-        &'a self,
-        card: &'a Scryfall,
-        queried_name: &str,
-    ) -> Option<(Vec<u8>, &'a CardFace)> {
-        let lev_0 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(0)?.name);
-        let lev_1 = fuzzy::lev(&queried_name, &card.card_faces.as_ref()?.get(1)?.name);
-
-        if lev_0 < lev_1 {
-            Some((
-                self.search_single_faced_image(
-                    &card,
-                    &card.card_faces.as_ref()?.get(0)?.image_uris,
-                )
-                .await?,
-                card.card_faces.as_ref()?.get(0)?,
-            ))
-        } else {
-            Some((
-                self.search_single_faced_image(
-                    &card,
-                    &card.card_faces.as_ref()?.get(1)?.image_uris,
-                )
-                .await?,
-                card.card_faces.as_ref()?.get(1)?,
-            ))
-        }
     }
 
     async fn search_scryfall_card_data(&self, queried_name: &str) -> Option<Scryfall> {

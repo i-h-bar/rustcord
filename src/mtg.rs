@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use log::{info, log};
 
 use regex::Captures;
 use serde::Deserialize;
@@ -88,8 +87,6 @@ impl<'a> Handler {
 
 pub struct CardInfo {
     card_id: String,
-    image_id: Uuid,
-    rules_id: Uuid,
     legalities_id: Uuid,
     pub(crate) name: String,
     flavour_text: Option<String>,
@@ -117,8 +114,6 @@ impl CardInfo {
 
         Some(Self {
             card_id,
-            image_id: Uuid::new_v4(),
-            rules_id: Uuid::new_v4(),
             legalities_id: front.legalities_id,
             name: utils::normalise(&face.name),
             flavour_text: face.flavor_text.to_owned(),
@@ -154,8 +149,6 @@ impl CardInfo {
 
         Self {
             card_id: card.id.to_owned(),
-            image_id: Uuid::new_v4(),
-            rules_id: Uuid::new_v4(),
             legalities_id: Uuid::new_v4(),
             name,
             flavour_text: card.flavor_text.to_owned(),
@@ -179,7 +172,7 @@ impl CardInfo {
     }
 }
 
-struct QueryParams<'a> {
+pub struct QueryParams<'a> {
     name: String,
     raw_name: &'a str,
     set_code: Option<&'a str>,
@@ -305,28 +298,38 @@ struct Legalities {
 
 #[derive(Deserialize, Clone)]
 struct ImageURIs {
+    #[allow(dead_code)]
     art_crop: String,
+    #[allow(dead_code)]
     border_crop: String,
+    #[allow(dead_code)]
     large: String,
+    #[allow(dead_code)]
     normal: String,
     pub png: String,
+    #[allow(dead_code)]
     small: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 struct CardFace {
+    #[allow(dead_code)]
     object: String,
     name: String,
     mana_cost: Option<String>,
     type_line: String,
     oracle_text: Option<String>,
+    #[allow(dead_code)]
     colors: Vec<String>,
     defence: Option<String>,
     power: Option<String>,
     toughness: Option<String>,
     loyalty: Option<String>,
+    #[allow(dead_code)]
     artist: String,
+    #[allow(dead_code)]
     artist_id: String,
+    #[allow(dead_code)]
     illustration_id: String,
     flavor_text: Option<String>,
     keywords: Option<Vec<String>>,
@@ -336,71 +339,119 @@ struct CardFace {
 #[derive(Deserialize)]
 pub struct Scryfall {
     artist: String,
+    #[allow(dead_code)]
     artist_ids: Vec<String>,
+    #[allow(dead_code)]
     booster: bool,
+    #[allow(dead_code)]
     border_color: String,
+    #[allow(dead_code)]
     card_back_id: Option<String>,
     card_faces: Option<Vec<CardFace>>,
+    #[allow(dead_code)]
     cardmarket_id: Option<u32>,
     cmc: f32,
+    #[allow(dead_code)]
     collector_number: String,
     color_identity: Vec<String>,
+    #[allow(dead_code)]
     colors: Option<Vec<String>>,
     loyalty: Option<String>,
     defence: Option<String>,
+    #[allow(dead_code)]
     digital: bool,
+    #[allow(dead_code)]
     edhrec_rank: Option<u32>,
+    #[allow(dead_code)]
     finishes: Vec<String>,
     flavor_text: Option<String>,
+    #[allow(dead_code)]
     foil: bool,
+    #[allow(dead_code)]
     frame: String,
+    #[allow(dead_code)]
     full_art: bool,
+    #[allow(dead_code)]
     games: Vec<String>,
+    #[allow(dead_code)]
     highres_image: bool,
     id: String,
+    #[allow(dead_code)]
     illustration_id: Option<String>,
+    #[allow(dead_code)]
     image_status: String,
     image_uris: Option<ImageURIs>,
     keywords: Option<Vec<String>>,
+    #[allow(dead_code)]
     lang: String,
+    #[allow(dead_code)]
     layout: String,
     legalities: Legalities,
     mana_cost: Option<String>,
+    #[allow(dead_code)]
     mtgo_foil_id: Option<u32>,
+    #[allow(dead_code)]
     mtgo_id: Option<u32>,
+    #[allow(dead_code)]
     multiverse_ids: Vec<u32>,
     name: String,
+    #[allow(dead_code)]
     nonfoil: bool,
+    #[allow(dead_code)]
     object: String,
+    #[allow(dead_code)]
     oracle_id: String,
     oracle_text: Option<String>,
+    #[allow(dead_code)]
     oversized: bool,
+    #[allow(dead_code)]
     penny_rank: Option<u32>,
     power: Option<String>,
+    #[allow(dead_code)]
     prices: HashMap<String, Option<String>>,
+    #[allow(dead_code)]
     prints_search_uri: String,
+    #[allow(dead_code)]
     promo: bool,
+    #[allow(dead_code)]
     purchase_uris: HashMap<String, String>,
+    #[allow(dead_code)]
     rarity: String,
+    #[allow(dead_code)]
     related_uris: HashMap<String, String>,
+    #[allow(dead_code)]
     released_at: String,
+    #[allow(dead_code)]
     reprint: bool,
+    #[allow(dead_code)]
     reserved: bool,
+    #[allow(dead_code)]
     rulings_uri: String,
+    #[allow(dead_code)]
     scryfall_set_uri: String,
+    #[allow(dead_code)]
     scryfall_uri: String,
     set: String,
     set_id: String,
     set_name: String,
+    #[allow(dead_code)]
     set_search_uri: String,
+    #[allow(dead_code)]
     set_type: String,
+    #[allow(dead_code)]
     set_uri: String,
+    #[allow(dead_code)]
     story_spotlight: bool,
+    #[allow(dead_code)]
     tcgplayer_id: Option<u32>,
+    #[allow(dead_code)]
     textless: bool,
     toughness: Option<String>,
     type_line: String,
+    #[allow(dead_code)]
     uri: String,
+    #[allow(dead_code)]
     variation: bool,
+    #[allow(dead_code)]
     watermark: Option<String>,
 }
