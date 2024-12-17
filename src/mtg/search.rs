@@ -58,6 +58,8 @@ impl<'a> MTG {
     async fn find_card(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
+
+
         if let Some(id) = { self.card_cache.lock().await.get(&query.name) } {
             log::info!("Found exact match in cache for '{}'!", query.name);
             let images = PSQL::get()?.fetch_card(&id).await?;

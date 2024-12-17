@@ -29,6 +29,19 @@ const EXACT_MATCH: &str = r#"
 select png from cards join images on cards.image_id = images.id where cards.id = uuid($1) or cards.other_side = uuid($1)
 "#;
 
+const FUZZY_FIND: &str = r#"
+select images.png, card.name, sml from images join (
+    select cards.name, cards.image_id, similarity(cards.name, 'gitrog monster') as sml
+    from cards order by sml desc limit 1
+) as card on card.image_id = images.id
+"#;
+
+struct FuzzyFound {
+    png: Vec<u8>,
+    name: String,
+    similarity: f32,
+}
+
 impl PSQL {
     async fn add_to_legalities(&self, card: &CardInfo) -> Uuid {
         let legalities_id = Uuid::new_v4();
@@ -171,6 +184,24 @@ impl PSQL {
                 None
             }
             Ok(rows) => rows.into_iter().map(|row| row.get("png")).collect(),
+        }
+    }
+
+    pub async fn fuzzy_fetch(&self, name: &str) -> Option<FuzzyFound> {
+        match sqlx::query(FUZZY_FIND)
+            .bind(&name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed card fetch - {why}");
+                None
+            }
+            Ok(row) => Some(FuzzyFound {
+                png: row.get("png")?,
+                name: row.get("name")?,
+                similarity: row.get("sml")?,
+            }),
         }
     }
 
