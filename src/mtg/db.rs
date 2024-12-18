@@ -1,6 +1,6 @@
+use sqlx::postgres::PgRow;
+use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
-
-use sqlx::Row;
 use uuid::Uuid;
 
 use crate::db::PSQL;
@@ -30,16 +30,46 @@ select png from cards join images on cards.image_id = images.id where cards.id =
 "#;
 
 const FUZZY_FIND: &str = r#"
-select images.png, card.name, sml from images join (
-    select cards.name, cards.image_id, similarity(cards.name, 'gitrog monster') as sml
-    from cards order by sml desc limit 1
-) as card on card.image_id = images.id
+select name,
+       png,
+       other_side,
+       similarity(cards.name, $1) as sml
+from cards join images on cards.image_id = images.id
+order by sml desc
+limit 1;
 "#;
 
-struct FuzzyFound {
-    png: Vec<u8>,
-    name: String,
-    similarity: f32,
+const BACKSIDE_FIND: &str = r#"
+select png, name, other_side from cards join images on cards.image_id = images.id where cards.id = uuid($1)
+"#;
+
+pub struct FuzzyFound {
+    pub(crate) png: Vec<u8>,
+    pub(crate) name: String,
+    pub(crate) similarity: f32,
+    pub(crate) other_side: Option<String>,
+}
+
+impl<'r> FromRow<'r, PgRow> for FuzzyFound {
+    fn from_row(row: &'r PgRow) -> Result<Self, Error> {
+        let other_side = match row.try_get::<Option<Uuid>, &str>("other_side") {
+            Ok(id) => match id {
+                Some(uuid) => Some(uuid.to_string()),
+                None => None,
+            },
+            Err(why) => {
+                log::warn!("Failed to get other side - {why}");
+                None
+            }
+        };
+
+        Ok(FuzzyFound {
+            png: row.get::<Vec<u8>, &str>("png"),
+            name: row.get::<String, &str>("name"),
+            similarity: row.try_get::<f32, &str>("sml").unwrap_or_else(|_| 0.0),
+            other_side,
+        })
+    }
 }
 
 impl PSQL {
@@ -173,17 +203,17 @@ impl PSQL {
         }
     }
 
-    pub async fn fetch_card(&self, id: &str) -> Option<Vec<Vec<u8>>> {
-        match sqlx::query(EXACT_MATCH)
-            .bind(&id)
-            .fetch_all(&self.pool)
+    pub async fn fetch_backside(&self, card_id: &str) -> Option<FuzzyFound> {
+        match sqlx::query(BACKSIDE_FIND)
+            .bind(&card_id)
+            .fetch_one(&self.pool)
             .await
         {
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
                 None
             }
-            Ok(rows) => rows.into_iter().map(|row| row.get("png")).collect(),
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
     }
 
@@ -197,11 +227,7 @@ impl PSQL {
                 log::warn!("Failed card fetch - {why}");
                 None
             }
-            Ok(row) => Some(FuzzyFound {
-                png: row.get("png")?,
-                name: row.get("name")?,
-                similarity: row.get("sml")?,
-            }),
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
     }
 

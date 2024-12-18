@@ -7,6 +7,7 @@ use serenity::all::{Context, Message};
 use uuid::Uuid;
 
 use crate::db::PSQL;
+use crate::mtg::db::FuzzyFound;
 use crate::{utils, Handler};
 
 mod db;
@@ -49,34 +50,6 @@ impl<'a> Handler {
                     .await;
                 }
                 self.add_to_local_stores(&card).await;
-
-                if card.score > 3 {
-                    log::info!("Score is high searching scryfall for potential better match");
-                    if let Some(better_card) = self.mtg.find_possible_better_match(&card).await {
-                        log::info!("Better match found from scryfall");
-                        utils::send_image(
-                            &better_card.image,
-                            &format!("{}.png", better_card.query.raw_name),
-                            Some("I found a better match on further searches: "),
-                            &msg,
-                            &ctx,
-                        )
-                        .await;
-
-                        if let Some(image) = &better_card.back_image {
-                            utils::send_image(
-                                &image,
-                                &format!("{}.png", better_card.query.name),
-                                None,
-                                &msg,
-                                &ctx,
-                            )
-                            .await;
-                        }
-
-                        self.add_to_local_stores(&better_card).await;
-                    }
-                };
             }
         }
     }
@@ -219,7 +192,6 @@ pub struct FoundCard<'a> {
     pub back: Option<CardInfo>,
     pub image: Vec<u8>,
     pub back_image: Option<Vec<u8>>,
-    pub score: usize,
 }
 
 impl<'a> FoundCard<'a> {
@@ -239,7 +211,6 @@ impl<'a> FoundCard<'a> {
             back_image: images.get(1)?.to_owned(),
             front: Some(front),
             back,
-            score: 0,
         })
     }
 
@@ -250,18 +221,17 @@ impl<'a> FoundCard<'a> {
             front: Some(CardInfo::new_card(&card, None)),
             back_image: None,
             back: None,
-            score: 0,
         }
     }
 
     fn existing_card(
         query: Arc<QueryParams<'a>>,
-        images: Vec<Vec<u8>>,
-        score: usize,
+        front: FuzzyFound,
+        back: Option<FuzzyFound>,
     ) -> Option<Self> {
-        let font_image = images.get(0)?.to_owned();
-        let back_image = match images.get(1) {
-            Some(image) => Some(image.to_owned()),
+        let font_image = front.png.to_owned();
+        let back_image = match back {
+            Some(found) => Some(found.png.to_owned()),
             None => None,
         };
 
@@ -269,7 +239,6 @@ impl<'a> FoundCard<'a> {
             query: Arc::clone(&query),
             image: font_image,
             back_image,
-            score,
             front: None,
             back: None,
         })
