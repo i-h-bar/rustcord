@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use regex::Captures;
-use serde::Deserialize;
-use serenity::all::{Context, Message};
-use uuid::Uuid;
-
 use crate::db::PSQL;
 use crate::mtg::db::FuzzyFound;
 use crate::{utils, Handler};
+use db::QueryParams;
+use serde::Deserialize;
+use serenity::all::{Context, Message};
+use uuid::Uuid;
 
 mod db;
 pub mod search;
@@ -144,45 +143,6 @@ impl CardInfo {
             keywords: card.keywords.to_owned(),
             other_side,
         }
-    }
-}
-
-pub struct QueryParams<'a> {
-    name: String,
-    raw_name: &'a str,
-    set_code: Option<&'a str>,
-    set_name: Option<&'a str>,
-    artist: Option<&'a str>,
-}
-
-impl<'a> QueryParams<'a> {
-    fn from(capture: Captures<'a>) -> Option<Self> {
-        let raw_name = capture.get(1)?.as_str();
-        let name = utils::normalise(&raw_name);
-        let (set_code, set_name) = match capture.get(4) {
-            Some(set) => {
-                let set = set.as_str();
-                if set.chars().count() == 3 {
-                    (Some(set), None)
-                } else {
-                    (None, Some(set))
-                }
-            }
-            None => (None, None),
-        };
-
-        let artist = match capture.get(7) {
-            Some(artist) => Some(artist.as_str()),
-            None => None,
-        };
-
-        Some(Self {
-            name,
-            raw_name,
-            artist,
-            set_code,
-            set_name,
-        })
     }
 }
 

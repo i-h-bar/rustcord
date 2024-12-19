@@ -1,10 +1,13 @@
+use crate::db::PSQL;
+use crate::mtg::{CardInfo, FoundCard};
+use crate::utils;
+use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::sync::Arc;
 use uuid::Uuid;
-
-use crate::db::PSQL;
-use crate::mtg::{CardInfo, FoundCard};
 
 const LEGALITIES_INSERT: &str = r#"
 INSERT INTO legalities
@@ -30,11 +33,15 @@ select png from cards join images on cards.image_id = images.id where cards.id =
 "#;
 
 const FUZZY_FIND: &str = r#"
-select name,
+select cards.name,
        png,
        other_side,
        similarity(cards.name, $1) as sml
 from cards join images on cards.image_id = images.id
+join sets on cards.set_id = sets.id
+where ($2 is null OR sets.code = $2)
+and ($3 is null or similarity(sets.name, $3) > 0.75)
+and ($4 is null or similarity(cards.artist, $4) > 0.75)
 order by sml desc
 limit 1;
 "#;
@@ -217,9 +224,12 @@ impl PSQL {
         }
     }
 
-    pub async fn fuzzy_fetch(&self, name: &str) -> Option<FuzzyFound> {
+    pub async fn fuzzy_fetch(&self, query: Arc<QueryParams<'_>>) -> Option<FuzzyFound> {
         match sqlx::query(FUZZY_FIND)
-            .bind(&name)
+            .bind(&query.name)
+            .bind(&query.set_code)
+            .bind(&query.set_name)
+            .bind(&query.artist)
             .fetch_one(&self.pool)
             .await
         {
@@ -245,5 +255,44 @@ impl PSQL {
                 HashMap::new()
             }
         }
+    }
+}
+
+pub struct QueryParams<'a> {
+    pub name: String,
+    pub raw_name: &'a str,
+    set_code: Option<&'a str>,
+    set_name: Option<&'a str>,
+    artist: Option<&'a str>,
+}
+
+impl<'a> QueryParams<'a> {
+    pub fn from(capture: Captures<'a>) -> Option<Self> {
+        let raw_name = capture.get(1)?.as_str();
+        let name = utils::normalise(&raw_name);
+        let (set_code, set_name) = match capture.get(4) {
+            Some(set) => {
+                let set = set.as_str();
+                if set.chars().count() == 3 {
+                    (Some(set), None)
+                } else {
+                    (None, Some(set))
+                }
+            }
+            None => (None, None),
+        };
+
+        let artist = match capture.get(7) {
+            Some(artist) => Some(artist.as_str()),
+            None => None,
+        };
+
+        Some(Self {
+            name,
+            raw_name,
+            artist,
+            set_code,
+            set_name,
+        })
     }
 }

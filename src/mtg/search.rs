@@ -9,7 +9,8 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::db::PSQL;
-use crate::mtg::{CardFace, FoundCard, ImageURIs, QueryParams, Scryfall};
+use crate::mtg::db::QueryParams;
+use crate::mtg::{CardFace, FoundCard, ImageURIs, Scryfall};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
@@ -58,13 +59,19 @@ impl<'a> MTG {
     async fn find_card(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
-        let fuzzy_found = PSQL::get()?.fuzzy_fetch(&query.name).await?;
+        let fuzzy_found = PSQL::get()?.fuzzy_fetch(Arc::clone(&query)).await?;
         if fuzzy_found.similarity > 0.75 {
             let back = if let Some(other_side) = fuzzy_found.other_side.as_ref() {
                 PSQL::get()?.fetch_backside(&other_side).await
             } else {
                 None
             };
+
+            log::info!(
+                "Found match for '{}' from database in {:.2?}",
+                query.raw_name,
+                start.elapsed()
+            );
 
             FoundCard::existing_card(Arc::clone(&query), fuzzy_found, back)
         } else {
@@ -80,7 +87,7 @@ impl<'a> MTG {
     }
 
     async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard> {
-        let card = self.search_scryfall_card_data(&query.name).await?;
+        let card = self.search_scryfall_card_data(Arc::clone(&query)).await?;
         match &card.card_faces {
             Some(card_faces) => {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
@@ -133,17 +140,17 @@ impl<'a> MTG {
         Some(image.to_vec())
     }
 
-    async fn search_scryfall_card_data(&self, queried_name: &str) -> Option<Scryfall> {
-        log::info!("Searching scryfall for '{queried_name}'");
+    async fn search_scryfall_card_data(&self, query: Arc<QueryParams<'_>>) -> Option<Scryfall> {
+        log::info!("Searching scryfall for '{}'", query.raw_name);
         let response = match self
             .http_client
-            .get(format!("{}{}", SCRYFALL, queried_name.replace(" ", "+")))
+            .get(format!("{}{}", SCRYFALL, query.name.replace(" ", "+")))
             .send()
             .await
         {
             Ok(response) => response,
             Err(why) => {
-                log::warn!("Error searching for '{}' because: {}", queried_name, why);
+                log::warn!("Error searching for '{}' because: {}", query.raw_name, why);
                 return None;
             }
         };
@@ -161,14 +168,14 @@ impl<'a> MTG {
                 404 => {
                     log::info!(
                         "Could not find card from scryfall with the name '{}'",
-                        queried_name
+                        query.raw_name
                     )
                 }
                 status => {
                     log::warn!(
                         "None 200 response from scryfall: {} when searching for '{}'",
                         status,
-                        queried_name
+                        query.raw_name
                     );
                 }
             }
