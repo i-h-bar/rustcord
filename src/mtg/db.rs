@@ -39,9 +39,9 @@ select cards.name,
        similarity(cards.name, $1) as sml
 from cards join images on cards.image_id = images.id
 join sets on cards.set_id = sets.id
-where ($2 is null OR sets.code = $2)
+where ($4 is null or similarity(cards.artist, $4) > 0.5)
 and ($3 is null or similarity(sets.name, $3) > 0.75)
-and ($4 is null or similarity(LOWER(cards.artist), LOWER($4)) > 0.5)
+and ($2 is null OR sets.code = $2)
 order by sml desc
 limit 1;
 "#;
@@ -172,7 +172,7 @@ impl PSQL {
             .bind(&card.flavour_text)
             .bind(&card.set_id)
             .bind(&image_id)
-            .bind(&card.artist)
+            .bind(utils::normalise(&card.artist))
             .bind(&rules_id)
             .bind(&card.other_side)
             .execute(&self.pool)
@@ -263,7 +263,7 @@ pub struct QueryParams<'a> {
     pub raw_name: &'a str,
     set_code: Option<&'a str>,
     set_name: Option<&'a str>,
-    artist: Option<&'a str>,
+    artist: Option<String>,
 }
 
 impl<'a> QueryParams<'a> {
@@ -283,7 +283,7 @@ impl<'a> QueryParams<'a> {
         };
 
         let artist = match capture.get(7) {
-            Some(artist) => Some(artist.as_str()),
+            Some(artist) => Some(utils::normalise(&artist.as_str())),
             None => None,
         };
 
