@@ -261,8 +261,8 @@ impl PSQL {
 pub struct QueryParams<'a> {
     pub name: String,
     pub raw_name: &'a str,
-    pub set_code: Option<&'a str>,
-    pub set_name: Option<&'a str>,
+    pub set_code: Option<String>,
+    pub set_name: Option<String>,
     pub artist: Option<String>,
 }
 
@@ -273,10 +273,10 @@ impl<'a> QueryParams<'a> {
         let (set_code, set_name) = match capture.get(4) {
             Some(set) => {
                 let set = set.as_str();
-                if set.chars().count() == 3 {
-                    (Some(set), None)
+                if set.chars().count() < 5 {
+                    (Some(utils::normalise(set)), None)
                 } else {
-                    (None, Some(set))
+                    (None, Some(utils::normalise(set)))
                 }
             }
             None => (None, None),

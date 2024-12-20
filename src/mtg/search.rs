@@ -13,7 +13,7 @@ use crate::mtg::db::QueryParams;
 use crate::mtg::{CardFace, FoundCard, ImageURIs, ScryfallCard, ScryfallList};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
-const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";
+const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&order=released&q=";
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -59,21 +59,31 @@ impl<'a> MTG {
     async fn find_card(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
-        let fuzzy_found = PSQL::get()?.fuzzy_fetch(Arc::clone(&query)).await?;
-        if fuzzy_found.similarity > 0.75 {
-            let back = if let Some(other_side) = fuzzy_found.other_side.as_ref() {
-                PSQL::get()?.fetch_backside(&other_side).await
+        if let Some(fuzzy_found) = PSQL::get()?.fuzzy_fetch(Arc::clone(&query)).await {
+            if fuzzy_found.similarity > 0.75 {
+                let back = if let Some(other_side) = fuzzy_found.other_side.as_ref() {
+                    PSQL::get()?.fetch_backside(&other_side).await
+                } else {
+                    None
+                };
+
+                log::info!(
+                    "Found match for '{}' from database in {:.2?}",
+                    query.raw_name,
+                    start.elapsed()
+                );
+
+                FoundCard::existing_card(Arc::clone(&query), fuzzy_found, back)
             } else {
-                None
-            };
+                let card = self.find_from_scryfall(Arc::clone(&query)).await?;
+                log::info!(
+                    "Found match for '{}' from scryfall in {:.2?}",
+                    query.raw_name,
+                    start.elapsed()
+                );
 
-            log::info!(
-                "Found match for '{}' from database in {:.2?}",
-                query.raw_name,
-                start.elapsed()
-            );
-
-            FoundCard::existing_card(Arc::clone(&query), fuzzy_found, back)
+                Some(card)
+            }
         } else {
             let card = self.find_from_scryfall(Arc::clone(&query)).await?;
             log::info!(
@@ -86,8 +96,13 @@ impl<'a> MTG {
         }
     }
 
-    fn determine_best_match<'b>(&'a self, query: Arc<QueryParams<'a>>, cards: &'b ScryfallList) -> Option<&'b ScryfallCard> {
-        let unique_cards: HashSet<String> = HashSet::from_iter(cards.data.iter().map(|card| card.name.clone()));
+    fn determine_best_match<'b>(
+        &'a self,
+        query: Arc<QueryParams<'a>>,
+        cards: &'b ScryfallList,
+    ) -> Option<&'b ScryfallCard> {
+        let unique_cards: HashSet<String> =
+            HashSet::from_iter(cards.data.iter().map(|card| card.name.clone()));
         let best_match = fuzzy::best_match_lev(&query.name, &unique_cards)?;
         let potential_cards: Vec<&ScryfallCard> = cards
             .data
@@ -98,45 +113,56 @@ impl<'a> MTG {
                 } else {
                     None
                 }
-            }).collect();
+            })
+            .collect();
 
         let potential_cards = if let Some(queried_artist) = &query.artist {
-            let artists_set: HashSet<String> = HashSet::from_iter(potential_cards.iter().map(|card| card.artist.clone()));
+            let artists_set: HashSet<String> =
+                HashSet::from_iter(potential_cards.iter().map(|card| card.artist.clone()));
             let best_artist = fuzzy::best_match_lev(queried_artist, &artists_set)?;
-            potential_cards.iter().filter_map(| &card | {
-                if best_artist == queried_artist {
-                    Some(card)
-                } else {
-                    None
-                }
-            }).collect::<Vec<&ScryfallCard>>()
+            potential_cards
+                .iter()
+                .filter_map(|&card| {
+                    if best_artist == &card.artist {
+                        Some(card)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<&ScryfallCard>>()
         } else {
             potential_cards
         };
 
-
-        let potential_cards = if let Some(queried_set_name) = query.set_name {
-            let set_name_set: HashSet<String> = HashSet::from_iter(potential_cards.iter().map(|&card| card.set_name.clone()));
-            let best_set = fuzzy::best_match_lev(queried_set_name, &set_name_set)?;
-            potential_cards.iter().filter_map(| &card | {
-                if best_set == queried_set_name {
-                    Some(card)
-                } else {
-                    None
-                }
-            }).collect::<Vec<&ScryfallCard>>()
+        let potential_cards = if let Some(queried_set_name) = &query.set_name {
+            let set_name_set: HashSet<String> =
+                HashSet::from_iter(potential_cards.iter().map(|&card| card.set_name.clone()));
+            let best_set = fuzzy::best_match_lev(&queried_set_name, &set_name_set)?;
+            potential_cards
+                .iter()
+                .filter_map(|&card| {
+                    if &card.set_name == best_set {
+                        Some(card)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<&ScryfallCard>>()
         } else {
             potential_cards
         };
 
-        let potential_cards = if let Some(queried_set_code) = query.set_code {
-            potential_cards.iter().filter_map(| &card | {
-                if card.set == queried_set_code {
-                    Some(card)
-                } else {
-                    None
-                }
-            }).collect::<Vec<&ScryfallCard>>()
+        let potential_cards = if let Some(queried_set_code) = &query.set_code {
+            potential_cards
+                .iter()
+                .filter_map(|&card| {
+                    if &card.set == queried_set_code {
+                        Some(card)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<&ScryfallCard>>()
         } else {
             potential_cards
         };

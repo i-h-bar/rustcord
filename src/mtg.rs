@@ -357,7 +357,7 @@ pub struct ScryfallCard {
     #[allow(dead_code)]
     promo: bool,
     #[allow(dead_code)]
-    purchase_uris: HashMap<String, String>,
+    purchase_uris: Option<HashMap<String, String>>,
     #[allow(dead_code)]
     rarity: String,
     #[allow(dead_code)]
@@ -396,5 +396,5 @@ pub struct ScryfallCard {
     #[allow(dead_code)]
     variation: bool,
     #[allow(dead_code)]
-    watermark: Option<String>,
+    watermark: Option<String>
 }
