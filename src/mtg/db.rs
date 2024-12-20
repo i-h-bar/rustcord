@@ -156,8 +156,8 @@ impl PSQL {
     async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
-            .bind(&card.set_name)
-            .bind(&card.set_code)
+            .bind(utils::normalise(&card.set_name))
+            .bind(utils::normalise(&card.set_code))
             .execute(&self.pool)
             .await
         {
@@ -238,22 +238,6 @@ impl PSQL {
                 None
             }
             Ok(row) => FuzzyFound::from_row(&row).ok(),
-        }
-    }
-
-    pub async fn names_and_ids(&self) -> HashMap<String, String> {
-        match sqlx::query("select cards.name, cards.id from cards")
-            .fetch_all(&self.pool)
-            .await
-        {
-            Ok(rows) => rows
-                .into_iter()
-                .map(|row| (row.get("name"), row.get::<Uuid, &str>("id").to_string()))
-                .collect::<HashMap<String, String>>(),
-            Err(why) => {
-                log::warn!("Failed card fetch - {why}");
-                HashMap::new()
-            }
         }
     }
 }

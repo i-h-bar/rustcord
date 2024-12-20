@@ -17,7 +17,6 @@ const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&orde
 
 pub struct MTG {
     http_client: reqwest::Client,
-    card_cache: Mutex<HashMap<String, String>>,
 }
 
 impl<'a> MTG {
@@ -30,16 +29,7 @@ impl<'a> MTG {
             .build()
             .expect("Failed HTTP Client build");
 
-        let cards_map = PSQL::get()
-            .expect("Could not retrieve instance of DB")
-            .names_and_ids()
-            .await;
-        let card_cache = Mutex::new(cards_map);
-
-        Self {
-            http_client,
-            card_cache,
-        }
+        Self { http_client }
     }
 
     pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<FoundCard<'a>>> {
@@ -170,10 +160,7 @@ impl<'a> MTG {
         Some(*potential_cards.get(0)?)
     }
 
-    async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard> {
-        let cards = self.search_scryfall_card_data(Arc::clone(&query)).await?;
-        let card = self.determine_best_match(Arc::clone(&query), &cards)?;
-
+    pub async fn fetch_images(&self, query: Arc<QueryParams<'a>>, card: &ScryfallCard, cards: Option<ScryfallList>) -> Option<FoundCard<'a>> {
         match &card.card_faces {
             Some(card_faces) => {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
@@ -183,9 +170,9 @@ impl<'a> MTG {
                     self.search_single_faced_image(&card, &face_0.image_uris),
                     self.search_single_faced_image(&card, &face_1.image_uris),
                 ])
-                .await;
+                    .await;
 
-                FoundCard::new_2_faced_card(Arc::clone(&query), &card, images)
+                FoundCard::new_2_faced_card(Arc::clone(&query), &card, images, cards)
             }
             None => {
                 log::info!(
@@ -196,9 +183,16 @@ impl<'a> MTG {
                     .search_single_faced_image(&card, card.image_uris.as_ref()?)
                     .await?;
 
-                Some(FoundCard::new_card(Arc::clone(&query), &card, image))
+                Some(FoundCard::new_card(Arc::clone(&query), &card, image, cards))
             }
         }
+    }
+
+    async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard> {
+        let cards = self.search_scryfall_card_data(Arc::clone(&query)).await?;
+        let card = self.determine_best_match(Arc::clone(&query), &cards)?;
+
+        self.fetch_images(Arc::clone(&query), &card, Some(cards.clone())).await
     }
 
     async fn search_single_faced_image(
@@ -267,32 +261,6 @@ impl<'a> MTG {
             }
 
             None
-        }
-    }
-
-    pub async fn update_local_cache(&self, card: &FoundCard<'a>) {
-        if let Some(new_card) = &card.front {
-            self.card_cache
-                .lock()
-                .await
-                .insert(new_card.name.to_string(), new_card.card_id.to_string());
-            log::info!(
-                "Added '{}' - {} to local cache",
-                new_card.name,
-                new_card.card_id
-            );
-        }
-
-        if let Some(new_card) = &card.back {
-            self.card_cache
-                .lock()
-                .await
-                .insert(new_card.name.to_string(), new_card.card_id.to_string());
-            log::info!(
-                "Added '{}' - {} to local cache",
-                new_card.name,
-                new_card.card_id
-            );
         }
     }
 }

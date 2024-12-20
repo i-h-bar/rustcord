@@ -7,17 +7,31 @@ use crate::{utils, Handler};
 use db::QueryParams;
 use serde::Deserialize;
 use serenity::all::{Context, Message};
+use serenity::futures::future::join_all;
 use uuid::Uuid;
 
 mod db;
 pub mod search;
 
 impl<'a> Handler {
-    async fn add_to_local_stores(&'a self, card_face: &FoundCard<'a>) {
+    async fn add_to_local_stores(&'a self, found_card: &FoundCard<'a>) {
         if let Some(pool) = PSQL::get() {
-            pool.add_card(&card_face).await;
+            if let Some(cards) = &found_card.scryfall_list {
+                let found_cards = join_all(
+                    cards
+                        .data
+                        .iter()
+                        .map(| card | {
+                            self
+                                .mtg
+                                .fetch_images(Arc::clone(&found_card.query), card, None)
+                        }))
+                    .await;
+
+                join_all(found_cards.iter().filter_map(| card | Some(pool.add_card(card.as_ref()?)))).await;
+            }
+
         }
-        self.mtg.update_local_cache(&card_face).await;
     }
 
     pub async fn card_response(
@@ -152,6 +166,7 @@ pub struct FoundCard<'a> {
     pub back: Option<CardInfo>,
     pub image: Vec<u8>,
     pub back_image: Option<Vec<u8>>,
+    pub scryfall_list: Option<ScryfallList>
 }
 
 impl<'a> FoundCard<'a> {
@@ -159,6 +174,7 @@ impl<'a> FoundCard<'a> {
         query: Arc<QueryParams<'a>>,
         card: &ScryfallCard,
         images: Vec<Option<Vec<u8>>>,
+        scryfall_list: Option<ScryfallList>
     ) -> Option<Self> {
         let back_id = Uuid::new_v4().to_string();
 
@@ -171,16 +187,18 @@ impl<'a> FoundCard<'a> {
             back_image: images.get(1)?.to_owned(),
             front: Some(front),
             back,
+            scryfall_list
         })
     }
 
-    fn new_card(query: Arc<QueryParams<'a>>, card: &ScryfallCard, image: Vec<u8>) -> Self {
+    fn new_card(query: Arc<QueryParams<'a>>, card: &ScryfallCard, image: Vec<u8>, scryfall_list: Option<ScryfallList>) -> Self {
         Self {
             query: Arc::clone(&query),
             image,
             front: Some(CardInfo::new_card(&card, None)),
             back_image: None,
             back: None,
+            scryfall_list
         }
     }
 
@@ -201,6 +219,7 @@ impl<'a> FoundCard<'a> {
             back_image,
             front: None,
             back: None,
+            scryfall_list: None
         })
     }
 }
@@ -246,7 +265,7 @@ struct ImageURIs {
     small: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct CardFace {
     #[allow(dead_code)]
     object: String,
@@ -271,15 +290,16 @@ struct CardFace {
     image_uris: ImageURIs,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ScryfallList {
     object: String,
     total_cards: u16,
     has_more: bool,
-    data: Vec<ScryfallCard>
+    data: Vec<ScryfallCard>,
 }
 
-#[derive(Deserialize)]
+
+#[derive(Deserialize, Clone)]
 pub struct ScryfallCard {
     artist: String,
     #[allow(dead_code)]
@@ -396,5 +416,5 @@ pub struct ScryfallCard {
     #[allow(dead_code)]
     variation: bool,
     #[allow(dead_code)]
-    watermark: Option<String>
+    watermark: Option<String>,
 }
