@@ -41,7 +41,7 @@ from cards join images on cards.image_id = images.id
 join sets on cards.set_id = sets.id
 where ($4 is null or similarity(cards.artist, $4) > 0.5)
 and ($3 is null or similarity(sets.name, $3) > 0.75)
-and ($2 is null OR sets.code = $2)
+and ($2 is null or sets.code = $2)
 order by sml desc
 limit 1;
 "#;
@@ -261,9 +261,9 @@ impl PSQL {
 pub struct QueryParams<'a> {
     pub name: String,
     pub raw_name: &'a str,
-    set_code: Option<&'a str>,
-    set_name: Option<&'a str>,
-    artist: Option<String>,
+    pub set_code: Option<&'a str>,
+    pub set_name: Option<&'a str>,
+    pub artist: Option<String>,
 }
 
 impl<'a> QueryParams<'a> {

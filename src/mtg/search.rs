@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -10,10 +10,10 @@ use tokio::time::Instant;
 
 use crate::db::PSQL;
 use crate::mtg::db::QueryParams;
-use crate::mtg::{CardFace, FoundCard, ImageURIs, Scryfall};
+use crate::mtg::{CardFace, FoundCard, ImageURIs, ScryfallCard, ScryfallList};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
-const SCRYFALL: &str = "https://api.scryfall.com/cards/named?fuzzy=";
+const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";
 
 pub struct MTG {
     http_client: reqwest::Client,
@@ -86,8 +86,68 @@ impl<'a> MTG {
         }
     }
 
+    fn determine_best_match<'b>(&'a self, query: Arc<QueryParams<'a>>, cards: &'b ScryfallList) -> Option<&'b ScryfallCard> {
+        let unique_cards: HashSet<String> = HashSet::from_iter(cards.data.iter().map(|card| card.name.clone()));
+        let best_match = fuzzy::best_match_lev(&query.name, &unique_cards)?;
+        let potential_cards: Vec<&ScryfallCard> = cards
+            .data
+            .iter()
+            .filter_map(|card| {
+                if &card.name == best_match {
+                    Some(card)
+                } else {
+                    None
+                }
+            }).collect();
+
+        let potential_cards = if let Some(queried_artist) = &query.artist {
+            let artists_set: HashSet<String> = HashSet::from_iter(potential_cards.iter().map(|card| card.artist.clone()));
+            let best_artist = fuzzy::best_match_lev(queried_artist, &artists_set)?;
+            potential_cards.iter().filter_map(| &card | {
+                if best_artist == queried_artist {
+                    Some(card)
+                } else {
+                    None
+                }
+            }).collect::<Vec<&ScryfallCard>>()
+        } else {
+            potential_cards
+        };
+
+
+        let potential_cards = if let Some(queried_set_name) = query.set_name {
+            let set_name_set: HashSet<String> = HashSet::from_iter(potential_cards.iter().map(|&card| card.set_name.clone()));
+            let best_set = fuzzy::best_match_lev(queried_set_name, &set_name_set)?;
+            potential_cards.iter().filter_map(| &card | {
+                if best_set == queried_set_name {
+                    Some(card)
+                } else {
+                    None
+                }
+            }).collect::<Vec<&ScryfallCard>>()
+        } else {
+            potential_cards
+        };
+
+        let potential_cards = if let Some(queried_set_code) = query.set_code {
+            potential_cards.iter().filter_map(| &card | {
+                if card.set == queried_set_code {
+                    Some(card)
+                } else {
+                    None
+                }
+            }).collect::<Vec<&ScryfallCard>>()
+        } else {
+            potential_cards
+        };
+
+        Some(*potential_cards.get(0)?)
+    }
+
     async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard> {
-        let card = self.search_scryfall_card_data(Arc::clone(&query)).await?;
+        let cards = self.search_scryfall_card_data(Arc::clone(&query)).await?;
+        let card = self.determine_best_match(Arc::clone(&query), &cards)?;
+
         match &card.card_faces {
             Some(card_faces) => {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
@@ -117,7 +177,7 @@ impl<'a> MTG {
 
     async fn search_single_faced_image(
         &self,
-        card: &Scryfall,
+        card: &ScryfallCard,
         image_uris: &ImageURIs,
     ) -> Option<Vec<u8>> {
         let Ok(image) = {
@@ -140,7 +200,7 @@ impl<'a> MTG {
         Some(image.to_vec())
     }
 
-    async fn search_scryfall_card_data(&self, query: Arc<QueryParams<'_>>) -> Option<Scryfall> {
+    async fn search_scryfall_card_data(&self, query: Arc<QueryParams<'_>>) -> Option<ScryfallList> {
         log::info!("Searching scryfall for '{}'", query.raw_name);
         let response = match self
             .http_client
@@ -156,7 +216,7 @@ impl<'a> MTG {
         };
 
         if response.status().is_success() {
-            match response.json::<Scryfall>().await {
+            match response.json::<ScryfallList>().await {
                 Ok(response) => Some(response),
                 Err(why) => {
                     log::warn!("Error getting card from scryfall - {why:?}");

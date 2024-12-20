@@ -79,7 +79,7 @@ pub struct CardInfo {
 
 impl CardInfo {
     fn new_back(
-        card: &Scryfall,
+        card: &ScryfallCard,
         front: &CardInfo,
         card_id: String,
         other_side: &String,
@@ -110,7 +110,7 @@ impl CardInfo {
         })
     }
 
-    fn new_card(card: &Scryfall, other_side: Option<String>) -> Self {
+    fn new_card(card: &ScryfallCard, other_side: Option<String>) -> Self {
         let name = if let Some(sides) = &card.card_faces {
             if let Some(front) = sides.get(0) {
                 utils::normalise(&front.name)
@@ -157,7 +157,7 @@ pub struct FoundCard<'a> {
 impl<'a> FoundCard<'a> {
     fn new_2_faced_card(
         query: Arc<QueryParams<'a>>,
-        card: &Scryfall,
+        card: &ScryfallCard,
         images: Vec<Option<Vec<u8>>>,
     ) -> Option<Self> {
         let back_id = Uuid::new_v4().to_string();
@@ -174,7 +174,7 @@ impl<'a> FoundCard<'a> {
         })
     }
 
-    fn new_card(query: Arc<QueryParams<'a>>, card: &Scryfall, image: Vec<u8>) -> Self {
+    fn new_card(query: Arc<QueryParams<'a>>, card: &ScryfallCard, image: Vec<u8>) -> Self {
         Self {
             query: Arc::clone(&query),
             image,
@@ -272,7 +272,15 @@ struct CardFace {
 }
 
 #[derive(Deserialize)]
-pub struct Scryfall {
+pub struct ScryfallList {
+    object: String,
+    total_cards: u16,
+    has_more: bool,
+    data: Vec<ScryfallCard>
+}
+
+#[derive(Deserialize)]
+pub struct ScryfallCard {
     artist: String,
     #[allow(dead_code)]
     artist_ids: Vec<String>,
