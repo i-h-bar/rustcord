@@ -49,7 +49,7 @@ impl<'a> MTG {
     async fn find_card(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let start = Instant::now();
 
-        if let Some(fuzzy_found) = PSQL::get()?.fuzzy_fetch(Arc::clone(&query)).await {
+        let card = if let Some(fuzzy_found) = PSQL::get()?.fuzzy_fetch(Arc::clone(&query)).await {
             if fuzzy_found.similarity > 0.75 {
                 let back = if let Some(other_side) = fuzzy_found.other_side.as_ref() {
                     PSQL::get()?.fetch_backside(&other_side).await
@@ -57,40 +57,26 @@ impl<'a> MTG {
                     None
                 };
 
-                log::info!(
-                    "Found match for '{}' from database in {:.2?}",
-                    query.raw_name,
-                    start.elapsed()
-                );
+                log::info!("Found match for '{}' from database", query.raw_name);
 
                 FoundCard::existing_card(Arc::clone(&query), fuzzy_found, back)
             } else {
-                let card = self.find_from_scryfall(Arc::clone(&query)).await?;
-                log::info!(
-                    "Found match for '{}' from scryfall in {:.2?}",
-                    query.raw_name,
-                    start.elapsed()
-                );
-
-                Some(card)
+                self.find_from_scryfall(Arc::clone(&query)).await
             }
         } else {
-            let card = self.find_from_scryfall(Arc::clone(&query)).await?;
-            log::info!(
-                "Found match for '{}' from scryfall in {:.2?}",
-                query.raw_name,
-                start.elapsed()
-            );
+            self.find_from_scryfall(Arc::clone(&query)).await
+        };
 
-            Some(card)
-        }
+        log::info!("Found match in {} ms", start.elapsed().as_millis());
+
+        card
     }
 
     fn determine_best_match<'b>(
         &'a self,
         query: Arc<QueryParams<'a>>,
         cards: &'b ScryfallList,
-    ) -> Option<&'b ScryfallCard> {
+    ) -> Option<ScryfallCard> {
         let unique_cards: HashSet<String> =
             HashSet::from_iter(cards.data.iter().map(|card| card.name.clone()));
         let best_match = fuzzy::best_match_lev(&query.name, &unique_cards)?;
@@ -157,7 +143,7 @@ impl<'a> MTG {
             potential_cards
         };
 
-        Some(*potential_cards.get(0)?)
+        Some((**potential_cards.get(0)?).clone())
     }
 
     async fn fetch_images(
@@ -216,8 +202,13 @@ impl<'a> MTG {
         let cards = self.search_scryfall_card_data(Arc::clone(&query)).await?;
         let card = self.determine_best_match(Arc::clone(&query), &cards)?;
 
-        self.create_found_card(Arc::clone(&query), &card, Some(cards.clone()))
-            .await
+        let found_card = self
+            .create_found_card(Arc::clone(&query), &card, Some(cards))
+            .await;
+
+        log::info!("Found match for '{}' from scryfall", query.raw_name);
+
+        found_card
     }
 
     async fn query_image(&self, url: &str, name: &str) -> Option<Vec<u8>> {
