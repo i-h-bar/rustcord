@@ -13,7 +13,7 @@ use crate::mtg::db::QueryParams;
 use crate::mtg::{CardFace, FoundCard, ImageURIs, ScryfallCard, ScryfallList};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
-const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&order=released&q=";
+const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";
 
 pub struct MTG {
     http_client: reqwest::Client,
