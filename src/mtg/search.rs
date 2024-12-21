@@ -148,7 +148,7 @@ impl<'a> MTG {
 
     async fn fetch_images(
         &self,
-        url: &'a str,
+        url: &str,
         name: &str,
         back_url: Option<&str>,
     ) -> Option<Vec<Vec<u8>>> {
