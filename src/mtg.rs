@@ -17,20 +17,19 @@ impl<'a> Handler {
     async fn add_to_local_stores(&'a self, found_card: &FoundCard<'a>) {
         if let Some(pool) = PSQL::get() {
             if let Some(cards) = &found_card.scryfall_list {
-                let found_cards = join_all(
-                    cards
-                        .data
+                let found_cards = join_all(cards.data.iter().map(|card| {
+                    self.mtg
+                        .create_found_card(Arc::clone(&found_card.query), &card, None)
+                }))
+                .await;
+
+                join_all(
+                    found_cards
                         .iter()
-                        .map(| card | {
-                            self
-                                .mtg
-                                .fetch_images(Arc::clone(&found_card.query), card, None)
-                        }))
-                    .await;
-
-                join_all(found_cards.iter().filter_map(| card | Some(pool.add_card(card.as_ref()?)))).await;
+                        .filter_map(|card| Some(pool.add_card(card.as_ref()?))),
+                )
+                .await;
             }
-
         }
     }
 
@@ -166,15 +165,15 @@ pub struct FoundCard<'a> {
     pub back: Option<CardInfo>,
     pub image: Vec<u8>,
     pub back_image: Option<Vec<u8>>,
-    pub scryfall_list: Option<ScryfallList>
+    pub scryfall_list: Option<ScryfallList>,
 }
 
 impl<'a> FoundCard<'a> {
     fn new_2_faced_card(
         query: Arc<QueryParams<'a>>,
         card: &ScryfallCard,
-        images: Vec<Option<Vec<u8>>>,
-        scryfall_list: Option<ScryfallList>
+        images: Vec<Vec<u8>>,
+        scryfall_list: Option<ScryfallList>,
     ) -> Option<Self> {
         let back_id = Uuid::new_v4().to_string();
 
@@ -183,22 +182,27 @@ impl<'a> FoundCard<'a> {
 
         Some(Self {
             query: Arc::clone(&query),
-            image: images.get(0)?.to_owned()?,
-            back_image: images.get(1)?.to_owned(),
+            image: images.get(0)?.to_owned(),
+            back_image: Some(images.get(1)?.to_owned()),
             front: Some(front),
             back,
-            scryfall_list
+            scryfall_list,
         })
     }
 
-    fn new_card(query: Arc<QueryParams<'a>>, card: &ScryfallCard, image: Vec<u8>, scryfall_list: Option<ScryfallList>) -> Self {
+    fn new_card(
+        query: Arc<QueryParams<'a>>,
+        card: &ScryfallCard,
+        image: Vec<u8>,
+        scryfall_list: Option<ScryfallList>,
+    ) -> Self {
         Self {
             query: Arc::clone(&query),
             image,
             front: Some(CardInfo::new_card(&card, None)),
             back_image: None,
             back: None,
-            scryfall_list
+            scryfall_list,
         }
     }
 
@@ -219,7 +223,7 @@ impl<'a> FoundCard<'a> {
             back_image,
             front: None,
             back: None,
-            scryfall_list: None
+            scryfall_list: None,
         })
     }
 }
@@ -297,7 +301,6 @@ pub struct ScryfallList {
     has_more: bool,
     data: Vec<ScryfallCard>,
 }
-
 
 #[derive(Deserialize, Clone)]
 pub struct ScryfallCard {

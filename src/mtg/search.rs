@@ -160,18 +160,40 @@ impl<'a> MTG {
         Some(*potential_cards.get(0)?)
     }
 
-    pub async fn fetch_images(&self, query: Arc<QueryParams<'a>>, card: &ScryfallCard, cards: Option<ScryfallList>) -> Option<FoundCard<'a>> {
+    async fn fetch_images(
+        &self,
+        url: &'a str,
+        name: &str,
+        back_url: Option<&str>,
+    ) -> Option<Vec<Vec<u8>>> {
+        if let Some(back) = back_url {
+            Some(vec![
+                self.query_image(&url, &name).await?,
+                self.query_image(&back, &name).await?,
+            ])
+        } else {
+            Some(vec![self.query_image(&url, name).await?])
+        }
+    }
+
+    pub async fn create_found_card(
+        &'a self,
+        query: Arc<QueryParams<'a>>,
+        card: &ScryfallCard,
+        cards: Option<ScryfallList>,
+    ) -> Option<FoundCard<'a>> {
         match &card.card_faces {
             Some(card_faces) => {
                 let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
                 let face_1 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(1)?;
 
-                let images = join_all(vec![
-                    self.search_single_faced_image(&card, &face_0.image_uris),
-                    self.search_single_faced_image(&card, &face_1.image_uris),
-                ])
-                    .await;
-
+                let images = self
+                    .fetch_images(
+                        &face_0.image_uris.png,
+                        &query.name,
+                        Some(&face_1.image_uris.png),
+                    )
+                    .await?;
                 FoundCard::new_2_faced_card(Arc::clone(&query), &card, images, cards)
             }
             None => {
@@ -180,8 +202,10 @@ impl<'a> MTG {
                     card.name
                 );
                 let image = self
-                    .search_single_faced_image(&card, card.image_uris.as_ref()?)
-                    .await?;
+                    .fetch_images(&card.image_uris.as_ref()?.png, &query.name, None)
+                    .await?
+                    .get(0)?
+                    .to_owned();
 
                 Some(FoundCard::new_card(Arc::clone(&query), &card, image, cards))
             }
@@ -192,19 +216,16 @@ impl<'a> MTG {
         let cards = self.search_scryfall_card_data(Arc::clone(&query)).await?;
         let card = self.determine_best_match(Arc::clone(&query), &cards)?;
 
-        self.fetch_images(Arc::clone(&query), &card, Some(cards.clone())).await
+        self.create_found_card(Arc::clone(&query), &card, Some(cards.clone()))
+            .await
     }
 
-    async fn search_single_faced_image(
-        &self,
-        card: &ScryfallCard,
-        image_uris: &ImageURIs,
-    ) -> Option<Vec<u8>> {
+    async fn query_image(&self, url: &str, name: &str) -> Option<Vec<u8>> {
         let Ok(image) = {
-            match self.http_client.get(&image_uris.png).send().await {
+            match self.http_client.get(url).send().await {
                 Ok(response) => response,
                 Err(why) => {
-                    log::warn!("Error grabbing image for '{}' because: {}", card.name, why);
+                    log::warn!("Error grabbing image for '{}' because: {}", name, why);
                     return None;
                 }
             }
@@ -216,7 +237,7 @@ impl<'a> MTG {
             return None;
         };
 
-        log::info!("Image found for - \"{}\".", &card.name);
+        log::info!("Image found for - \"{}\".", name);
         Some(image.to_vec())
     }
 

@@ -35,13 +35,16 @@ pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
     a: &str,
     items: &'a I,
 ) -> Option<&'a String> {
-    Some(items
-        .par_iter()
-        .map(|item: &String| {
-            let dist = lev(&a, &item);
-            (item, dist)
-        })
-        .min_by(|(_, x), (_, y)| x.cmp(y))?.0)
+    Some(
+        items
+            .par_iter()
+            .map(|item: &String| {
+                let dist = lev(&a, &item);
+                (item, dist)
+            })
+            .min_by(|(_, x), (_, y)| x.cmp(y))?
+            .0,
+    )
 }
 
 pub fn best_match_lev_keys<'a>(
