@@ -1,8 +1,5 @@
-#![allow(warnings)]
-
 use rayon::prelude::*;
 use std::cmp;
-use std::collections::HashMap;
 
 pub fn lev(a: &str, b: &str) -> usize {
     if a.is_empty() {
@@ -47,19 +44,6 @@ pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
     )
 }
 
-pub fn best_match_lev_keys<'a>(
-    a: &str,
-    items: &'a HashMap<String, String>,
-) -> Option<((&'a String, &'a String), usize)> {
-    items
-        .par_iter()
-        .map(|(k, v)| {
-            let dist = lev(&a, &k);
-            ((k, v), dist)
-        })
-        .min_by(|(_, x), (_, y)| x.cmp(y))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,7 +59,7 @@ mod tests {
         let a = vec!["sitting".to_string(), "kitten".to_string()];
         let b = "sitting";
 
-        assert_eq!(best_match_lev(&b, &a).unwrap(), (a.get(0).unwrap(), 0));
+        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
     }
 
     #[test]
@@ -83,7 +67,7 @@ mod tests {
         let a = vec!["sitting".to_string(), "kitten".to_string()];
         let b = "setting";
 
-        assert_eq!(best_match_lev(&b, &a).unwrap(), (a.get(0).unwrap(), 1));
+        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
     }
 
     #[test]
@@ -93,6 +77,6 @@ mod tests {
         a.insert("kitten".to_string());
         let b = "setting";
 
-        assert_eq!(best_match_lev(&b, &a).unwrap(), (&"sitting".to_string(), 1));
+        assert_eq!(best_match_lev(&b, &a).unwrap(), &"sitting".to_string());
     }
 }
