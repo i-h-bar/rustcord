@@ -1,6 +1,5 @@
 use rayon::prelude::*;
 use std::cmp;
-use std::collections::HashMap;
 
 pub fn lev(a: &str, b: &str) -> usize {
     if a.is_empty() {
@@ -9,7 +8,7 @@ pub fn lev(a: &str, b: &str) -> usize {
         return a.chars().count();
     }
 
-    let mut dcol: Vec<_> = (0..(b.len() + 1)).collect();
+    let mut dcol: Vec<usize> = (0..(b.len() + 1)).collect();
     let mut t_last = 0;
     for (i, sc) in a.chars().enumerate() {
         let mut current = i;
@@ -32,27 +31,17 @@ pub fn lev(a: &str, b: &str) -> usize {
 pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
     a: &str,
     items: &'a I,
-) -> Option<(&'a String, usize)> {
-    items
-        .par_iter()
-        .map(|item: &String| {
-            let dist = lev(&a, &item);
-            (item, dist)
-        })
-        .min_by(|(_, x), (_, y)| x.cmp(y))
-}
-
-pub fn best_match_lev_keys<'a>(
-    a: &str,
-    items: &'a HashMap<String, String>,
-) -> Option<((&'a String, &'a String), usize)> {
-    items
-        .par_iter()
-        .map(|(k, v)| {
-            let dist = lev(&a, &k);
-            ((k, v), dist)
-        })
-        .min_by(|(_, x), (_, y)| x.cmp(y))
+) -> Option<&'a String> {
+    Some(
+        items
+            .par_iter()
+            .map(|item: &String| {
+                let dist = lev(&a, &item);
+                (item, dist)
+            })
+            .min_by(|(_, x), (_, y)| x.cmp(y))?
+            .0,
+    )
 }
 
 #[cfg(test)]
@@ -70,7 +59,7 @@ mod tests {
         let a = vec!["sitting".to_string(), "kitten".to_string()];
         let b = "sitting";
 
-        assert_eq!(best_match_lev(&b, &a).unwrap(), (a.get(0).unwrap(), 0));
+        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
     }
 
     #[test]
@@ -78,7 +67,7 @@ mod tests {
         let a = vec!["sitting".to_string(), "kitten".to_string()];
         let b = "setting";
 
-        assert_eq!(best_match_lev(&b, &a).unwrap(), (a.get(0).unwrap(), 1));
+        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
     }
 
     #[test]
@@ -88,6 +77,6 @@ mod tests {
         a.insert("kitten".to_string());
         let b = "setting";
 
-        assert_eq!(best_match_lev(&b, &a).unwrap(), (&"sitting".to_string(), 1));
+        assert_eq!(best_match_lev(&b, &a).unwrap(), &"sitting".to_string());
     }
 }

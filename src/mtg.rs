@@ -1,74 +1,106 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
+use crate::db::PSQL;
+use crate::mtg::db::FuzzyFound;
+use crate::{utils, Handler};
+use db::QueryParams;
 use serde::Deserialize;
 use serenity::all::{Context, Message};
+use serenity::futures::future::join_all;
 use uuid::Uuid;
-
-use crate::{Handler, utils};
-use crate::db::PSQL;
 
 mod db;
 pub mod search;
 
-
 impl<'a> Handler {
-    async fn add_to_local_stores(&'a self, card_face: &FoundCard<'a>) {
+    async fn add_to_local_stores(&'a self, found_card: &FoundCard<'a>) {
         if let Some(pool) = PSQL::get() {
-            pool.add_card(&card_face).await;
+            if let Some(cards) = &found_card.scryfall_list {
+                let found_cards = join_all(cards.data.iter().map(|card| {
+                    self.mtg
+                        .create_found_card(Arc::clone(&found_card.query), &card, None)
+                }))
+                .await;
+
+                let mut shared_ids: HashMap<&String, (Uuid, Uuid)> = HashMap::new();
+                for card_option in found_cards.iter() {
+                    if let Some(card) = card_option.as_ref() {
+                        let legalities_id = if let Some(front) = card.front.as_ref() {
+                            if !shared_ids.contains_key(&front.name) {
+                                if let Some((legalities_id, rules_id)) = pool.fetch_rules_legalities_id(&front.name).await {
+                                    shared_ids.insert(&front.name, (legalities_id, rules_id));
+                                    legalities_id
+                                } else {
+                                    let legalities_id = Uuid::new_v4();
+                                    shared_ids.insert(&front.name, (legalities_id, Uuid::new_v4()));
+                                    legalities_id
+                                }
+                            } else {
+                                continue
+                            }
+                        } else {
+                            continue
+                        };
+
+                        if let Some(back) = card.back.as_ref() {
+                            if !shared_ids.contains_key(&back.name) {
+                                if let Some((legalities_id, rules_id)) = pool.fetch_rules_legalities_id(&back.name).await {
+                                    shared_ids.insert(&back.name, (legalities_id, rules_id));
+                                } else {
+                                    shared_ids.insert(&back.name, (legalities_id, Uuid::new_v4()));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                join_all(
+                    found_cards
+                        .iter()
+                        .filter_map(|card| Some(pool.add_card(card.as_ref()?, &shared_ids))),
+                )
+                .await;
+            }
         }
-        self.mtg.update_local_cache(&card_face).await;
     }
 
-    pub async fn card_response(&'a self, card: &Option<Vec<FoundCard<'a>>>, msg: &Message, ctx: &Context) {
+    pub async fn card_response(
+        &'a self,
+        card: &Option<FoundCard<'a>>,
+        msg: &Message,
+        ctx: &Context,
+    ) {
         match card {
             None => utils::send("Failed to find card :(", &msg, &ctx).await,
             Some(card) => {
-                for card_face in card {
+                utils::send_image(
+                    &card.image,
+                    &format!("{}.png", card.query.name),
+                    None,
+                    &msg,
+                    &ctx,
+                )
+                .await;
+
+                if let Some(image) = &card.back_image {
                     utils::send_image(
-                        &card_face.image,
-                        &format!("{}.png", card_face.queried_name),
+                        &image,
+                        &format!("{}.png", card.query.name),
                         None,
                         &msg,
                         &ctx,
                     )
-                        .await;
-
-                    self.add_to_local_stores(&card_face).await;
+                    .await;
                 }
-
-                if let Some(card_face) = card.get(0) {
-                    if card_face.score > 3 {
-                        log::info!("Score is high searching scryfall for potential better match");
-                        if let Some(better_card) =
-                            self.mtg.find_possible_better_match(&card_face).await
-                        {
-                            for better_face in better_card.iter() {
-                                log::info!("Better match found from scryfall");
-                                utils::send_image(
-                                    &better_face.image,
-                                    &format!("{}.png", better_face.queried_name),
-                                    Some("I found a better match on further searches: "),
-                                    &msg,
-                                    &ctx,
-                                )
-                                    .await;
-
-                                self.add_to_local_stores(&better_face).await;
-                            }
-                        };
-                    }
-                }
+                self.add_to_local_stores(&card).await;
             }
         }
     }
 }
 
-
-#[derive(Debug)]
-pub struct NewCardInfo {
+pub struct CardInfo {
     card_id: String,
-    image_id: Uuid,
-    rules_id: Uuid,
     legalities_id: Uuid,
     pub(crate) name: String,
     flavour_text: Option<String>,
@@ -90,14 +122,54 @@ pub struct NewCardInfo {
     other_side: Option<String>,
 }
 
-impl NewCardInfo {
-    fn new_card(card: &Scryfall) -> Self {
+impl CardInfo {
+    fn new_back(
+        card: &ScryfallCard,
+        front: &CardInfo,
+        card_id: String,
+        other_side: &String,
+    ) -> Option<Self> {
+        let face = card.card_faces.as_ref()?.get(1)?;
+
+        Some(Self {
+            card_id,
+            legalities_id: front.legalities_id,
+            name: utils::normalise(&face.name),
+            flavour_text: face.flavor_text.to_owned(),
+            set_id: front.set_id.clone(),
+            set_name: front.set_name.clone(),
+            set_code: front.set_code.clone(),
+            artist: front.artist.clone(),
+            legalities: front.legalities.clone(),
+            colour_identity: front.colour_identity.clone(),
+            mana_cost: face.mana_cost.to_owned(),
+            cmc: card.cmc,
+            power: face.power.to_owned(),
+            toughness: face.toughness.to_owned(),
+            loyalty: face.loyalty.to_owned(),
+            defence: face.defence.to_owned(),
+            type_line: face.type_line.to_owned(),
+            oracle_text: face.oracle_text.to_owned(),
+            keywords: face.keywords.to_owned(),
+            other_side: Some(other_side.clone()),
+        })
+    }
+
+    fn new_card(card: &ScryfallCard, other_side: Option<String>) -> Self {
+        let name = if let Some(sides) = &card.card_faces {
+            if let Some(front) = sides.get(0) {
+                utils::normalise(&front.name)
+            } else {
+                utils::normalise(&card.name)
+            }
+        } else {
+            utils::normalise(&card.name)
+        };
+
         Self {
             card_id: card.id.to_owned(),
-            image_id: Uuid::new_v4(),
-            rules_id: Uuid::new_v4(),
             legalities_id: Uuid::new_v4(),
-            name: utils::normalise(&card.name),
+            name,
             flavour_text: card.flavor_text.to_owned(),
             set_id: card.set_id.to_owned(),
             set_name: card.set_name.to_owned(),
@@ -114,89 +186,77 @@ impl NewCardInfo {
             type_line: card.type_line.to_owned(),
             oracle_text: card.oracle_text.to_owned(),
             keywords: card.keywords.to_owned(),
-            other_side: None,
+            other_side,
         }
-    }
-    fn new_card_side(card: &Scryfall, side: usize, side_ids: &Vec<Uuid>) -> Option<Self> {
-        let face = card.card_faces.as_ref()?.get(side)?.clone();
-        let card_id = side_ids.get(side)?.to_string();
-        let other_side = side_ids.get((side + 1) % 2)?.to_string();
-
-        Some(Self {
-            card_id,
-            image_id: Uuid::new_v4(),
-            rules_id: Uuid::new_v4(),
-            legalities_id: Uuid::new_v4(),
-            name: utils::normalise(&face.name),
-            flavour_text: face.flavor_text,
-            set_id: card.set_id.clone(),
-            set_name: card.set_name.clone(),
-            set_code: card.set.clone(),
-            artist: face.artist,
-            legalities: card.legalities.clone(),
-            colour_identity: card.color_identity.clone(),
-            mana_cost: face.mana_cost,
-            cmc: card.cmc,
-            power: face.power,
-            toughness: face.toughness,
-            loyalty: face.loyalty,
-            defence: face.defence,
-            type_line: face.type_line,
-            oracle_text: face.oracle_text,
-            keywords: face.keywords,
-            other_side: Some(other_side),
-        })
     }
 }
 
 pub struct FoundCard<'a> {
-    pub queried_name: &'a str,
-    pub new_card_info: Option<NewCardInfo>,
+    pub query: Arc<QueryParams<'a>>,
+    pub front: Option<CardInfo>,
+    pub back: Option<CardInfo>,
     pub image: Vec<u8>,
-    pub score: usize,
+    pub back_image: Option<Vec<u8>>,
+    pub scryfall_list: Option<ScryfallList>,
 }
 
 impl<'a> FoundCard<'a> {
     fn new_2_faced_card(
-        queried_name: &'a str,
-        card: &Scryfall,
-        images: Vec<Option<Vec<u8>>>,
-    ) -> Vec<Self> {
-        let side_ids = vec![Uuid::new_v4(), Uuid::new_v4()];
+        query: Arc<QueryParams<'a>>,
+        card: &ScryfallCard,
+        images: Vec<Vec<u8>>,
+        scryfall_list: Option<ScryfallList>,
+    ) -> Option<Self> {
+        let back_id = Uuid::new_v4().to_string();
 
-        images
-            .into_iter()
-            .enumerate()
-            .filter_map(|(i, image)| {
-                Some(Self {
-                    queried_name,
-                    image: image?,
-                    new_card_info: NewCardInfo::new_card_side(&card, i, &side_ids),
-                    score: 0,
-                })
-            })
-            .collect()
+        let front = CardInfo::new_card(&card, Some(back_id.clone()));
+        let back = CardInfo::new_back(&card, &front, back_id, &front.card_id);
+
+        Some(Self {
+            query: Arc::clone(&query),
+            image: images.get(0)?.to_owned(),
+            back_image: Some(images.get(1)?.to_owned()),
+            front: Some(front),
+            back,
+            scryfall_list,
+        })
     }
 
-    fn new_card(queried_name: &'a str, card: &Scryfall, image: Vec<u8>) -> Vec<Self> {
-        vec![Self {
-            queried_name,
+    fn new_card(
+        query: Arc<QueryParams<'a>>,
+        card: &ScryfallCard,
+        image: Vec<u8>,
+        scryfall_list: Option<ScryfallList>,
+    ) -> Self {
+        Self {
+            query: Arc::clone(&query),
             image,
-            new_card_info: Some(NewCardInfo::new_card(&card)),
-            score: 0,
-        }]
+            front: Some(CardInfo::new_card(&card, None)),
+            back_image: None,
+            back: None,
+            scryfall_list,
+        }
     }
 
-    fn existing_card(queried_name: &'a str, images: Vec<Vec<u8>>, score: usize) -> Vec<Self> {
-        images
-            .into_iter()
-            .map(|image| Self {
-                queried_name,
-                image,
-                new_card_info: None,
-                score,
-            })
-            .collect()
+    fn existing_card(
+        query: Arc<QueryParams<'a>>,
+        front: FuzzyFound,
+        back: Option<FuzzyFound>,
+    ) -> Option<Self> {
+        let font_image = front.png.to_owned();
+        let back_image = match back {
+            Some(found) => Some(found.png.to_owned()),
+            None => None,
+        };
+
+        Some(Self {
+            query: Arc::clone(&query),
+            image: font_image,
+            back_image,
+            front: None,
+            back: None,
+            scryfall_list: None,
+        })
     }
 }
 
@@ -228,102 +288,171 @@ struct Legalities {
 
 #[derive(Deserialize, Clone)]
 struct ImageURIs {
+    #[allow(dead_code)]
     art_crop: String,
+    #[allow(dead_code)]
     border_crop: String,
+    #[allow(dead_code)]
     large: String,
+    #[allow(dead_code)]
     normal: String,
     pub png: String,
+    #[allow(dead_code)]
     small: String,
 }
 
 #[derive(Deserialize, Clone)]
 struct CardFace {
+    #[allow(dead_code)]
     object: String,
     name: String,
     mana_cost: Option<String>,
     type_line: String,
     oracle_text: Option<String>,
+    #[allow(dead_code)]
     colors: Vec<String>,
     defence: Option<String>,
     power: Option<String>,
     toughness: Option<String>,
     loyalty: Option<String>,
+    #[allow(dead_code)]
     artist: String,
+    #[allow(dead_code)]
     artist_id: String,
+    #[allow(dead_code)]
     illustration_id: String,
     flavor_text: Option<String>,
     keywords: Option<Vec<String>>,
     image_uris: ImageURIs,
 }
 
-#[derive(Deserialize)]
-pub struct Scryfall {
+#[derive(Deserialize, Clone)]
+pub struct ScryfallList {
+    #[allow(dead_code)]
+    object: String,
+    #[allow(dead_code)]
+    total_cards: u16,
+    #[allow(dead_code)]
+    has_more: bool,
+    data: Vec<ScryfallCard>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ScryfallCard {
     artist: String,
+    #[allow(dead_code)]
     artist_ids: Vec<String>,
+    #[allow(dead_code)]
     booster: bool,
+    #[allow(dead_code)]
     border_color: String,
+    #[allow(dead_code)]
     card_back_id: Option<String>,
     card_faces: Option<Vec<CardFace>>,
+    #[allow(dead_code)]
     cardmarket_id: Option<u32>,
     cmc: f32,
+    #[allow(dead_code)]
     collector_number: String,
     color_identity: Vec<String>,
+    #[allow(dead_code)]
     colors: Option<Vec<String>>,
     loyalty: Option<String>,
     defence: Option<String>,
+    #[allow(dead_code)]
     digital: bool,
+    #[allow(dead_code)]
     edhrec_rank: Option<u32>,
+    #[allow(dead_code)]
     finishes: Vec<String>,
     flavor_text: Option<String>,
+    #[allow(dead_code)]
     foil: bool,
+    #[allow(dead_code)]
     frame: String,
+    #[allow(dead_code)]
     full_art: bool,
+    #[allow(dead_code)]
     games: Vec<String>,
+    #[allow(dead_code)]
     highres_image: bool,
     id: String,
+    #[allow(dead_code)]
     illustration_id: Option<String>,
+    #[allow(dead_code)]
     image_status: String,
     image_uris: Option<ImageURIs>,
     keywords: Option<Vec<String>>,
+    #[allow(dead_code)]
     lang: String,
+    #[allow(dead_code)]
     layout: String,
     legalities: Legalities,
     mana_cost: Option<String>,
+    #[allow(dead_code)]
     mtgo_foil_id: Option<u32>,
+    #[allow(dead_code)]
     mtgo_id: Option<u32>,
+    #[allow(dead_code)]
     multiverse_ids: Vec<u32>,
     name: String,
+    #[allow(dead_code)]
     nonfoil: bool,
+    #[allow(dead_code)]
     object: String,
+    #[allow(dead_code)]
     oracle_id: String,
     oracle_text: Option<String>,
+    #[allow(dead_code)]
     oversized: bool,
+    #[allow(dead_code)]
     penny_rank: Option<u32>,
     power: Option<String>,
+    #[allow(dead_code)]
     prices: HashMap<String, Option<String>>,
+    #[allow(dead_code)]
     prints_search_uri: String,
+    #[allow(dead_code)]
     promo: bool,
-    purchase_uris: HashMap<String, String>,
+    #[allow(dead_code)]
+    purchase_uris: Option<HashMap<String, String>>,
+    #[allow(dead_code)]
     rarity: String,
+    #[allow(dead_code)]
     related_uris: HashMap<String, String>,
+    #[allow(dead_code)]
     released_at: String,
+    #[allow(dead_code)]
     reprint: bool,
+    #[allow(dead_code)]
     reserved: bool,
+    #[allow(dead_code)]
     rulings_uri: String,
+    #[allow(dead_code)]
     scryfall_set_uri: String,
+    #[allow(dead_code)]
     scryfall_uri: String,
     set: String,
     set_id: String,
     set_name: String,
+    #[allow(dead_code)]
     set_search_uri: String,
+    #[allow(dead_code)]
     set_type: String,
+    #[allow(dead_code)]
     set_uri: String,
+    #[allow(dead_code)]
     story_spotlight: bool,
+    #[allow(dead_code)]
     tcgplayer_id: Option<u32>,
+    #[allow(dead_code)]
     textless: bool,
     toughness: Option<String>,
     type_line: String,
+    #[allow(dead_code)]
     uri: String,
+    #[allow(dead_code)]
     variation: bool,
+    #[allow(dead_code)]
     watermark: Option<String>,
 }

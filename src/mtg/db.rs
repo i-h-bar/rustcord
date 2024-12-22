@@ -1,10 +1,22 @@
 use std::collections::HashMap;
-
-use sqlx::Row;
+use crate::db::PSQL;
+use crate::mtg::{CardInfo, FoundCard};
+use crate::utils;
+use regex::Captures;
+use sqlx::postgres::PgRow;
+use sqlx::{Error, FromRow, Row};
+use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::db::PSQL;
-use crate::mtg::{FoundCard, NewCardInfo};
+const RULES_LEGAL_IDS: &str = r#"
+select
+    distinct rules.id as rules_id,
+             legalities.id as lagalities_id
+from cards
+    join rules on rules.id = cards.rules_id
+    join legalities on legalities.id = rules.legalities_id
+where cards.name = $1
+"#;
 
 const LEGALITIES_INSERT: &str = r#"
 INSERT INTO legalities
@@ -25,13 +37,53 @@ const CARD_INSERT: &str = r#"
 INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id, other_side)
 values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8)) ON CONFLICT DO NOTHING"#;
 
-const EXACT_MATCH: &str = r#"
-select png from cards join images on cards.image_id = images.id where cards.id = uuid($1) or cards.other_side = uuid($1)
+const FUZZY_FIND: &str = r#"
+select cards.name,
+       png,
+       other_side,
+       similarity(cards.name, $1) as sml
+from cards join images on cards.image_id = images.id
+join sets on cards.set_id = sets.id
+where ($4 is null or similarity(cards.artist, $4) > 0.5)
+and ($3 is null or similarity(sets.name, $3) > 0.75)
+and ($2 is null or sets.code = $2)
+order by sml desc
+limit 1;
 "#;
 
+const BACKSIDE_FIND: &str = r#"
+select png, name, other_side from cards join images on cards.image_id = images.id where cards.id = uuid($1)
+"#;
+
+pub struct FuzzyFound {
+    pub(crate) png: Vec<u8>,
+    pub(crate) similarity: f32,
+    pub(crate) other_side: Option<String>,
+}
+
+impl<'r> FromRow<'r, PgRow> for FuzzyFound {
+    fn from_row(row: &'r PgRow) -> Result<Self, Error> {
+        let other_side = match row.try_get::<Option<Uuid>, &str>("other_side") {
+            Ok(id) => match id {
+                Some(uuid) => Some(uuid.to_string()),
+                None => None,
+            },
+            Err(why) => {
+                log::warn!("Failed to get other side - {why}");
+                None
+            }
+        };
+
+        Ok(FuzzyFound {
+            png: row.get::<Vec<u8>, &str>("png"),
+            similarity: row.try_get::<f32, &str>("sml").unwrap_or_else(|_| 0.0),
+            other_side,
+        })
+    }
+}
+
 impl PSQL {
-    async fn add_to_legalities(&self, card: &NewCardInfo) -> Uuid {
-        let legalities_id = Uuid::new_v4();
+    async fn add_to_legalities(&self, card: &CardInfo, legalities_id: &Uuid) {
         if let Err(why) = sqlx::query(LEGALITIES_INSERT)
             .bind(&legalities_id)
             .bind(&card.legalities.alchemy)
@@ -61,12 +113,9 @@ impl PSQL {
         {
             log::warn!("Failed legalities insert - {why}")
         }
-
-        legalities_id
     }
 
-    async fn add_to_rules(&self, card: &NewCardInfo, legalities_id: &Uuid) -> Uuid {
-        let rules_id = Uuid::new_v4();
+    async fn add_to_rules(&self, card: &CardInfo, rules_id: &Uuid, legalities_id: &Uuid) {
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
             .bind(&card.colour_identity)
@@ -85,8 +134,6 @@ impl PSQL {
         {
             log::warn!("Failed legalities insert - {why}")
         }
-
-        rules_id
     }
 
     async fn add_to_images(&self, image: &Vec<u8>) -> Uuid {
@@ -103,11 +150,11 @@ impl PSQL {
         image_id
     }
 
-    async fn add_to_sets(&self, card: &NewCardInfo) {
+    async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id)
-            .bind(&card.set_name)
-            .bind(&card.set_code)
+            .bind(utils::normalise(&card.set_name))
+            .bind(utils::normalise(&card.set_code))
             .execute(&self.pool)
             .await
         {
@@ -115,14 +162,14 @@ impl PSQL {
         };
     }
 
-    async fn add_to_cards(&self, card: &NewCardInfo, image_id: &Uuid, rules_id: &Uuid) {
+    async fn add_to_cards(&self, card: &CardInfo, image_id: &Uuid, rules_id: &Uuid) {
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.card_id)
             .bind(&card.name)
             .bind(&card.flavour_text)
             .bind(&card.set_id)
             .bind(&image_id)
-            .bind(&card.artist)
+            .bind(utils::normalise(&card.artist))
             .bind(&rules_id)
             .bind(&card.other_side)
             .execute(&self.pool)
@@ -132,11 +179,39 @@ impl PSQL {
         };
     }
 
-    pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>) {
-        if let Some(card_info) = &card.new_card_info {
-            let legalities_id = self.add_to_legalities(&card_info).await;
-            let rules_id = self.add_to_rules(&card_info, &legalities_id).await;
+    pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>, shared_ids: &HashMap<&String, (Uuid, Uuid)>) {
+        if let Some(card_info) = &card.front {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+                log::warn!("No front ids found");
+                return
+            };
+
+            self.add_to_legalities(&card_info, &legalities_id).await;
+            self.add_to_rules(&card_info, &rules_id, &legalities_id).await;
             let image_id = self.add_to_images(&card.image).await;
+            self.add_to_sets(&card_info).await;
+            self.add_to_cards(&card_info, &image_id, &rules_id).await;
+            log::info!("Added {} to postgres", card_info.name);
+
+        } else {
+            log::warn!("No front card found");
+            return
+        };
+
+        if let Some(card_info) = &card.back {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+                log::warn!("No front back ids found");
+                return
+            };
+
+            let image_id = if let Some(back_image) = &card.back_image {
+                self.add_to_images(&back_image).await
+            } else {
+                log::warn!("Could not add the back image as there was none to add");
+                return;
+            };
+
+            self.add_to_rules(&card_info, &rules_id, &legalities_id).await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
 
@@ -144,33 +219,84 @@ impl PSQL {
         }
     }
 
-    pub async fn fetch_card(&self, id: &str) -> Option<Vec<Vec<u8>>> {
-        match sqlx::query(EXACT_MATCH)
-            .bind(&id)
-            .fetch_all(&self.pool)
+    pub async fn fetch_rules_legalities_id(&self, name: &str) -> Option<(Uuid, Uuid)> {
+        if let Ok(result) = sqlx::query(RULES_LEGAL_IDS)
+            .bind(&name)
+            .fetch_one(&self.pool)
+            .await {
+            Some((result.get::<Uuid, &str>("rules_id"), result.get::<Uuid, &str>("legalities_id")))
+        } else {
+            None
+        }
+    }
+
+    pub async fn fetch_backside(&self, card_id: &str) -> Option<FuzzyFound> {
+        match sqlx::query(BACKSIDE_FIND)
+            .bind(&card_id)
+            .fetch_one(&self.pool)
             .await
         {
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
                 None
             }
-            Ok(rows) => rows.into_iter().map(|row| row.get("png")).collect(),
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
     }
 
-    pub async fn names_and_ids(&self) -> HashMap<String, String> {
-        match sqlx::query("select cards.name, cards.id from cards")
-            .fetch_all(&self.pool)
+    pub async fn fuzzy_fetch(&self, query: Arc<QueryParams<'_>>) -> Option<FuzzyFound> {
+        match sqlx::query(FUZZY_FIND)
+            .bind(&query.name)
+            .bind(&query.set_code)
+            .bind(&query.set_name)
+            .bind(&query.artist)
+            .fetch_one(&self.pool)
             .await
         {
-            Ok(rows) => rows
-                .into_iter()
-                .map(|row| (row.get("name"), row.get::<Uuid, &str>("id").to_string()))
-                .collect::<HashMap<String, String>>(),
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
-                HashMap::new()
+                None
             }
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
+    }
+}
+
+pub struct QueryParams<'a> {
+    pub name: String,
+    pub raw_name: &'a str,
+    pub set_code: Option<String>,
+    pub set_name: Option<String>,
+    pub artist: Option<String>,
+}
+
+impl<'a> QueryParams<'a> {
+    pub fn from(capture: Captures<'a>) -> Option<Self> {
+        let raw_name = capture.get(1)?.as_str();
+        let name = utils::normalise(&raw_name);
+        let (set_code, set_name) = match capture.get(4) {
+            Some(set) => {
+                let set = set.as_str();
+                if set.chars().count() < 5 {
+                    (Some(utils::normalise(set)), None)
+                } else {
+                    (None, Some(utils::normalise(set)))
+                }
+            }
+            None => (None, None),
+        };
+
+        let artist = match capture.get(7) {
+            Some(artist) => Some(utils::normalise(&artist.as_str())),
+            None => None,
+        };
+
+        Some(Self {
+            name,
+            raw_name,
+            artist,
+            set_code,
+            set_name,
+        })
     }
 }

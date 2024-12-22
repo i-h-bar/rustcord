@@ -2,7 +2,7 @@
 create table sets (
     id uuid primary key,
     name varchar(150),
-    code char(3)
+    code varchar(4)
 );
 
 create table images (
