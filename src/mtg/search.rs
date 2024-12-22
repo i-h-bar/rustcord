@@ -1,16 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
 use log;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serenity::futures::future::join_all;
-use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::db::PSQL;
 use crate::mtg::db::QueryParams;
-use crate::mtg::{CardFace, FoundCard, ImageURIs, ScryfallCard, ScryfallList};
+use crate::mtg::{CardFace, FoundCard, ScryfallCard, ScryfallList};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";

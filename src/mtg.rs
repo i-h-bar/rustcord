@@ -296,8 +296,11 @@ struct CardFace {
 
 #[derive(Deserialize, Clone)]
 pub struct ScryfallList {
+    #[allow(dead_code)]
     object: String,
+    #[allow(dead_code)]
     total_cards: u16,
+    #[allow(dead_code)]
     has_more: bool,
     data: Vec<ScryfallCard>,
 }

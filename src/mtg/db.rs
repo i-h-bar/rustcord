@@ -4,8 +4,6 @@ use crate::utils;
 use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
-use std::collections::HashMap;
-use std::fmt::Display;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -28,10 +26,6 @@ const CARD_INSERT: &str = r#"
 INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id, other_side)
 values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8)) ON CONFLICT DO NOTHING"#;
 
-const EXACT_MATCH: &str = r#"
-select png from cards join images on cards.image_id = images.id where cards.id = uuid($1) or cards.other_side = uuid($1)
-"#;
-
 const FUZZY_FIND: &str = r#"
 select cards.name,
        png,
@@ -52,7 +46,6 @@ select png, name, other_side from cards join images on cards.image_id = images.i
 
 pub struct FuzzyFound {
     pub(crate) png: Vec<u8>,
-    pub(crate) name: String,
     pub(crate) similarity: f32,
     pub(crate) other_side: Option<String>,
 }
@@ -72,7 +65,6 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
 
         Ok(FuzzyFound {
             png: row.get::<Vec<u8>, &str>("png"),
-            name: row.get::<String, &str>("name"),
             similarity: row.try_get::<f32, &str>("sml").unwrap_or_else(|_| 0.0),
             other_side,
         })
