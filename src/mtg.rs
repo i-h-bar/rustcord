@@ -23,10 +23,42 @@ impl<'a> Handler {
                 }))
                 .await;
 
+                let mut shared_ids: HashMap<&String, (Uuid, Uuid)> = HashMap::new();
+                for card_option in found_cards.iter() {
+                    if let Some(card) = card_option.as_ref() {
+                        let legalities_id = if let Some(front) = card.front.as_ref() {
+                            if !shared_ids.contains_key(&front.name) {
+                                if let Some((legalities_id, rules_id)) = pool.fetch_rules_legalities_id(&front.name).await {
+                                    shared_ids.insert(&front.name, (legalities_id, rules_id));
+                                    legalities_id
+                                } else {
+                                    let legalities_id = Uuid::new_v4();
+                                    shared_ids.insert(&front.name, (legalities_id, Uuid::new_v4()));
+                                    legalities_id
+                                }
+                            } else {
+                                continue
+                            }
+                        } else {
+                            continue
+                        };
+
+                        if let Some(back) = card.back.as_ref() {
+                            if !shared_ids.contains_key(&back.name) {
+                                if let Some((legalities_id, rules_id)) = pool.fetch_rules_legalities_id(&back.name).await {
+                                    shared_ids.insert(&back.name, (legalities_id, rules_id));
+                                } else {
+                                    shared_ids.insert(&back.name, (legalities_id, Uuid::new_v4()));
+                                }
+                            }
+                        }
+                    }
+                }
+
                 join_all(
                     found_cards
                         .iter()
-                        .filter_map(|card| Some(pool.add_card(card.as_ref()?))),
+                        .filter_map(|card| Some(pool.add_card(card.as_ref()?, &shared_ids))),
                 )
                 .await;
             }

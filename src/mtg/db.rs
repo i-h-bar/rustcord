@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::db::PSQL;
 use crate::mtg::{CardInfo, FoundCard};
 use crate::utils;
@@ -6,6 +7,16 @@ use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::sync::Arc;
 use uuid::Uuid;
+
+const RULES_LEGAL_IDS: &str = r#"
+select
+    distinct rules.id as rules_id,
+             legalities.id as lagalities_id
+from cards
+    join rules on rules.id = cards.rules_id
+    join legalities on legalities.id = rules.legalities_id
+where cards.name = $1
+"#;
 
 const LEGALITIES_INSERT: &str = r#"
 INSERT INTO legalities
@@ -72,8 +83,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
 }
 
 impl PSQL {
-    async fn add_to_legalities(&self, card: &CardInfo) -> Uuid {
-        let legalities_id = Uuid::new_v4();
+    async fn add_to_legalities(&self, card: &CardInfo, legalities_id: &Uuid) {
         if let Err(why) = sqlx::query(LEGALITIES_INSERT)
             .bind(&legalities_id)
             .bind(&card.legalities.alchemy)
@@ -103,12 +113,9 @@ impl PSQL {
         {
             log::warn!("Failed legalities insert - {why}")
         }
-
-        legalities_id
     }
 
-    async fn add_to_rules(&self, card: &CardInfo, legalities_id: &Uuid) -> Uuid {
-        let rules_id = Uuid::new_v4();
+    async fn add_to_rules(&self, card: &CardInfo, rules_id: &Uuid, legalities_id: &Uuid) {
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
             .bind(&card.colour_identity)
@@ -127,8 +134,6 @@ impl PSQL {
         {
             log::warn!("Failed legalities insert - {why}")
         }
-
-        rules_id
     }
 
     async fn add_to_images(&self, image: &Vec<u8>) -> Uuid {
@@ -174,18 +179,31 @@ impl PSQL {
         };
     }
 
-    pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>) {
+    pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>, shared_ids: &HashMap<&String, (Uuid, Uuid)>) {
         if let Some(card_info) = &card.front {
-            let legalities_id = self.add_to_legalities(&card_info).await;
-            let rules_id = self.add_to_rules(&card_info, &legalities_id).await;
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+                log::warn!("No front ids found");
+                return
+            };
+
+            self.add_to_legalities(&card_info, &legalities_id).await;
+            self.add_to_rules(&card_info, &rules_id, &legalities_id).await;
             let image_id = self.add_to_images(&card.image).await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
+            log::info!("Added {} to postgres", card_info.name);
 
-            log::info!("Added {} to postgres", card_info.name)
-        }
+        } else {
+            log::warn!("No front card found");
+            return
+        };
 
         if let Some(card_info) = &card.back {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+                log::warn!("No front back ids found");
+                return
+            };
+
             let image_id = if let Some(back_image) = &card.back_image {
                 self.add_to_images(&back_image).await
             } else {
@@ -193,12 +211,22 @@ impl PSQL {
                 return;
             };
 
-            let legalities_id = self.add_to_legalities(&card_info).await;
-            let rules_id = self.add_to_rules(&card_info, &legalities_id).await;
+            self.add_to_rules(&card_info, &rules_id, &legalities_id).await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
 
             log::info!("Added {} to postgres", card_info.name)
+        }
+    }
+
+    pub async fn fetch_rules_legalities_id(&self, name: &str) -> Option<(Uuid, Uuid)> {
+        if let Ok(result) = sqlx::query(RULES_LEGAL_IDS)
+            .bind(&name)
+            .fetch_one(&self.pool)
+            .await {
+            Some((result.get::<Uuid, &str>("rules_id"), result.get::<Uuid, &str>("legalities_id")))
+        } else {
+            None
         }
     }
 
