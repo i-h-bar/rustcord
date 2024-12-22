@@ -8,7 +8,7 @@ pub fn lev(a: &str, b: &str) -> usize {
         return a.chars().count();
     }
 
-    let mut dcol: Vec<_> = (0..(b.len() + 1)).collect();
+    let mut dcol: Vec<usize> = (0..(b.len() + 1)).collect();
     let mut t_last = 0;
     for (i, sc) in a.chars().enumerate() {
         let mut current = i;
