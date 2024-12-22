@@ -6,7 +6,7 @@ use regex::Regex;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 use unicode_normalization::UnicodeNormalization;
 
-const CARD_QUERY_RE: &str = r#"(?i)\[\[(.*?)(:?(?:\s)?\|(?:\s)?(:?set(?:\s)?=(?:\s)?(.*?)?)?)?(:?\||\s\||\|\s|\s\|\s(:?artist(?:\s)?=(?:\s)?(.*?)?)?)?]]"#;
+const CARD_QUERY_RE: &str = r#"(?i)\[\[(.*?)(:?(?:\s)?\|(?:\s)?(:?set(?:\s)?=(?:\s)?(.*?)?)?)?(:?(?:\s)?\|(?:\s)?(:?artist(?:\s)?=(?:\s)?(.*?)?)?)?]]"#;
 
 pub static REGEX_COLLECTION: Lazy<RegexCollection> = Lazy::new(|| {
     let punctuation_removal = Regex::new(r#"[^\w\s]"#).expect("Invalid regex");
