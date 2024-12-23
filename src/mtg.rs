@@ -143,7 +143,7 @@ impl CardInfo {
             legalities: front.legalities.clone(),
             colour_identity: front.colour_identity.clone(),
             mana_cost: face.mana_cost.to_owned(),
-            cmc: card.cmc,
+            cmc: card.cmc.unwrap_or_else(|| 0.0),
             power: face.power.to_owned(),
             toughness: face.toughness.to_owned(),
             loyalty: face.loyalty.to_owned(),
@@ -178,12 +178,12 @@ impl CardInfo {
             legalities: card.legalities.to_owned(),
             colour_identity: card.color_identity.to_owned(),
             mana_cost: card.mana_cost.to_owned(),
-            cmc: card.cmc,
+            cmc: card.cmc.unwrap_or_else(|| 0.0),
             power: card.power.to_owned(),
             toughness: card.toughness.to_owned(),
             loyalty: card.loyalty.to_owned(),
             defence: card.defence.to_owned(),
-            type_line: card.type_line.to_owned(),
+            type_line: card.type_line.to_owned().unwrap_or_else(|| String::new()),
             oracle_text: card.oracle_text.to_owned(),
             keywords: card.keywords.to_owned(),
             other_side,
@@ -351,7 +351,7 @@ pub struct ScryfallCard {
     card_faces: Option<Vec<CardFace>>,
     #[allow(dead_code)]
     cardmarket_id: Option<u32>,
-    cmc: f32,
+    cmc: Option<f32>,
     #[allow(dead_code)]
     collector_number: String,
     color_identity: Vec<String>,
@@ -401,7 +401,7 @@ pub struct ScryfallCard {
     #[allow(dead_code)]
     object: String,
     #[allow(dead_code)]
-    oracle_id: String,
+    oracle_id: Option<String>,
     oracle_text: Option<String>,
     #[allow(dead_code)]
     oversized: bool,
@@ -448,7 +448,7 @@ pub struct ScryfallCard {
     #[allow(dead_code)]
     textless: bool,
     toughness: Option<String>,
-    type_line: String,
+    type_line: Option<String>,
     #[allow(dead_code)]
     uri: String,
     #[allow(dead_code)]
