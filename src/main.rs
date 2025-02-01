@@ -9,9 +9,11 @@ use serenity::client::EventHandler;
 use serenity::prelude::*;
 
 use crate::db::PSQL;
+use crate::help::HELP;
 use crate::mtg::search::MTG;
 
 mod db;
+mod help;
 mod mtg;
 mod utils;
 
@@ -32,8 +34,8 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.id == ctx.cache.current_user().id {
             return;
-        } else if msg.content == "!ping" {
-            utils::send("Pong!", &msg, &ctx).await
+        } else if msg.content == "!help" {
+            utils::send(HELP, &msg, &ctx).await
         } else {
             for card in self.mtg.parse_message(&msg.content).await {
                 self.card_response(&card, &msg, &ctx).await;

@@ -28,7 +28,9 @@ impl<'a> Handler {
                     if let Some(card) = card_option.as_ref() {
                         let legalities_id = if let Some(front) = card.front.as_ref() {
                             if !shared_ids.contains_key(&front.name) {
-                                if let Some((legalities_id, rules_id)) = pool.fetch_rules_legalities_id(&front.name).await {
+                                if let Some((legalities_id, rules_id)) =
+                                    pool.fetch_rules_legalities_id(&front.name).await
+                                {
                                     shared_ids.insert(&front.name, (legalities_id, rules_id));
                                     legalities_id
                                 } else {
@@ -37,15 +39,17 @@ impl<'a> Handler {
                                     legalities_id
                                 }
                             } else {
-                                continue
+                                continue;
                             }
                         } else {
-                            continue
+                            continue;
                         };
 
                         if let Some(back) = card.back.as_ref() {
                             if !shared_ids.contains_key(&back.name) {
-                                if let Some((legalities_id, rules_id)) = pool.fetch_rules_legalities_id(&back.name).await {
+                                if let Some((legalities_id, rules_id)) =
+                                    pool.fetch_rules_legalities_id(&back.name).await
+                                {
                                     shared_ids.insert(&back.name, (legalities_id, rules_id));
                                 } else {
                                     shared_ids.insert(&back.name, (legalities_id, Uuid::new_v4()));

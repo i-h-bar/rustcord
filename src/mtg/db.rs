@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use crate::db::PSQL;
 use crate::mtg::{CardInfo, FoundCard};
 use crate::utils;
 use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -179,29 +179,33 @@ impl PSQL {
         };
     }
 
-    pub async fn add_card<'a>(&'a self, card: &FoundCard<'a>, shared_ids: &HashMap<&String, (Uuid, Uuid)>) {
+    pub async fn add_card<'a>(
+        &'a self,
+        card: &FoundCard<'a>,
+        shared_ids: &HashMap<&String, (Uuid, Uuid)>,
+    ) {
         if let Some(card_info) = &card.front {
             let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
                 log::warn!("No front ids found");
-                return
+                return;
             };
 
             self.add_to_legalities(&card_info, &legalities_id).await;
-            self.add_to_rules(&card_info, &rules_id, &legalities_id).await;
+            self.add_to_rules(&card_info, &rules_id, &legalities_id)
+                .await;
             let image_id = self.add_to_images(&card.image).await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
             log::info!("Added {} to postgres", card_info.name);
-
         } else {
             log::warn!("No front card found");
-            return
+            return;
         };
 
         if let Some(card_info) = &card.back {
             let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
                 log::warn!("No front back ids found");
-                return
+                return;
             };
 
             let image_id = if let Some(back_image) = &card.back_image {
@@ -211,7 +215,8 @@ impl PSQL {
                 return;
             };
 
-            self.add_to_rules(&card_info, &rules_id, &legalities_id).await;
+            self.add_to_rules(&card_info, &rules_id, &legalities_id)
+                .await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
 
@@ -223,8 +228,12 @@ impl PSQL {
         if let Ok(result) = sqlx::query(RULES_LEGAL_IDS)
             .bind(&name)
             .fetch_one(&self.pool)
-            .await {
-            Some((result.get::<Uuid, &str>("rules_id"), result.get::<Uuid, &str>("legalities_id")))
+            .await
+        {
+            Some((
+                result.get::<Uuid, &str>("rules_id"),
+                result.get::<Uuid, &str>("legalities_id"),
+            ))
         } else {
             None
         }

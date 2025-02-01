@@ -197,7 +197,7 @@ impl<'a> MTG {
         }
     }
 
-    async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard> {
+    async fn find_from_scryfall(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let cards = self.search_scryfall_card_data(Arc::clone(&query)).await?;
         let card = self.determine_best_match(Arc::clone(&query), &cards)?;
 
