@@ -24,11 +24,11 @@ impl<'a> Handler {
                 }))
                 .await;
 
-                let mut shared_ids: HashMap<&String, (Uuid, Uuid)> = HashMap::new();
+                let mut shared_ids: HashMap<&str, (Uuid, Uuid)> = HashMap::new();
                 for card_option in found_cards.iter() {
                     if let Some(card) = card_option.as_ref() {
                         let legalities_id = if let Some(front) = card.front.as_ref() {
-                            if !shared_ids.contains_key(&front.name) {
+                            if !shared_ids.contains_key(&front.name.as_ref()) {
                                 if let Some((legalities_id, rules_id)) =
                                     pool.fetch_rules_legalities_id(&front.name).await
                                 {
@@ -47,7 +47,7 @@ impl<'a> Handler {
                         };
 
                         if let Some(back) = card.back.as_ref() {
-                            if !shared_ids.contains_key(&back.name) {
+                            if !shared_ids.contains_key(&back.name.as_ref()) {
                                 if let Some((legalities_id, rules_id)) =
                                     pool.fetch_rules_legalities_id(&back.name).await
                                 {
@@ -267,28 +267,28 @@ impl<'a> FoundCard<'a> {
 
 #[derive(Deserialize, Clone, Debug)]
 struct Legalities {
-    alchemy: String,
-    brawl: String,
-    commander: String,
-    duel: String,
-    explorer: String,
-    future: String,
-    gladiator: String,
-    historic: String,
-    legacy: String,
-    modern: String,
-    oathbreaker: String,
-    oldschool: String,
-    pauper: String,
-    paupercommander: String,
-    penny: String,
-    pioneer: String,
-    predh: String,
-    premodern: String,
-    standard: String,
-    standardbrawl: String,
-    timeless: String,
-    vintage: String,
+    alchemy: Box<str>,
+    brawl: Box<str>,
+    commander: Box<str>,
+    duel: Box<str>,
+    explorer: Box<str>,
+    future: Box<str>,
+    gladiator: Box<str>,
+    historic: Box<str>,
+    legacy: Box<str>,
+    modern: Box<str>,
+    oathbreaker: Box<str>,
+    oldschool: Box<str>,
+    pauper: Box<str>,
+    paupercommander: Box<str>,
+    penny: Box<str>,
+    pioneer: Box<str>,
+    predh: Box<str>,
+    premodern: Box<str>,
+    standard: Box<str>,
+    standardbrawl: Box<str>,
+    timeless: Box<str>,
+    vintage: Box<str>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -301,7 +301,7 @@ struct ImageURIs {
     large: String,
     #[allow(dead_code)]
     normal: String,
-    pub png: String,
+    pub png: Box<str>,
     #[allow(dead_code)]
     small: String,
 }

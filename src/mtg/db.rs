@@ -161,8 +161,8 @@ impl PSQL {
     async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
             .bind(&card.set_id.deref())
-            .bind(utils::normalise(&card.set_name))
-            .bind(utils::normalise(&card.set_code))
+            .bind(utils::normalise(&card.set_name.deref()))
+            .bind(utils::normalise(&card.set_code.deref()))
             .execute(&self.pool)
             .await
         {
@@ -178,11 +178,11 @@ impl PSQL {
 
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(card.card_id.deref())
-            .bind(card.name.deref())
+            .bind(utils::normalise(card.name.deref()))
             .bind(card.flavour_text.deref())
             .bind(&card.set_id.deref())
             .bind(&image_id)
-            .bind(utils::normalise(&card.artist))
+            .bind(utils::normalise(&card.artist.deref()))
             .bind(&rules_id)
             .bind(other_side)
             .execute(&self.pool)
@@ -195,10 +195,10 @@ impl PSQL {
     pub async fn add_card<'a>(
         &'a self,
         card: &FoundCard<'a>,
-        shared_ids: &HashMap<&String, (Uuid, Uuid)>,
+        shared_ids: &HashMap<&str, (Uuid, Uuid)>,
     ) {
         if let Some(card_info) = &card.front {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
                 log::warn!("No front ids found");
                 return;
             };
@@ -216,7 +216,7 @@ impl PSQL {
         };
 
         if let Some(card_info) = &card.back {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
                 log::warn!("No front back ids found");
                 return;
             };

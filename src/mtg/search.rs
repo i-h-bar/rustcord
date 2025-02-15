@@ -10,7 +10,7 @@ use tokio::time::Instant;
 
 use crate::db::PSQL;
 use crate::mtg::db::QueryParams;
-use crate::mtg::{CardFace, FoundCard, ScryfallCard, ScryfallList};
+use crate::mtg::{FoundCard, ScryfallCard, ScryfallList};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";
