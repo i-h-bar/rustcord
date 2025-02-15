@@ -315,7 +315,7 @@ struct CardFace {
     type_line: Arc<Option<Box<str>>>,
     oracle_text: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
-    colors: Vec<String>,
+    colors: Option<Vec<String>>,
     defence: Arc<Option<Box<str>>>,
     power: Arc<Option<Box<str>>>,
     toughness: Arc<Option<Box<str>>>,
