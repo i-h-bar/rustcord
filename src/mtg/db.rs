@@ -5,6 +5,7 @@ use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -152,7 +153,7 @@ impl PSQL {
 
     async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
-            .bind(&card.set_id)
+            .bind(&card.set_id.deref())
             .bind(utils::normalise(&card.set_name))
             .bind(utils::normalise(&card.set_code))
             .execute(&self.pool)
@@ -163,11 +164,16 @@ impl PSQL {
     }
 
     async fn add_to_cards(&self, card: &CardInfo, image_id: &Uuid, rules_id: &Uuid) {
+        let flavour_text = match &card.flavour_text {
+            Some(flavour_text) => Some(flavour_text.deref()),
+            None => None
+        };
+
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(&card.card_id)
             .bind(&card.name)
-            .bind(&card.flavour_text)
-            .bind(&card.set_id)
+            .bind(flavour_text)
+            .bind(&card.set_id.deref())
             .bind(&image_id)
             .bind(utils::normalise(&card.artist))
             .bind(&rules_id)

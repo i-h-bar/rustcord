@@ -107,8 +107,8 @@ pub struct CardInfo {
     card_id: String,
     legalities_id: Uuid,
     pub(crate) name: String,
-    flavour_text: Option<String>,
-    set_id: String,
+    flavour_text: Option<Arc<str>>,
+    set_id: Arc<str>,
     set_name: String,
     set_code: String,
     artist: String,
@@ -135,12 +135,17 @@ impl CardInfo {
     ) -> Option<Self> {
         let face = card.card_faces.as_ref()?.get(1)?;
 
+        let flavour_text: Option<Arc<str>> = match &face.flavor_text {
+                Some(flavor_text) => Some(flavor_text.as_str().into()),
+                None => None
+        };
+
         Some(Self {
             card_id,
             legalities_id: front.legalities_id,
             name: utils::normalise(&face.name),
-            flavour_text: face.flavor_text.to_owned(),
-            set_id: front.set_id.clone(),
+            flavour_text,
+            set_id: Arc::clone(&front.set_id),
             set_name: front.set_name.clone(),
             set_code: front.set_code.clone(),
             artist: front.artist.clone(),
@@ -170,12 +175,19 @@ impl CardInfo {
             utils::normalise(&card.name)
         };
 
+        let flavour_text: Option<Arc<str>> = match &card.flavor_text {
+            Some(flavor_text) => Some(flavor_text.as_str().into()),
+            None => None
+        };
+
+        let set_id: Arc<str> = card.set_id.as_str().into();
+
         Self {
             card_id: card.id.to_owned(),
             legalities_id: Uuid::new_v4(),
             name,
-            flavour_text: card.flavor_text.to_owned(),
-            set_id: card.set_id.to_owned(),
+            flavour_text,
+            set_id,
             set_name: card.set_name.to_owned(),
             set_code: card.set.to_owned(),
             artist: card.artist.to_owned(),
