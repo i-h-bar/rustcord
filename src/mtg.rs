@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::db::PSQL;
@@ -104,68 +105,63 @@ impl<'a> Handler {
 }
 
 pub struct CardInfo {
-    card_id: String,
+    card_id: Arc<str>,
     legalities_id: Uuid,
     pub(crate) name: String,
-    flavour_text: Option<Arc<str>>,
+    flavour_text: Arc<Option<Box<str>>>,
     set_id: Arc<str>,
-    set_name: String,
-    set_code: String,
-    artist: String,
-    legalities: Legalities,
-    colour_identity: Vec<String>,
-    mana_cost: Option<String>,
+    set_name: Arc<str>,
+    set_code: Arc<str>,
+    artist: Arc<str>,
+    legalities: Arc<Legalities>,
+    colour_identity: Arc<[Box<str>]>,
+    mana_cost: Arc<Option<Box<str>>>,
     cmc: f32,
-    power: Option<String>,
-    toughness: Option<String>,
-    loyalty: Option<String>,
-    defence: Option<String>,
-    type_line: String,
-    oracle_text: Option<String>,
-    keywords: Option<Vec<String>>,
-    other_side: Option<String>,
+    power: Arc<Option<Box<str>>>,
+    toughness: Arc<Option<Box<str>>>,
+    loyalty: Arc<Option<Box<str>>>,
+    defence: Arc<Option<Box<str>>>,
+    type_line: Arc<Option<Box<str>>>,
+    oracle_text: Arc<Option<Box<str>>>,
+    keywords: Arc<Option<Vec<Box<str>>>>,
+    other_side: Option<Arc<str>>,
 }
 
 impl CardInfo {
     fn new_back(
         card: &ScryfallCard,
         front: &CardInfo,
-        card_id: String,
-        other_side: &String,
+        card_id: Arc<str>,
+        other_side: Arc<str>,
     ) -> Option<Self> {
-        let face = card.card_faces.as_ref()?.get(1)?;
-
-        let flavour_text: Option<Arc<str>> = match &face.flavor_text {
-                Some(flavor_text) => Some(flavor_text.as_str().into()),
-                None => None
-        };
+        let face = card.card_faces.deref().as_ref()?.get(1)?;
 
         Some(Self {
             card_id,
             legalities_id: front.legalities_id,
             name: utils::normalise(&face.name),
-            flavour_text,
+            flavour_text: Arc::clone(&face.flavor_text),
             set_id: Arc::clone(&front.set_id),
-            set_name: front.set_name.clone(),
-            set_code: front.set_code.clone(),
-            artist: front.artist.clone(),
-            legalities: front.legalities.clone(),
-            colour_identity: front.colour_identity.clone(),
-            mana_cost: face.mana_cost.to_owned(),
+            set_name: Arc::clone(&front.set_name),
+            set_code: Arc::clone(&front.set_code),
+            artist: Arc::clone(&front.artist),
+            legalities: Arc::clone(&front.legalities),
+            colour_identity: Arc::clone(&front.colour_identity),
+            mana_cost: Arc::clone(&face.mana_cost),
             cmc: card.cmc.unwrap_or_else(|| 0.0),
-            power: face.power.to_owned(),
-            toughness: face.toughness.to_owned(),
-            loyalty: face.loyalty.to_owned(),
-            defence: face.defence.to_owned(),
-            type_line: face.type_line.to_owned(),
-            oracle_text: face.oracle_text.to_owned(),
-            keywords: face.keywords.to_owned(),
-            other_side: Some(other_side.clone()),
+            power: Arc::clone(&face.power),
+            toughness: Arc::clone(&face.toughness),
+            loyalty: Arc::clone(&face.loyalty),
+            defence: Arc::clone(&face.defence),
+            type_line: Arc::clone(&face.type_line),
+            oracle_text: Arc::clone(&face.oracle_text),
+            keywords: Arc::clone(&face.keywords),
+            other_side: Some(Arc::clone(&other_side)),
         })
     }
 
-    fn new_card(card: &ScryfallCard, other_side: Option<String>) -> Self {
-        let name = if let Some(sides) = &card.card_faces {
+    fn new_card(card: &ScryfallCard, other_side: Option<Arc<str>>) -> Self {
+        let name = if let Some(sides) = &card.card_faces.deref() {
             if let Some(front) = sides.get(0) {
                 utils::normalise(&front.name)
             } else {
@@ -175,33 +171,26 @@ impl CardInfo {
             utils::normalise(&card.name)
         };
 
-        let flavour_text: Option<Arc<str>> = match &card.flavor_text {
-            Some(flavor_text) => Some(flavor_text.as_str().into()),
-            None => None
-        };
-
-        let set_id: Arc<str> = card.set_id.as_str().into();
-
         Self {
-            card_id: card.id.to_owned(),
+            card_id: Arc::clone(&card.id),
             legalities_id: Uuid::new_v4(),
             name,
-            flavour_text,
-            set_id,
-            set_name: card.set_name.to_owned(),
-            set_code: card.set.to_owned(),
-            artist: card.artist.to_owned(),
-            legalities: card.legalities.to_owned(),
-            colour_identity: card.color_identity.to_owned(),
-            mana_cost: card.mana_cost.to_owned(),
+            flavour_text: Arc::clone(&card.flavor_text),
+            set_id: Arc::clone(&card.set_id),
+            set_name: Arc::clone(&card.set_name),
+            set_code: Arc::clone(&card.set),
+            artist: Arc::clone(&card.artist),
+            legalities: Arc::clone(&card.legalities),
+            colour_identity: Arc::clone(&card.color_identity),
+            mana_cost: Arc::clone(&card.mana_cost),
             cmc: card.cmc.unwrap_or_else(|| 0.0),
-            power: card.power.to_owned(),
-            toughness: card.toughness.to_owned(),
-            loyalty: card.loyalty.to_owned(),
-            defence: card.defence.to_owned(),
-            type_line: card.type_line.to_owned().unwrap_or_else(|| String::new()),
-            oracle_text: card.oracle_text.to_owned(),
-            keywords: card.keywords.to_owned(),
+            power: Arc::clone(&card.power),
+            toughness: Arc::clone(&card.toughness),
+            loyalty: Arc::clone(&card.loyalty),
+            defence: Arc::clone(&card.defence),
+            type_line: Arc::clone(&card.type_line),
+            oracle_text: Arc::clone(&card.oracle_text),
+            keywords: Arc::clone(&card.keywords),
             other_side,
         }
     }
@@ -223,10 +212,10 @@ impl<'a> FoundCard<'a> {
         images: Vec<Vec<u8>>,
         scryfall_list: Option<ScryfallList>,
     ) -> Option<Self> {
-        let back_id = Uuid::new_v4().to_string();
+        let back_id = Uuid::new_v4().to_string().as_str().into();
 
-        let front = CardInfo::new_card(&card, Some(back_id.clone()));
-        let back = CardInfo::new_back(&card, &front, back_id, &front.card_id);
+        let front = CardInfo::new_card(&card, Some(Arc::clone(&back_id)));
+        let back = CardInfo::new_back(&card, &front, Arc::clone(&back_id), Arc::clone(&front.card_id));
 
         Some(Self {
             query: Arc::clone(&query),
@@ -321,25 +310,25 @@ struct ImageURIs {
 struct CardFace {
     #[allow(dead_code)]
     object: String,
-    name: String,
-    mana_cost: Option<String>,
-    type_line: String,
-    oracle_text: Option<String>,
+    name: Arc<str>,
+    mana_cost: Arc<Option<Box<str>>>,
+    type_line: Arc<Option<Box<str>>>,
+    oracle_text: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     colors: Vec<String>,
-    defence: Option<String>,
-    power: Option<String>,
-    toughness: Option<String>,
-    loyalty: Option<String>,
+    defence: Arc<Option<Box<str>>>,
+    power: Arc<Option<Box<str>>>,
+    toughness: Arc<Option<Box<str>>>,
+    loyalty: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     artist: String,
     #[allow(dead_code)]
     artist_id: String,
     #[allow(dead_code)]
     illustration_id: String,
-    flavor_text: Option<String>,
-    keywords: Option<Vec<String>>,
-    image_uris: ImageURIs,
+    flavor_text: Arc<Option<Box<str>>>,
+    keywords: Arc<Option<Vec<Box<str>>>>,
+    image_uris: Arc<ImageURIs>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -355,7 +344,7 @@ pub struct ScryfallList {
 
 #[derive(Deserialize, Clone)]
 pub struct ScryfallCard {
-    artist: String,
+    artist: Arc<str>,
     #[allow(dead_code)]
     artist_ids: Vec<String>,
     #[allow(dead_code)]
@@ -364,24 +353,24 @@ pub struct ScryfallCard {
     border_color: String,
     #[allow(dead_code)]
     card_back_id: Option<String>,
-    card_faces: Option<Vec<CardFace>>,
+    card_faces: Arc<Option<Vec<Arc<CardFace>>>>,
     #[allow(dead_code)]
     cardmarket_id: Option<u32>,
     cmc: Option<f32>,
     #[allow(dead_code)]
     collector_number: String,
-    color_identity: Vec<String>,
+    color_identity: Arc<[Box<str>]>,
     #[allow(dead_code)]
     colors: Option<Vec<String>>,
-    loyalty: Option<String>,
-    defence: Option<String>,
+    loyalty: Arc<Option<Box<str>>>,
+    defence: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     digital: bool,
     #[allow(dead_code)]
     edhrec_rank: Option<u32>,
     #[allow(dead_code)]
     finishes: Vec<String>,
-    flavor_text: Option<String>,
+    flavor_text: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     foil: bool,
     #[allow(dead_code)]
@@ -392,38 +381,38 @@ pub struct ScryfallCard {
     games: Vec<String>,
     #[allow(dead_code)]
     highres_image: bool,
-    id: String,
+    id: Arc<str>,
     #[allow(dead_code)]
     illustration_id: Option<String>,
     #[allow(dead_code)]
     image_status: String,
-    image_uris: Option<ImageURIs>,
-    keywords: Option<Vec<String>>,
+    image_uris: Arc<Option<ImageURIs>>,
+    keywords: Arc<Option<Vec<Box<str>>>>,
     #[allow(dead_code)]
     lang: String,
     #[allow(dead_code)]
     layout: String,
-    legalities: Legalities,
-    mana_cost: Option<String>,
+    legalities: Arc<Legalities>,
+    mana_cost: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     mtgo_foil_id: Option<u32>,
     #[allow(dead_code)]
     mtgo_id: Option<u32>,
     #[allow(dead_code)]
     multiverse_ids: Vec<u32>,
-    name: String,
+    name: Arc<str>,
     #[allow(dead_code)]
     nonfoil: bool,
     #[allow(dead_code)]
     object: String,
     #[allow(dead_code)]
     oracle_id: Option<String>,
-    oracle_text: Option<String>,
+    oracle_text: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     oversized: bool,
     #[allow(dead_code)]
     penny_rank: Option<u32>,
-    power: Option<String>,
+    power: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     prices: HashMap<String, Option<String>>,
     #[allow(dead_code)]
@@ -448,9 +437,9 @@ pub struct ScryfallCard {
     scryfall_set_uri: String,
     #[allow(dead_code)]
     scryfall_uri: String,
-    set: String,
-    set_id: String,
-    set_name: String,
+    set: Arc<str>,
+    set_id: Arc<str>,
+    set_name: Arc<str>,
     #[allow(dead_code)]
     set_search_uri: String,
     #[allow(dead_code)]
@@ -463,8 +452,8 @@ pub struct ScryfallCard {
     tcgplayer_id: Option<u32>,
     #[allow(dead_code)]
     textless: bool,
-    toughness: Option<String>,
-    type_line: Option<String>,
+    toughness: Arc<Option<Box<str>>>,
+    type_line: Arc<Option<Box<str>>>,
     #[allow(dead_code)]
     uri: String,
     #[allow(dead_code)]

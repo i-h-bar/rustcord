@@ -117,18 +117,25 @@ impl PSQL {
     }
 
     async fn add_to_rules(&self, card: &CardInfo, rules_id: &Uuid, legalities_id: &Uuid) {
+        let keywords: Option<Vec<&str>> = match &card.keywords.deref() {
+            Some(keywords) => Some(
+                keywords.iter().map(| keyword | keyword.as_ref() ).collect()
+            ),
+            None => None
+        };
+
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
-            .bind(&card.colour_identity)
+            .bind(card.colour_identity.deref())
             .bind(&card.cmc)
-            .bind(&card.power)
-            .bind(&card.toughness)
-            .bind(&card.type_line)
-            .bind(&card.oracle_text)
-            .bind(&card.keywords)
-            .bind(&card.loyalty)
-            .bind(&card.defence)
-            .bind(&card.mana_cost)
+            .bind(card.power.deref())
+            .bind(card.toughness.deref())
+            .bind(card.type_line.deref())
+            .bind(card.oracle_text.deref())
+            .bind(keywords)
+            .bind(card.loyalty.deref())
+            .bind(card.defence.deref())
+            .bind(&card.mana_cost.deref())
             .bind(&legalities_id)
             .execute(&self.pool)
             .await
@@ -164,20 +171,20 @@ impl PSQL {
     }
 
     async fn add_to_cards(&self, card: &CardInfo, image_id: &Uuid, rules_id: &Uuid) {
-        let flavour_text = match &card.flavour_text {
-            Some(flavour_text) => Some(flavour_text.deref()),
+        let other_side = match &card.other_side {
+            Some(other_side) => Some(other_side.deref()),
             None => None
         };
 
         if let Err(why) = sqlx::query(CARD_INSERT)
-            .bind(&card.card_id)
-            .bind(&card.name)
-            .bind(flavour_text)
+            .bind(card.card_id.deref())
+            .bind(card.name.deref())
+            .bind(card.flavour_text.deref())
             .bind(&card.set_id.deref())
             .bind(&image_id)
             .bind(utils::normalise(&card.artist))
             .bind(&rules_id)
-            .bind(&card.other_side)
+            .bind(other_side)
             .execute(&self.pool)
             .await
         {
