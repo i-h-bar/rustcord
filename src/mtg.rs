@@ -293,39 +293,19 @@ struct Legalities {
 
 #[derive(Deserialize, Clone)]
 struct ImageURIs {
-    #[allow(dead_code)]
-    art_crop: String,
-    #[allow(dead_code)]
-    border_crop: String,
-    #[allow(dead_code)]
-    large: String,
-    #[allow(dead_code)]
-    normal: String,
     pub png: Box<str>,
-    #[allow(dead_code)]
-    small: String,
 }
 
 #[derive(Deserialize, Clone)]
 struct CardFace {
-    #[allow(dead_code)]
-    object: String,
     name: Arc<str>,
     mana_cost: Arc<Option<Box<str>>>,
     type_line: Arc<Option<Box<str>>>,
     oracle_text: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    colors: Option<Vec<String>>,
     defence: Arc<Option<Box<str>>>,
     power: Arc<Option<Box<str>>>,
     toughness: Arc<Option<Box<str>>>,
     loyalty: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    artist: String,
-    #[allow(dead_code)]
-    artist_id: String,
-    #[allow(dead_code)]
-    illustration_id: String,
     flavor_text: Arc<Option<Box<str>>>,
     keywords: Arc<Option<Vec<Box<str>>>>,
     image_uris: Arc<ImageURIs>,
@@ -333,131 +313,29 @@ struct CardFace {
 
 #[derive(Deserialize, Clone)]
 pub struct ScryfallList {
-    #[allow(dead_code)]
-    object: String,
-    #[allow(dead_code)]
-    total_cards: u16,
-    #[allow(dead_code)]
-    has_more: bool,
     data: Vec<ScryfallCard>,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct ScryfallCard {
     artist: Arc<str>,
-    #[allow(dead_code)]
-    artist_ids: Vec<String>,
-    #[allow(dead_code)]
-    booster: bool,
-    #[allow(dead_code)]
-    border_color: String,
-    #[allow(dead_code)]
-    card_back_id: Option<String>,
     card_faces: Arc<Option<Vec<Arc<CardFace>>>>,
-    #[allow(dead_code)]
-    cardmarket_id: Option<u32>,
     cmc: Option<f32>,
-    #[allow(dead_code)]
-    collector_number: String,
     color_identity: Arc<[Box<str>]>,
-    #[allow(dead_code)]
-    colors: Option<Vec<String>>,
     loyalty: Arc<Option<Box<str>>>,
     defence: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    digital: bool,
-    #[allow(dead_code)]
-    edhrec_rank: Option<u32>,
-    #[allow(dead_code)]
-    finishes: Vec<String>,
     flavor_text: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    foil: bool,
-    #[allow(dead_code)]
-    frame: String,
-    #[allow(dead_code)]
-    full_art: bool,
-    #[allow(dead_code)]
-    games: Vec<String>,
-    #[allow(dead_code)]
-    highres_image: bool,
     id: Arc<str>,
-    #[allow(dead_code)]
-    illustration_id: Option<String>,
-    #[allow(dead_code)]
-    image_status: String,
     image_uris: Arc<Option<ImageURIs>>,
     keywords: Arc<Option<Vec<Box<str>>>>,
-    #[allow(dead_code)]
-    lang: String,
-    #[allow(dead_code)]
-    layout: String,
     legalities: Arc<Legalities>,
     mana_cost: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    mtgo_foil_id: Option<u32>,
-    #[allow(dead_code)]
-    mtgo_id: Option<u32>,
-    #[allow(dead_code)]
-    multiverse_ids: Vec<u32>,
     name: Arc<str>,
-    #[allow(dead_code)]
-    nonfoil: bool,
-    #[allow(dead_code)]
-    object: String,
-    #[allow(dead_code)]
-    oracle_id: Option<String>,
     oracle_text: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    oversized: bool,
-    #[allow(dead_code)]
-    penny_rank: Option<u32>,
     power: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    prices: HashMap<String, Option<String>>,
-    #[allow(dead_code)]
-    prints_search_uri: String,
-    #[allow(dead_code)]
-    promo: bool,
-    #[allow(dead_code)]
-    purchase_uris: Option<HashMap<String, String>>,
-    #[allow(dead_code)]
-    rarity: String,
-    #[allow(dead_code)]
-    related_uris: HashMap<String, String>,
-    #[allow(dead_code)]
-    released_at: String,
-    #[allow(dead_code)]
-    reprint: bool,
-    #[allow(dead_code)]
-    reserved: bool,
-    #[allow(dead_code)]
-    rulings_uri: String,
-    #[allow(dead_code)]
-    scryfall_set_uri: String,
-    #[allow(dead_code)]
-    scryfall_uri: String,
     set: Arc<str>,
     set_id: Arc<str>,
     set_name: Arc<str>,
-    #[allow(dead_code)]
-    set_search_uri: String,
-    #[allow(dead_code)]
-    set_type: String,
-    #[allow(dead_code)]
-    set_uri: String,
-    #[allow(dead_code)]
-    story_spotlight: bool,
-    #[allow(dead_code)]
-    tcgplayer_id: Option<u32>,
-    #[allow(dead_code)]
-    textless: bool,
     toughness: Arc<Option<Box<str>>>,
     type_line: Arc<Option<Box<str>>>,
-    #[allow(dead_code)]
-    uri: String,
-    #[allow(dead_code)]
-    variation: bool,
-    #[allow(dead_code)]
-    watermark: Option<String>,
 }
