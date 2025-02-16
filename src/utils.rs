@@ -63,6 +63,6 @@ pub async fn send_image(
 pub fn normalise(name: &str) -> String {
     REGEX_COLLECTION
         .punctuation_removal
-        .replace(&name.nfkc().collect::<String>(), "")
+        .replace(&name.replace("-", " ").nfkc().collect::<String>(), "")
         .to_lowercase()
 }

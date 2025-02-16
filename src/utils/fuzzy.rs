@@ -1,5 +1,6 @@
 use rayon::prelude::*;
 use std::cmp;
+use std::sync::Arc;
 
 pub fn lev(a: &str, b: &str) -> usize {
     if a.is_empty() {
@@ -28,15 +29,15 @@ pub fn lev(a: &str, b: &str) -> usize {
     dcol[t_last + 1]
 }
 
-pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a String>>(
+pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a Arc<str>>>(
     a: &str,
     items: &'a I,
-) -> Option<&'a String> {
+) -> Option<&'a Arc<str>> {
     Some(
         items
             .par_iter()
-            .map(|item: &String| {
-                let dist = lev(&a, &item);
+            .map(|item: &Arc<str>| {
+                let dist = lev(&a, item.as_ref());
                 (item, dist)
             })
             .min_by(|(_, x), (_, y)| x.cmp(y))?

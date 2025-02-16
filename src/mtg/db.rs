@@ -5,6 +5,7 @@ use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -116,18 +117,25 @@ impl PSQL {
     }
 
     async fn add_to_rules(&self, card: &CardInfo, rules_id: &Uuid, legalities_id: &Uuid) {
+        let keywords: Option<Vec<&str>> = match &card.keywords.deref() {
+            Some(keywords) => Some(
+                keywords.iter().map(| keyword | keyword.as_ref() ).collect()
+            ),
+            None => None
+        };
+
         if let Err(why) = sqlx::query(RULES_INSERT)
             .bind(&rules_id)
-            .bind(&card.colour_identity)
+            .bind(card.colour_identity.deref())
             .bind(&card.cmc)
-            .bind(&card.power)
-            .bind(&card.toughness)
-            .bind(&card.type_line)
-            .bind(&card.oracle_text)
-            .bind(&card.keywords)
-            .bind(&card.loyalty)
-            .bind(&card.defence)
-            .bind(&card.mana_cost)
+            .bind(card.power.deref())
+            .bind(card.toughness.deref())
+            .bind(card.type_line.deref())
+            .bind(card.oracle_text.deref())
+            .bind(keywords)
+            .bind(card.loyalty.deref())
+            .bind(card.defence.deref())
+            .bind(card.mana_cost.deref())
             .bind(&legalities_id)
             .execute(&self.pool)
             .await
@@ -152,9 +160,9 @@ impl PSQL {
 
     async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
-            .bind(&card.set_id)
-            .bind(utils::normalise(&card.set_name))
-            .bind(utils::normalise(&card.set_code))
+            .bind(card.set_id.deref())
+            .bind(utils::normalise(card.set_name.deref()))
+            .bind(utils::normalise(card.set_code.deref()))
             .execute(&self.pool)
             .await
         {
@@ -163,15 +171,20 @@ impl PSQL {
     }
 
     async fn add_to_cards(&self, card: &CardInfo, image_id: &Uuid, rules_id: &Uuid) {
+        let other_side = match &card.other_side {
+            Some(other_side) => Some(other_side.deref()),
+            None => None
+        };
+
         if let Err(why) = sqlx::query(CARD_INSERT)
-            .bind(&card.card_id)
-            .bind(&card.name)
-            .bind(&card.flavour_text)
-            .bind(&card.set_id)
+            .bind(card.card_id.deref())
+            .bind(utils::normalise(card.name.deref()))
+            .bind(card.flavour_text.deref())
+            .bind(card.set_id.deref())
             .bind(&image_id)
-            .bind(utils::normalise(&card.artist))
+            .bind(utils::normalise(card.artist.deref()))
             .bind(&rules_id)
-            .bind(&card.other_side)
+            .bind(other_side)
             .execute(&self.pool)
             .await
         {
@@ -182,10 +195,10 @@ impl PSQL {
     pub async fn add_card<'a>(
         &'a self,
         card: &FoundCard<'a>,
-        shared_ids: &HashMap<&String, (Uuid, Uuid)>,
+        shared_ids: &HashMap<&str, (Uuid, Uuid)>,
     ) {
         if let Some(card_info) = &card.front {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
                 log::warn!("No front ids found");
                 return;
             };
@@ -203,7 +216,7 @@ impl PSQL {
         };
 
         if let Some(card_info) = &card.back {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name) else {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
                 log::warn!("No front back ids found");
                 return;
             };

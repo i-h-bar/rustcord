@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,7 +10,7 @@ use tokio::time::Instant;
 
 use crate::db::PSQL;
 use crate::mtg::db::QueryParams;
-use crate::mtg::{CardFace, FoundCard, ScryfallCard, ScryfallList};
+use crate::mtg::{FoundCard, ScryfallCard, ScryfallList};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";
@@ -76,7 +77,7 @@ impl<'a> MTG {
         query: Arc<QueryParams<'a>>,
         cards: &'b ScryfallList,
     ) -> Option<ScryfallCard> {
-        let unique_cards: HashSet<String> =
+        let unique_cards: HashSet<Arc<str>> =
             HashSet::from_iter(cards.data.iter().map(|card| card.name.clone()));
         let best_match = fuzzy::best_match_lev(&query.name, &unique_cards)?;
         let potential_cards: Vec<&ScryfallCard> = cards
@@ -92,7 +93,7 @@ impl<'a> MTG {
             .collect();
 
         let potential_cards = if let Some(queried_artist) = &query.artist {
-            let artists_set: HashSet<String> =
+            let artists_set: HashSet<Arc<str>> =
                 HashSet::from_iter(potential_cards.iter().map(|card| card.artist.clone()));
             let best_artist = fuzzy::best_match_lev(queried_artist, &artists_set)?;
             potential_cards
@@ -110,7 +111,7 @@ impl<'a> MTG {
         };
 
         let potential_cards = if let Some(queried_set_name) = &query.set_name {
-            let set_name_set: HashSet<String> =
+            let set_name_set: HashSet<Arc<str>> =
                 HashSet::from_iter(potential_cards.iter().map(|&card| card.set_name.clone()));
             let best_set = fuzzy::best_match_lev(&queried_set_name, &set_name_set)?;
             potential_cards
@@ -131,7 +132,7 @@ impl<'a> MTG {
             potential_cards
                 .iter()
                 .filter_map(|&card| {
-                    if &card.set == queried_set_code {
+                    if card.set.as_ref() == queried_set_code {
                         Some(card)
                     } else {
                         None
@@ -169,8 +170,8 @@ impl<'a> MTG {
     ) -> Option<FoundCard<'a>> {
         match &card.card_faces {
             Some(card_faces) => {
-                let face_0 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(0)?;
-                let face_1 = <Vec<CardFace> as AsRef<Vec<CardFace>>>::as_ref(card_faces).get(1)?;
+                let face_0 = card_faces.get(0)?.deref();
+                let face_1 = card_faces.get(1)?.deref();
 
                 let images = self
                     .fetch_images(
@@ -187,7 +188,7 @@ impl<'a> MTG {
                     card.name
                 );
                 let image = self
-                    .fetch_images(&card.image_uris.as_ref()?.png, &query.name, None)
+                    .fetch_images(&card.image_uris.deref().as_ref()?.png, &query.name, None)
                     .await?
                     .get(0)?
                     .to_owned();
