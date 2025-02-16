@@ -160,9 +160,9 @@ impl PSQL {
 
     async fn add_to_sets(&self, card: &CardInfo) {
         if let Err(why) = sqlx::query(SET_INSERT)
-            .bind(&card.set_id.deref())
-            .bind(utils::normalise(&card.set_name.deref()))
-            .bind(utils::normalise(&card.set_code.deref()))
+            .bind(card.set_id.deref())
+            .bind(utils::normalise(card.set_name.deref()))
+            .bind(utils::normalise(card.set_code.deref()))
             .execute(&self.pool)
             .await
         {
@@ -180,9 +180,9 @@ impl PSQL {
             .bind(card.card_id.deref())
             .bind(utils::normalise(card.name.deref()))
             .bind(card.flavour_text.deref())
-            .bind(&card.set_id.deref())
+            .bind(card.set_id.deref())
             .bind(&image_id)
-            .bind(utils::normalise(&card.artist.deref()))
+            .bind(utils::normalise(card.artist.deref()))
             .bind(&rules_id)
             .bind(other_side)
             .execute(&self.pool)
