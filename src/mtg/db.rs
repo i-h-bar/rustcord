@@ -135,7 +135,7 @@ impl PSQL {
             .bind(keywords)
             .bind(card.loyalty.deref())
             .bind(card.defence.deref())
-            .bind(&card.mana_cost.deref())
+            .bind(card.mana_cost.deref())
             .bind(&legalities_id)
             .execute(&self.pool)
             .await
