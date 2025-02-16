@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::db::PSQL;
@@ -134,7 +133,7 @@ impl CardInfo {
         card_id: Arc<str>,
         other_side: Arc<str>,
     ) -> Option<Self> {
-        let face = card.card_faces.deref().as_ref()?.get(1)?;
+        let face = card.card_faces.as_ref()?.get(1)?;
 
         Some(Self {
             card_id,
@@ -161,7 +160,7 @@ impl CardInfo {
     }
 
     fn new_card(card: &ScryfallCard, other_side: Option<Arc<str>>) -> Self {
-        let name = if let Some(sides) = &card.card_faces.deref() {
+        let name = if let Some(sides) = &card.card_faces {
             if let Some(front) = sides.get(0) {
                 utils::normalise(&front.name)
             } else {
@@ -319,7 +318,7 @@ pub struct ScryfallList {
 #[derive(Deserialize, Clone)]
 pub struct ScryfallCard {
     artist: Arc<str>,
-    card_faces: Arc<Option<Vec<Arc<CardFace>>>>,
+    card_faces: Option<Vec<Arc<CardFace>>>,
     cmc: Option<f32>,
     color_identity: Arc<[Box<str>]>,
     loyalty: Arc<Option<Box<str>>>,

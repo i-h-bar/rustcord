@@ -168,7 +168,7 @@ impl<'a> MTG {
         card: &ScryfallCard,
         cards: Option<ScryfallList>,
     ) -> Option<FoundCard<'a>> {
-        match card.card_faces.deref() {
+        match &card.card_faces {
             Some(card_faces) => {
                 let face_0 = card_faces.get(0)?.deref();
                 let face_1 = card_faces.get(1)?.deref();
