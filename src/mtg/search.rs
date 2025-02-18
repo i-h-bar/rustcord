@@ -79,7 +79,7 @@ impl<'a> MTG {
     ) -> Option<ScryfallCard> {
         let unique_cards: HashSet<Arc<str>> =
             HashSet::from_iter(cards.data.iter().map(|card| card.name.clone()));
-        let best_match = fuzzy::best_match_lev(&query.name, &unique_cards)?;
+        let best_match = fuzzy::best_match_lev(&query.normalised_name, &unique_cards)?;
         let potential_cards: Vec<&ScryfallCard> = cards
             .data
             .iter()
@@ -176,7 +176,7 @@ impl<'a> MTG {
                 let images = self
                     .fetch_images(
                         &face_0.image_uris.png,
-                        &query.name,
+                        &query.normalised_name,
                         Some(&face_1.image_uris.png),
                     )
                     .await?;
@@ -188,7 +188,7 @@ impl<'a> MTG {
                     card.name
                 );
                 let image = self
-                    .fetch_images(&card.image_uris.deref().as_ref()?.png, &query.name, None)
+                    .fetch_images(&card.image_uris.deref().as_ref()?.png, &query.normalised_name, None)
                     .await?
                     .get(0)?
                     .to_owned();
@@ -236,7 +236,7 @@ impl<'a> MTG {
         log::info!("Searching scryfall for '{}'", query.raw_name);
         let response = match self
             .http_client
-            .get(format!("{}{}", SCRYFALL, query.name.replace(" ", "+")))
+            .get(format!("{}{}", SCRYFALL, query.normalised_name.replace(" ", "+")))
             .send()
             .await
         {

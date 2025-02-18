@@ -16,7 +16,7 @@ select
 from cards
     join rules on rules.id = cards.rules_id
     join legalities on legalities.id = rules.legalities_id
-where cards.name = $1
+where cards.normalised_name = $1
 "#;
 
 const LEGALITIES_INSERT: &str = r#"
@@ -35,14 +35,14 @@ const IMAGE_INSERT: &str = r#"INSERT INTO images (id, png) values ($1, $2) ON CO
 const SET_INSERT: &str =
     r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#;
 const CARD_INSERT: &str = r#"
-INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id, other_side)
-values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8)) ON CONFLICT DO NOTHING"#;
+INSERT INTO cards (id, normalised_name, flavour_text, set_id, image_id, artist, rules_id, other_side, name)
+values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8), $9) ON CONFLICT DO NOTHING"#;
 
 const FUZZY_FIND: &str = r#"
-select cards.name,
+select cards.normalised_name,
        png,
        other_side,
-       similarity(cards.name, $1) as sml
+       similarity(cards.normalised_name, $1) as sml
 from cards join images on cards.image_id = images.id
 join sets on cards.set_id = sets.id
 where ($4 is null or similarity(cards.artist, $4) > 0.5)
@@ -178,13 +178,14 @@ impl PSQL {
 
         if let Err(why) = sqlx::query(CARD_INSERT)
             .bind(card.card_id.deref())
-            .bind(utils::normalise(card.name.deref()))
+            .bind(utils::normalise(card.normalised_name.deref()))
             .bind(card.flavour_text.deref())
             .bind(card.set_id.deref())
             .bind(&image_id)
             .bind(utils::normalise(card.artist.deref()))
             .bind(&rules_id)
             .bind(other_side)
+            .bind(card.name.deref())
             .execute(&self.pool)
             .await
         {
@@ -198,7 +199,7 @@ impl PSQL {
         shared_ids: &HashMap<&str, (Uuid, Uuid)>,
     ) {
         if let Some(card_info) = &card.front {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.normalised_name.as_ref()) else {
                 log::warn!("No front ids found");
                 return;
             };
@@ -209,14 +210,14 @@ impl PSQL {
             let image_id = self.add_to_images(&card.image).await;
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
-            log::info!("Added {} to postgres", card_info.name);
+            log::info!("Added {} to postgres", card_info.normalised_name);
         } else {
             log::warn!("No front card found");
             return;
         };
 
         if let Some(card_info) = &card.back {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
+            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.normalised_name.as_ref()) else {
                 log::warn!("No front back ids found");
                 return;
             };
@@ -233,7 +234,7 @@ impl PSQL {
             self.add_to_sets(&card_info).await;
             self.add_to_cards(&card_info, &image_id, &rules_id).await;
 
-            log::info!("Added {} to postgres", card_info.name)
+            log::info!("Added {} to postgres", card_info.normalised_name)
         }
     }
 
@@ -268,7 +269,7 @@ impl PSQL {
 
     pub async fn fuzzy_fetch(&self, query: Arc<QueryParams<'_>>) -> Option<FuzzyFound> {
         match sqlx::query(FUZZY_FIND)
-            .bind(&query.name)
+            .bind(&query.normalised_name)
             .bind(&query.set_code)
             .bind(&query.set_name)
             .bind(&query.artist)
@@ -285,7 +286,7 @@ impl PSQL {
 }
 
 pub struct QueryParams<'a> {
-    pub name: String,
+    pub normalised_name: String,
     pub raw_name: &'a str,
     pub set_code: Option<String>,
     pub set_name: Option<String>,
@@ -314,7 +315,7 @@ impl<'a> QueryParams<'a> {
         };
 
         Some(Self {
-            name,
+            normalised_name: name,
             raw_name,
             artist,
             set_code,

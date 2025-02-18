@@ -27,15 +27,15 @@ impl<'a> Handler {
                 for card_option in found_cards.iter() {
                     if let Some(card) = card_option.as_ref() {
                         let legalities_id = if let Some(front) = card.front.as_ref() {
-                            if !shared_ids.contains_key(&front.name.as_ref()) {
+                            if !shared_ids.contains_key(&front.normalised_name.as_ref()) {
                                 if let Some((legalities_id, rules_id)) =
-                                    pool.fetch_rules_legalities_id(&front.name).await
+                                    pool.fetch_rules_legalities_id(&front.normalised_name).await
                                 {
-                                    shared_ids.insert(&front.name, (legalities_id, rules_id));
+                                    shared_ids.insert(&front.normalised_name, (legalities_id, rules_id));
                                     legalities_id
                                 } else {
                                     let legalities_id = Uuid::new_v4();
-                                    shared_ids.insert(&front.name, (legalities_id, Uuid::new_v4()));
+                                    shared_ids.insert(&front.normalised_name, (legalities_id, Uuid::new_v4()));
                                     legalities_id
                                 }
                             } else {
@@ -46,13 +46,13 @@ impl<'a> Handler {
                         };
 
                         if let Some(back) = card.back.as_ref() {
-                            if !shared_ids.contains_key(&back.name.as_ref()) {
+                            if !shared_ids.contains_key(&back.normalised_name.as_ref()) {
                                 if let Some((legalities_id, rules_id)) =
-                                    pool.fetch_rules_legalities_id(&back.name).await
+                                    pool.fetch_rules_legalities_id(&back.normalised_name).await
                                 {
-                                    shared_ids.insert(&back.name, (legalities_id, rules_id));
+                                    shared_ids.insert(&back.normalised_name, (legalities_id, rules_id));
                                 } else {
-                                    shared_ids.insert(&back.name, (legalities_id, Uuid::new_v4()));
+                                    shared_ids.insert(&back.normalised_name, (legalities_id, Uuid::new_v4()));
                                 }
                             }
                         }
@@ -80,7 +80,7 @@ impl<'a> Handler {
             Some(card) => {
                 utils::send_image(
                     &card.image,
-                    &format!("{}.png", card.query.name),
+                    &format!("{}.png", card.query.normalised_name),
                     None,
                     &msg,
                     &ctx,
@@ -90,7 +90,7 @@ impl<'a> Handler {
                 if let Some(image) = &card.back_image {
                     utils::send_image(
                         &image,
-                        &format!("{}.png", card.query.name),
+                        &format!("{}.png", card.query.normalised_name),
                         None,
                         &msg,
                         &ctx,
@@ -106,7 +106,8 @@ impl<'a> Handler {
 pub struct CardInfo {
     card_id: Arc<str>,
     legalities_id: Uuid,
-    pub(crate) name: String,
+    name: Arc<str>,
+    pub(crate) normalised_name: String,
     flavour_text: Arc<Option<Box<str>>>,
     set_id: Arc<str>,
     set_name: Arc<str>,
@@ -138,7 +139,8 @@ impl CardInfo {
         Some(Self {
             card_id,
             legalities_id: front.legalities_id,
-            name: utils::normalise(&face.name),
+            name: Arc::clone(&card.name),
+            normalised_name: utils::normalise(&face.name),
             flavour_text: Arc::clone(&face.flavor_text),
             set_id: Arc::clone(&front.set_id),
             set_name: Arc::clone(&front.set_name),
@@ -160,7 +162,7 @@ impl CardInfo {
     }
 
     fn new_card(card: &ScryfallCard, other_side: Option<Arc<str>>) -> Self {
-        let name = if let Some(sides) = &card.card_faces {
+        let normalised_name = if let Some(sides) = &card.card_faces {
             if let Some(front) = sides.get(0) {
                 utils::normalise(&front.name)
             } else {
@@ -173,7 +175,8 @@ impl CardInfo {
         Self {
             card_id: Arc::clone(&card.id),
             legalities_id: Uuid::new_v4(),
-            name,
+            name: Arc::clone(&card.name),
+            normalised_name,
             flavour_text: Arc::clone(&card.flavor_text),
             set_id: Arc::clone(&card.set_id),
             set_name: Arc::clone(&card.set_name),
