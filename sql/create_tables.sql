@@ -54,6 +54,7 @@ create table rules (
 create table cards (
     id uuid primary key,
     name varchar(150),
+    normalised_name varchar(150),
     flavour_text text,
     set_id uuid references sets(id),
     image_id uuid references images(id),
