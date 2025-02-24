@@ -1,3 +1,5 @@
+mod queries;
+
 use crate::db::PSQL;
 use crate::mtg::{CardInfo, FoundCard};
 use crate::utils;
@@ -8,12 +10,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use uuid::Uuid;
-
-const FUZZY_SEARCH_DISTINCT_CARDS: &str = r#"
-select *
-from distinct_cards
-where word_similarity(front_normalised_name, $1) > 0.50;
-"#;
+use crate::mtg::db::queries::FUZZY_SEARCH_DISTINCT_CARDS;
 
 pub struct FuzzyFound {
     front_id: Uuid,
