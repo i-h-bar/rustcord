@@ -46,8 +46,24 @@ impl<'a> MTG {
         join_all(futures).await
     }
 
+    async fn search_distinct_cards(&'a self, normalised_name: &str) -> Option<FoundCard<'a>> {
+        let potentials = PSQL::get()?.fuzzy_search_distinct(&normalised_name).await?;
+
+
+    }
+
     async fn find_card(&'a self, query: Arc<QueryParams<'a>>) -> Option<FoundCard<'a>> {
         let start = Instant::now();
+
+        if let Some(set_code) = &query.set_code {
+            todo!()
+        } else if let Some(set_name) = &query.set_name {
+            todo!()
+        } else if let Some(artist) = & query.artist {
+            todo!()
+        } else {
+            self.search_distinct_cards(&query.name).await
+        }
 
         let card = if let Some(fuzzy_found) = PSQL::get()?.fuzzy_fetch(Arc::clone(&query)).await {
             if fuzzy_found.similarity > 0.75 {

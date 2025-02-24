@@ -9,277 +9,81 @@ use std::ops::Deref;
 use std::sync::Arc;
 use uuid::Uuid;
 
-const RULES_LEGAL_IDS: &str = r#"
-select
-    distinct rules.id as rules_id,
-             legalities.id as lagalities_id
-from cards
-    join rules on rules.id = cards.rules_id
-    join legalities on legalities.id = rules.legalities_id
-where cards.name = $1
-"#;
-
-const LEGALITIES_INSERT: &str = r#"
-INSERT INTO legalities
-(id, alchemy, brawl, commander, duel, explorer, future, gladiator, historic, legacy, modern,
-oathbreaker, oldschool, pauper, paupercommander, penny, pioneer, predh, premodern, standard,
-standardbrawl, timeless, vintage)
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-$15, $16, $17, $18, $19, $20, $21, $22, $23) ON CONFLICT DO NOTHING"#;
-const RULES_INSERT: &str = r#"
-INSERT INTO rules
-(id, colour_identity, cmc, power, toughness, type_line, oracle_text, keywords, loyalty, defence, mana_cost, legalities_id)
-values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT DO NOTHING
-"#;
-const IMAGE_INSERT: &str = r#"INSERT INTO images (id, png) values ($1, $2) ON CONFLICT DO NOTHING"#;
-const SET_INSERT: &str =
-    r#"INSERT INTO sets (id, name, code) values (uuid($1), $2, $3) ON CONFLICT DO NOTHING"#;
-const CARD_INSERT: &str = r#"
-INSERT INTO cards (id, name, flavour_text, set_id, image_id, artist, rules_id, other_side)
-values (uuid($1), $2, $3, uuid($4), uuid($5), $6, $7, uuid($8)) ON CONFLICT DO NOTHING"#;
-
-const FUZZY_FIND: &str = r#"
-select cards.name,
-       png,
-       other_side,
-       similarity(cards.name, $1) as sml
-from cards join images on cards.image_id = images.id
-join sets on cards.set_id = sets.id
-where ($4 is null or similarity(cards.artist, $4) > 0.5)
-and ($3 is null or similarity(sets.name, $3) > 0.75)
-and ($2 is null or sets.code = $2)
-order by sml desc
-limit 1;
-"#;
-
-const BACKSIDE_FIND: &str = r#"
-select png, name, other_side from cards join images on cards.image_id = images.id where cards.id = uuid($1)
+const FUZZY_SEARCH_DISTINCT_CARDS: &str = r#"
+select *
+from distinct_cards
+where word_similarity(front_normalised_name, $1) > 0.50;
 "#;
 
 pub struct FuzzyFound {
-    pub(crate) png: Vec<u8>,
-    pub(crate) similarity: f32,
-    pub(crate) other_side: Option<String>,
+    front_id: Uuid,
+    front_name: String,
+    front_normalised_name: String,
+    front_image_id: Uuid,
+    front_mana_cost: String,
+    front_power: Option<String>,
+    front_toughness: Option<String>,
+    front_loyalty: Option<String>,
+    front_defence: Option<String>,
+    front_type_line: String,
+    front_keywords: Vec<String>,
+    front_oracle_text: String,
+    back_id: Option<Uuid>,
+    back_name: Option<String>,
+    back_image_id: Option<Uuid>,
+    back_mana_cost: Option<String>,
+    back_power: Option<String>,
+    back_toughness: Option<String>,
+    back_loyalty: Option<String>,
+    back_defence: Option<String>,
+    back_type_line: Option<String>,
+    back_keywords: Option<Vec<String>>,
+    back_oracle_text: Option<String>,
+    release_date: String,
 }
 
 impl<'r> FromRow<'r, PgRow> for FuzzyFound {
     fn from_row(row: &'r PgRow) -> Result<Self, Error> {
-        let other_side = match row.try_get::<Option<Uuid>, &str>("other_side") {
-            Ok(id) => match id {
-                Some(uuid) => Some(uuid.to_string()),
-                None => None,
-            },
-            Err(why) => {
-                log::warn!("Failed to get other side - {why}");
-                None
-            }
-        };
-
         Ok(FuzzyFound {
-            png: row.get::<Vec<u8>, &str>("png"),
-            similarity: row.try_get::<f32, &str>("sml").unwrap_or_else(|_| 0.0),
-            other_side,
+            front_id: row.get::<Uuid, &str>("front_id"),
+            front_name: row.get::<String, &str>("front_name"),
+            front_normalised_name: row.get::<String, &str>("front_normalised_name"),
+            front_image_id: row.get::<Uuid, &str>("front_image_id"),
+            front_mana_cost: row.get::<String, &str>("front_mana_cost"),
+            front_power: row.get::<Option<String>, &str>("front_power"),
+            front_toughness: row.get::<Option<String>, &str>("front_toughness"),
+            front_loyalty: row.get::<Option<String>, &str>("front_loyalty"),
+            front_defence: row.get::<Option<String>, &str>("front_defence"),
+            front_type_line: row.get::<String, &str>("front_type_line"),
+            front_keywords: row.get::<Vec<String>, &str>("front_keywords"),
+            front_oracle_text: row.get::<String, &str>("front_oracle_text"),
+            back_id: row.get::<Option<Uuid>, &str>("back_id"),
+            back_name: row.get::<Option<String>, &str>("back_name"),
+            back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
+            back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
+            back_power: row.get::<Option<String>, &str>("back_power"),
+            back_toughness: row.get::<Option<String>, &str>("back_toughness"),
+            back_loyalty: row.get::<Option<String>, &str>("back_loyalty"),
+            back_defence: row.get::<Option<String>, &str>("back_defence"),
+            back_type_line: row.get::<Option<String>, &str>("back_type_line"),
+            back_keywords: row.get::<Option<Vec<String>>, &str>("back_keywords"),
+            back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
+            release_date: row.get::<String, &str>("release_date"),
         })
     }
 }
 
 impl PSQL {
-    async fn add_to_legalities(&self, card: &CardInfo, legalities_id: &Uuid) {
-        if let Err(why) = sqlx::query(LEGALITIES_INSERT)
-            .bind(&legalities_id)
-            .bind(&card.legalities.alchemy)
-            .bind(&card.legalities.brawl)
-            .bind(&card.legalities.commander)
-            .bind(&card.legalities.duel)
-            .bind(&card.legalities.explorer)
-            .bind(&card.legalities.future)
-            .bind(&card.legalities.gladiator)
-            .bind(&card.legalities.historic)
-            .bind(&card.legalities.legacy)
-            .bind(&card.legalities.modern)
-            .bind(&card.legalities.oathbreaker)
-            .bind(&card.legalities.oldschool)
-            .bind(&card.legalities.pauper)
-            .bind(&card.legalities.paupercommander)
-            .bind(&card.legalities.penny)
-            .bind(&card.legalities.pioneer)
-            .bind(&card.legalities.predh)
-            .bind(&card.legalities.premodern)
-            .bind(&card.legalities.standard)
-            .bind(&card.legalities.standardbrawl)
-            .bind(&card.legalities.timeless)
-            .bind(&card.legalities.vintage)
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed legalities insert - {why}")
-        }
-    }
-
-    async fn add_to_rules(&self, card: &CardInfo, rules_id: &Uuid, legalities_id: &Uuid) {
-        let keywords: Option<Vec<&str>> = match &card.keywords.deref() {
-            Some(keywords) => Some(
-                keywords.iter().map(| keyword | keyword.as_ref() ).collect()
-            ),
-            None => None
-        };
-
-        if let Err(why) = sqlx::query(RULES_INSERT)
-            .bind(&rules_id)
-            .bind(card.colour_identity.deref())
-            .bind(&card.cmc)
-            .bind(card.power.deref())
-            .bind(card.toughness.deref())
-            .bind(card.type_line.deref())
-            .bind(card.oracle_text.deref())
-            .bind(keywords)
-            .bind(card.loyalty.deref())
-            .bind(card.defence.deref())
-            .bind(card.mana_cost.deref())
-            .bind(&legalities_id)
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed legalities insert - {why}")
-        }
-    }
-
-    async fn add_to_images(&self, image: &Vec<u8>) -> Uuid {
-        let image_id = Uuid::new_v4();
-        if let Err(why) = sqlx::query(IMAGE_INSERT)
-            .bind(&image_id)
-            .bind(&image)
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed images insert - {why}")
-        };
-
-        image_id
-    }
-
-    async fn add_to_sets(&self, card: &CardInfo) {
-        if let Err(why) = sqlx::query(SET_INSERT)
-            .bind(card.set_id.deref())
-            .bind(utils::normalise(card.set_name.deref()))
-            .bind(utils::normalise(card.set_code.deref()))
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed set insert - {why}")
-        };
-    }
-
-    async fn add_to_cards(&self, card: &CardInfo, image_id: &Uuid, rules_id: &Uuid) {
-        let other_side = match &card.other_side {
-            Some(other_side) => Some(other_side.deref()),
-            None => None
-        };
-
-        if let Err(why) = sqlx::query(CARD_INSERT)
-            .bind(card.card_id.deref())
-            .bind(utils::normalise(card.name.deref()))
-            .bind(card.flavour_text.deref())
-            .bind(card.set_id.deref())
-            .bind(&image_id)
-            .bind(utils::normalise(card.artist.deref()))
-            .bind(&rules_id)
-            .bind(other_side)
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed card insert - {why}")
-        };
-    }
-
-    pub async fn add_card<'a>(
-        &'a self,
-        card: &FoundCard<'a>,
-        shared_ids: &HashMap<&str, (Uuid, Uuid)>,
-    ) {
-        if let Some(card_info) = &card.front {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
-                log::warn!("No front ids found");
-                return;
-            };
-
-            self.add_to_legalities(&card_info, &legalities_id).await;
-            self.add_to_rules(&card_info, &rules_id, &legalities_id)
-                .await;
-            let image_id = self.add_to_images(&card.image).await;
-            self.add_to_sets(&card_info).await;
-            self.add_to_cards(&card_info, &image_id, &rules_id).await;
-            log::info!("Added {} to postgres", card_info.name);
-        } else {
-            log::warn!("No front card found");
-            return;
-        };
-
-        if let Some(card_info) = &card.back {
-            let Some((legalities_id, rules_id)) = shared_ids.get(&card_info.name.as_ref()) else {
-                log::warn!("No front back ids found");
-                return;
-            };
-
-            let image_id = if let Some(back_image) = &card.back_image {
-                self.add_to_images(&back_image).await
-            } else {
-                log::warn!("Could not add the back image as there was none to add");
-                return;
-            };
-
-            self.add_to_rules(&card_info, &rules_id, &legalities_id)
-                .await;
-            self.add_to_sets(&card_info).await;
-            self.add_to_cards(&card_info, &image_id, &rules_id).await;
-
-            log::info!("Added {} to postgres", card_info.name)
-        }
-    }
-
-    pub async fn fetch_rules_legalities_id(&self, name: &str) -> Option<(Uuid, Uuid)> {
-        if let Ok(result) = sqlx::query(RULES_LEGAL_IDS)
-            .bind(&name)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Some((
-                result.get::<Uuid, &str>("rules_id"),
-                result.get::<Uuid, &str>("legalities_id"),
-            ))
-        } else {
-            None
-        }
-    }
-
-    pub async fn fetch_backside(&self, card_id: &str) -> Option<FuzzyFound> {
-        match sqlx::query(BACKSIDE_FIND)
-            .bind(&card_id)
-            .fetch_one(&self.pool)
-            .await
-        {
+    pub async fn fuzzy_search_distinct(&self, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
+        match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
+            .bind(&normalised_name)
+            .fetch_all(&self.pool)
+            .await {
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
                 None
             }
-            Ok(row) => FuzzyFound::from_row(&row).ok(),
-        }
-    }
-
-    pub async fn fuzzy_fetch(&self, query: Arc<QueryParams<'_>>) -> Option<FuzzyFound> {
-        match sqlx::query(FUZZY_FIND)
-            .bind(&query.name)
-            .bind(&query.set_code)
-            .bind(&query.set_name)
-            .bind(&query.artist)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed card fetch - {why}");
-                None
-            }
-            Ok(row) => FuzzyFound::from_row(&row).ok(),
+            Ok(rows) => rows.into_iter().map(| row | FuzzyFound::from_row(&row).ok()).collect()
         }
     }
 }
