@@ -1,7 +1,8 @@
 mod queries;
 
 use crate::db::PSQL;
-use crate::mtg::{CardInfo, FoundCard};
+use crate::mtg::db::queries::FUZZY_SEARCH_DISTINCT_CARDS;
+use crate::mtg::FoundCard;
 use crate::utils;
 use regex::Captures;
 use sqlx::postgres::PgRow;
@@ -9,34 +10,34 @@ use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
+use sqlx::types::time::Date;
 use uuid::Uuid;
-use crate::mtg::db::queries::FUZZY_SEARCH_DISTINCT_CARDS;
 
 pub struct FuzzyFound {
-    front_id: Uuid,
-    front_name: String,
-    front_normalised_name: String,
-    front_image_id: Uuid,
-    front_mana_cost: String,
-    front_power: Option<String>,
-    front_toughness: Option<String>,
-    front_loyalty: Option<String>,
-    front_defence: Option<String>,
-    front_type_line: String,
-    front_keywords: Vec<String>,
-    front_oracle_text: String,
-    back_id: Option<Uuid>,
-    back_name: Option<String>,
-    back_image_id: Option<Uuid>,
-    back_mana_cost: Option<String>,
-    back_power: Option<String>,
-    back_toughness: Option<String>,
-    back_loyalty: Option<String>,
-    back_defence: Option<String>,
-    back_type_line: Option<String>,
-    back_keywords: Option<Vec<String>>,
-    back_oracle_text: Option<String>,
-    release_date: String,
+    pub front_id: Uuid,
+    pub front_name: String,
+    pub front_normalised_name: String,
+    pub front_image_id: Uuid,
+    pub front_mana_cost: String,
+    pub front_power: Option<String>,
+    pub front_toughness: Option<String>,
+    pub front_loyalty: Option<String>,
+    pub front_defence: Option<String>,
+    pub front_type_line: String,
+    pub front_keywords: Vec<String>,
+    pub front_oracle_text: String,
+    pub back_id: Option<Uuid>,
+    pub back_name: Option<String>,
+    pub back_image_id: Option<Uuid>,
+    pub back_mana_cost: Option<String>,
+    pub back_power: Option<String>,
+    pub back_toughness: Option<String>,
+    pub back_loyalty: Option<String>,
+    pub back_defence: Option<String>,
+    pub back_type_line: Option<String>,
+    pub back_keywords: Option<Vec<String>>,
+    pub back_oracle_text: Option<String>,
+    pub release_date: Date,
 }
 
 impl<'r> FromRow<'r, PgRow> for FuzzyFound {
@@ -65,7 +66,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_type_line: row.get::<Option<String>, &str>("back_type_line"),
             back_keywords: row.get::<Option<Vec<String>>, &str>("back_keywords"),
             back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
-            release_date: row.get::<String, &str>("release_date"),
+            release_date: row.get::<Date, &str>("release_date"),
         })
     }
 }
@@ -75,12 +76,18 @@ impl PSQL {
         match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
             .bind(&normalised_name)
             .fetch_all(&self.pool)
-            .await {
+            .await
+        {
             Err(why) => {
                 log::warn!("Failed card fetch - {why}");
                 None
             }
-            Ok(rows) => rows.into_iter().map(| row | FuzzyFound::from_row(&row).ok()).collect()
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row|
+                    FuzzyFound::from_row(&row).ok()
+                )
+                .collect()
         }
     }
 }

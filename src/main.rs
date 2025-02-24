@@ -24,7 +24,7 @@ struct Handler {
 impl Handler {
     async fn new() -> Self {
         Self {
-            mtg: MTG::new().await,
+            mtg: MTG::new().await
         }
     }
 }
