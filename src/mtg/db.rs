@@ -1,7 +1,9 @@
 mod queries;
 
 use crate::db::PSQL;
-use crate::mtg::db::queries::{FUZZY_SEARCH_DISTINCT_CARDS, NORMALISED_SET_NAME};
+use crate::mtg::db::queries::{
+    FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
+};
 use crate::utils;
 use regex::Captures;
 use sqlx::postgres::PgRow;
@@ -76,7 +78,7 @@ impl PSQL {
             .await
         {
             Err(why) => {
-                log::warn!("Failed card fetch - {why}");
+                log::warn!("Failed fuzzy search distinct cards fetch - {why}");
                 None
             }
             Ok(rows) => rows
@@ -86,17 +88,95 @@ impl PSQL {
         }
     }
 
-    async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
-        match sqlx::query(NORMALISED_SET_NAME).bind(&abbreviation).fetch_one(&self.pool).await {
+    pub async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
+        match sqlx::query(NORMALISED_SET_NAME)
+            .bind(&abbreviation)
+            .fetch_one(&self.pool)
+            .await
+        {
             Err(why) => {
-                log::warn!("Failed set fetch - {why}");
+                log::warn!("Failed set name from abbr fetch - {why}");
                 None
             }
-            Ok(row) => Some(row.get::<String, &str>("normalised_name"))
+            Ok(row) => Some(row.get::<String, &str>("normalised_name")),
         }
     }
 
+    pub async fn fuzzy_search_set(
+        &self,
+        set_name: &str,
+        normalised_name: &str,
+    ) -> Option<Vec<FuzzyFound>> {
+        match sqlx::query(&format!(
+            r#"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            set_name.replace(" ", "_")
+        ))
+        .bind(&normalised_name)
+        .fetch_all(&self.pool)
+        .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| FuzzyFound::from_row(&row).ok())
+                .collect(),
+        }
+    }
 
+    pub async fn fuzzy_search_set_name(&self, normalised_name: &str) -> Option<Vec<String>> {
+        match sqlx::query(FUZZY_SEARCH_SET_NAME)
+            .bind(&normalised_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed set name fetch - {why}");
+                None
+            }
+            Ok(row) => Some(row.get::<Vec<String>, &str>("array_agg")),
+        }
+    }
+
+    pub async fn fuzzy_search_for_artist(&self, normalised_name: &str) -> Option<Vec<String>> {
+        match sqlx::query(FUZZY_SEARCH_ARTIST)
+            .bind(&normalised_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed artist fetch - {why}");
+                None
+            }
+            Ok(row) => Some(row.get::<Vec<String>, &str>("array_agg")),
+        }
+    }
+
+    pub async fn fuzzy_search_artist(
+        &self,
+        artist: &str,
+        normalised_name: &str,
+    ) -> Option<Vec<FuzzyFound>> {
+        match sqlx::query(&format!(
+            r#"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            artist.replace(" ", "_")
+        ))
+        .bind(&normalised_name)
+        .fetch_all(&self.pool)
+        .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| FuzzyFound::from_row(&row).ok())
+                .collect(),
+        }
+    }
 }
 
 pub struct QueryParams {

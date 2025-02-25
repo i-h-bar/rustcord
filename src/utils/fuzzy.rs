@@ -1,5 +1,6 @@
 use crate::mtg::db::FuzzyFound;
 use std::cmp::Ordering;
+use std::fmt::Display;
 
 fn jaro_winkler(a: &str, b: &str) -> f32 {
     if a == b {
@@ -53,12 +54,24 @@ fn jaro_winkler(a: &str, b: &str) -> f32 {
     (matches / len_a as f32 + matches / len_b as f32 + match_diff / matches) / 3.0
 }
 
-pub fn best_jaro_match_name(target: &str, heap: Vec<FuzzyFound>) -> Option<FuzzyFound> {
+pub fn best_jaro_match_name_fuzzy_found(target: &str, heap: Vec<FuzzyFound>) -> Option<FuzzyFound> {
     let (_, closest_match) = heap
         .into_iter()
         .map(|card| {
-            let distance = jaro_winkler(&target, &card.front_normalised_name);
+            let distance = jaro_winkler(target, &card.front_normalised_name);
             (distance, card)
+        })
+        .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less))?;
+
+    Some(closest_match)
+}
+
+pub fn best_jaro_match(target: &str, heap: Vec<String>) -> Option<String> {
+    let (_, closest_match) = heap
+        .into_iter()
+        .map(|needle| {
+            let distance = jaro_winkler(target, &needle);
+            (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less))?;
 

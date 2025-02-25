@@ -47,22 +47,57 @@ impl<'a> MTG {
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
         let potentials = PSQL::get()?.fuzzy_search_distinct(&normalised_name).await?;
-        fuzzy::best_jaro_match_name(&normalised_name, potentials)
+        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
     }
 
-    async fn search_set_abbreviation(&self, abbreviation: &str) -> Option<FuzzyFound> {
-        todo!()
+    async fn search_set_abbreviation(
+        &self,
+        abbreviation: &str,
+        normalised_name: &str,
+    ) -> Option<FuzzyFound> {
+        let set_name = PSQL::get()?
+            .set_name_from_abbreviation(&abbreviation)
+            .await?;
+        let potentials = PSQL::get()?
+            .fuzzy_search_set(&set_name, &normalised_name)
+            .await?;
+        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
+    }
+
+    async fn search_set_name(
+        &self,
+        normalised_set_name: &str,
+        normalised_name: &str,
+    ) -> Option<FuzzyFound> {
+        let potentials = PSQL::get()?
+            .fuzzy_search_set_name(normalised_set_name)
+            .await?;
+        let set_name = fuzzy::best_jaro_match(&normalised_set_name, potentials)?;
+        let potentials = PSQL::get()?
+            .fuzzy_search_set(&set_name, &normalised_name)
+            .await?;
+        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
+    }
+
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
+        let potentials = PSQL::get()?.fuzzy_search_for_artist(artist).await?;
+        let best_artist = fuzzy::best_jaro_match(&artist, potentials)?;
+        let potentials = PSQL::get()?
+            .fuzzy_search_artist(&best_artist, &normalised_name)
+            .await?;
+
+        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
     }
 
     async fn find_card(&self, query: QueryParams) -> Option<CardAndImage> {
         let start = Instant::now();
 
         let found_card = if let Some(set_code) = &query.set_code {
-            todo!()
+            self.search_set_abbreviation(&set_code, &query.name).await?
         } else if let Some(set_name) = &query.set_name {
-            todo!()
+            self.search_set_name(&set_name, &query.name).await?
         } else if let Some(artist) = &query.artist {
-            todo!()
+            self.search_artist(&artist, &query.name).await?
         } else {
             self.search_distinct_cards(&query.name).await?
         };
