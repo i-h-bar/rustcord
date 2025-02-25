@@ -1,6 +1,4 @@
-use rayon::prelude::*;
 use std::cmp;
-use std::sync::Arc;
 
 pub fn lev(a: &str, b: &str) -> usize {
     if a.is_empty() {
@@ -29,21 +27,6 @@ pub fn lev(a: &str, b: &str) -> usize {
     dcol[t_last + 1]
 }
 
-pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a Arc<str>>>(
-    a: &str,
-    items: &'a I,
-) -> Option<&'a Arc<str>> {
-    Some(
-        items
-            .par_iter()
-            .map(|item: &Arc<str>| {
-                let dist = lev(&a, item.as_ref());
-                (item, dist)
-            })
-            .min_by(|(_, x), (_, y)| x.cmp(y))?
-            .0,
-    )
-}
 
 #[cfg(test)]
 mod tests {
@@ -55,29 +38,4 @@ mod tests {
         assert_eq!(lev("sitting", "kitten"), 3)
     }
 
-    #[test]
-    fn test_best_match() {
-        let a = vec!["sitting".to_string(), "kitten".to_string()];
-        let b = "sitting";
-
-        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
-    }
-
-    #[test]
-    fn test_best_match_2() {
-        let a = vec!["sitting".to_string(), "kitten".to_string()];
-        let b = "setting";
-
-        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
-    }
-
-    #[test]
-    fn test_best_match_hash_map() {
-        let mut a: HashSet<String> = HashSet::new();
-        a.insert("sitting".to_string());
-        a.insert("kitten".to_string());
-        let b = "setting";
-
-        assert_eq!(best_match_lev(&b, &a).unwrap(), &"sitting".to_string());
-    }
 }

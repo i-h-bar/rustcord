@@ -1,6 +1,3 @@
-use std::collections::HashSet;
-use std::ops::Deref;
-use std::sync::Arc;
 use std::time::Duration;
 
 use log;
@@ -10,15 +7,15 @@ use tokio::time::Instant;
 
 use crate::db::PSQL;
 use crate::mtg::db::{FuzzyFound, QueryParams};
-use crate::mtg::{FoundCard, ScryfallCard, ScryfallList};
 use crate::mtg::images::ImageFetcher;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
-const SCRYFALL: &str = "https://api.scryfall.com/cards/search?unique=prints&q=";
+pub type CardAndImage = (FuzzyFound, (Option<Vec<u8>>, Option<Vec<u8>>));
 
 pub struct MTG {
+    #[allow(dead_code)]
     http_client: reqwest::Client,
-    images: ImageFetcher
+    images: ImageFetcher,
 }
 
 impl<'a> MTG {
@@ -33,10 +30,13 @@ impl<'a> MTG {
 
         let images = ImageFetcher::new();
 
-        Self { http_client, images }
+        Self {
+            http_client,
+            images,
+        }
     }
 
-    pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<(FuzzyFound, Option<Vec<u8>>)>> {
+    pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<CardAndImage>> {
         join_all(
             REGEX_COLLECTION
                 .cards
@@ -51,16 +51,16 @@ impl<'a> MTG {
 
         let (_, closest_match) = potentials
             .into_iter()
-            .map(| card | {
+            .map(|card| {
                 let distance = fuzzy::lev(&normalised_name, &card.front_normalised_name);
                 (distance, card)
             })
-            .min_by(| (x, _), (y, _) | x.cmp(y))?;
+            .min_by(|(x, _), (y, _)| x.cmp(y))?;
 
         Some(closest_match)
     }
 
-    async fn find_card(&'a self, query: QueryParams<'a>) -> Option<(FuzzyFound, Option<Vec<u8>>)> {
+    async fn find_card(&self, query: QueryParams) -> Option<CardAndImage> {
         let start = Instant::now();
 
         let found_card = if let Some(set_code) = &query.set_code {
@@ -79,8 +79,8 @@ impl<'a> MTG {
             start.elapsed().as_millis()
         );
 
-        let image = self.images.fetch(&found_card).await;
+        let images = self.images.fetch(&found_card).await;
 
-        Some((found_card, image))
+        Some((found_card, images))
     }
 }

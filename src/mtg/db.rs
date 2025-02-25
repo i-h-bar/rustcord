@@ -2,15 +2,12 @@ mod queries;
 
 use crate::db::PSQL;
 use crate::mtg::db::queries::FUZZY_SEARCH_DISTINCT_CARDS;
-use crate::mtg::FoundCard;
 use crate::utils;
 use regex::Captures;
 use sqlx::postgres::PgRow;
+use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::Arc;
-use sqlx::types::time::Date;
 use uuid::Uuid;
 
 pub struct FuzzyFound {
@@ -84,23 +81,20 @@ impl PSQL {
             }
             Ok(rows) => rows
                 .into_iter()
-                .map(|row|
-                    FuzzyFound::from_row(&row).ok()
-                )
-                .collect()
+                .map(|row| FuzzyFound::from_row(&row).ok())
+                .collect(),
         }
     }
 }
 
-pub struct QueryParams<'a> {
+pub struct QueryParams {
     pub name: String,
-    pub raw_name: &'a str,
     pub set_code: Option<String>,
     pub set_name: Option<String>,
     pub artist: Option<String>,
 }
 
-impl<'a> QueryParams<'a> {
+impl<'a> QueryParams {
     pub fn from(capture: Captures<'a>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str();
         let name = utils::normalise(&raw_name);
@@ -123,7 +117,6 @@ impl<'a> QueryParams<'a> {
 
         Some(Self {
             name,
-            raw_name,
             artist,
             set_code,
             set_name,

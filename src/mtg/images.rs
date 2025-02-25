@@ -1,5 +1,5 @@
-use std::env;
 use crate::mtg::db::FuzzyFound;
+use std::env;
 
 pub struct ImageFetcher {
     image_dir: String,
@@ -15,9 +15,19 @@ impl ImageFetcher {
         }
     }
 
-    pub async fn fetch(&self, card: &FuzzyFound) -> Option<Vec<u8>> {
-        tokio::fs::read(
-            format!("{}{}.png", &self.image_dir, &card.front_image_id)
-        ).await.ok()
+    pub async fn fetch(&self, card: &FuzzyFound) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
+        let front = tokio::fs::read(format!("{}{}.png", &self.image_dir, &card.front_image_id))
+            .await
+            .ok();
+
+        let back = if let Some(back_image_id) = &card.back_image_id {
+            tokio::fs::read(format!("{}{}.png", &self.image_dir, &back_image_id))
+                .await
+                .ok()
+        } else {
+            None
+        };
+
+        (front, back)
     }
 }
