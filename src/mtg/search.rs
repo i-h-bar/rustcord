@@ -13,7 +13,6 @@ use crate::utils::{fuzzy, REGEX_COLLECTION};
 pub type CardAndImage = (FuzzyFound, (Option<Vec<u8>>, Option<Vec<u8>>));
 
 pub struct MTG {
-    #[allow(dead_code)]
     http_client: reqwest::Client,
     images: ImageFetcher,
 }
@@ -48,16 +47,11 @@ impl<'a> MTG {
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
         let potentials = PSQL::get()?.fuzzy_search_distinct(&normalised_name).await?;
+        fuzzy::best_jaro_match_name(&normalised_name, potentials)
+    }
 
-        let (_, closest_match) = potentials
-            .into_iter()
-            .map(|card| {
-                let distance = fuzzy::lev(&normalised_name, &card.front_normalised_name);
-                (distance, card)
-            })
-            .min_by(|(x, _), (y, _)| x.cmp(y))?;
-
-        Some(closest_match)
+    async fn search_set_abbreviation(&self, abbreviation: &str) -> Option<FuzzyFound> {
+        todo!()
     }
 
     async fn find_card(&self, query: QueryParams) -> Option<CardAndImage> {

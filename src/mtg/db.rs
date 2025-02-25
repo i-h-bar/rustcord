@@ -1,7 +1,7 @@
 mod queries;
 
 use crate::db::PSQL;
-use crate::mtg::db::queries::FUZZY_SEARCH_DISTINCT_CARDS;
+use crate::mtg::db::queries::{FUZZY_SEARCH_DISTINCT_CARDS, NORMALISED_SET_NAME};
 use crate::utils;
 use regex::Captures;
 use sqlx::postgres::PgRow;
@@ -85,6 +85,18 @@ impl PSQL {
                 .collect(),
         }
     }
+
+    async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
+        match sqlx::query(NORMALISED_SET_NAME).bind(&abbreviation).fetch_one(&self.pool).await {
+            Err(why) => {
+                log::warn!("Failed set fetch - {why}");
+                None
+            }
+            Ok(row) => Some(row.get::<String, &str>("normalised_name"))
+        }
+    }
+
+
 }
 
 pub struct QueryParams {

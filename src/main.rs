@@ -14,7 +14,7 @@ use crate::mtg::search::MTG;
 
 mod db;
 mod help;
-mod mtg;
+pub mod mtg;
 mod utils;
 
 struct Handler {
