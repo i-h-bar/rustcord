@@ -1,14 +1,51 @@
-use crate::mtg::db::FuzzyFound;
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::str::Chars;
 
-fn jaro_winkler(a: &str, b: &str) -> f32 {
+pub trait ToChars {
+    fn to_chars(&self) -> Chars<'_>;
+}
+
+impl ToChars for str {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for &str {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for &String {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for String {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for Box<str> {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+fn jaro_winkler<A: AsRef<str> + PartialEq<B> + ToChars, B: AsRef<str> + ToChars>(
+    a: &A,
+    b: &B,
+) -> f32 {
     if a == b {
         return 1.0;
     }
 
-    let a: Vec<char> = a.chars().collect();
-    let b: Vec<char> = b.chars().collect();
+    let a: Vec<char> = a.to_chars().collect();
+    let b: Vec<char> = b.to_chars().collect();
     let len_a = a.len();
     let len_b = b.len();
     let max_dist = (len_a.max(len_b) / 2) - 1;
@@ -54,23 +91,18 @@ fn jaro_winkler(a: &str, b: &str) -> f32 {
     (matches / len_a as f32 + matches / len_b as f32 + match_diff / matches) / 3.0
 }
 
-pub fn best_jaro_match_name_fuzzy_found(target: &str, heap: Vec<FuzzyFound>) -> Option<FuzzyFound> {
-    let (_, closest_match) = heap
-        .into_iter()
-        .map(|card| {
-            let distance = jaro_winkler(target, &card.front_normalised_name);
-            (distance, card)
-        })
-        .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less))?;
-
-    Some(closest_match)
-}
-
-pub fn best_jaro_match(target: &str, heap: Vec<String>) -> Option<String> {
+pub fn best_jaro_match<
+    A: AsRef<str> + PartialEq<B> + ToChars,
+    B: AsRef<str> + ToChars,
+    I: AsRef<[B]> + IntoIterator<Item = B>,
+>(
+    target: A,
+    heap: I,
+) -> Option<B> {
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let distance = jaro_winkler(target, &needle);
+            let distance = jaro_winkler(&target, &needle);
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less))?;
@@ -87,6 +119,6 @@ mod tests {
         let a = "CRATE";
         let b = "TRACE";
 
-        assert_eq!(jaro_winkler(a, b), 0.73333335)
+        assert_eq!(jaro_winkler(&a, &b), 0.73333335)
     }
 }

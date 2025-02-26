@@ -5,11 +5,13 @@ use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
 };
 use crate::utils;
+use crate::utils::fuzzy::ToChars;
 use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
+use std::str::Chars;
 use uuid::Uuid;
 
 pub struct FuzzyFound {
@@ -37,6 +39,36 @@ pub struct FuzzyFound {
     pub back_keywords: Option<Vec<String>>,
     pub back_oracle_text: Option<String>,
     pub release_date: Date,
+}
+
+impl ToChars for FuzzyFound {
+    fn to_chars(&self) -> Chars<'_> {
+        self.front_normalised_name.chars()
+    }
+}
+
+impl ToChars for &FuzzyFound {
+    fn to_chars(&self) -> Chars<'_> {
+        self.front_normalised_name.chars()
+    }
+}
+
+impl AsRef<str> for FuzzyFound {
+    fn as_ref(&self) -> &str {
+        &self.front_normalised_name
+    }
+}
+
+impl PartialEq<FuzzyFound> for &str {
+    fn eq(&self, other: &FuzzyFound) -> bool {
+        self == &other.front_normalised_name
+    }
+}
+
+impl PartialEq<FuzzyFound> for str {
+    fn eq(&self, other: &FuzzyFound) -> bool {
+        self == &other.front_normalised_name
+    }
 }
 
 impl<'r> FromRow<'r, PgRow> for FuzzyFound {

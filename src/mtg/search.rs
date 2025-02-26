@@ -47,7 +47,7 @@ impl<'a> MTG {
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
         let potentials = PSQL::get()?.fuzzy_search_distinct(&normalised_name).await?;
-        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
+        fuzzy::best_jaro_match(normalised_name, potentials)
     }
 
     async fn search_set_abbreviation(
@@ -61,7 +61,7 @@ impl<'a> MTG {
         let potentials = PSQL::get()?
             .fuzzy_search_set(&set_name, &normalised_name)
             .await?;
-        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
+        fuzzy::best_jaro_match(normalised_name, potentials)
     }
 
     async fn search_set_name(
@@ -72,21 +72,21 @@ impl<'a> MTG {
         let potentials = PSQL::get()?
             .fuzzy_search_set_name(normalised_set_name)
             .await?;
-        let set_name = fuzzy::best_jaro_match(&normalised_set_name, potentials)?;
+        let set_name = fuzzy::best_jaro_match(normalised_set_name, potentials)?;
         let potentials = PSQL::get()?
             .fuzzy_search_set(&set_name, &normalised_name)
             .await?;
-        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
+        fuzzy::best_jaro_match(normalised_name, potentials)
     }
 
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
         let potentials = PSQL::get()?.fuzzy_search_for_artist(artist).await?;
-        let best_artist = fuzzy::best_jaro_match(&artist, potentials)?;
+        let best_artist = fuzzy::best_jaro_match(artist, potentials)?;
         let potentials = PSQL::get()?
             .fuzzy_search_artist(&best_artist, &normalised_name)
             .await?;
 
-        fuzzy::best_jaro_match_name_fuzzy_found(&normalised_name, potentials)
+        fuzzy::best_jaro_match(normalised_name, potentials)
     }
 
     async fn find_card(&self, query: QueryParams) -> Option<CardAndImage> {
