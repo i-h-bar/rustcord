@@ -47,25 +47,7 @@ impl ToChars for FuzzyFound {
     }
 }
 
-impl ToChars for &FuzzyFound {
-    fn to_chars(&self) -> Chars<'_> {
-        self.front_normalised_name.chars()
-    }
-}
-
-impl AsRef<str> for FuzzyFound {
-    fn as_ref(&self) -> &str {
-        &self.front_normalised_name
-    }
-}
-
 impl PartialEq<FuzzyFound> for &str {
-    fn eq(&self, other: &FuzzyFound) -> bool {
-        self == &other.front_normalised_name
-    }
-}
-
-impl PartialEq<FuzzyFound> for str {
     fn eq(&self, other: &FuzzyFound) -> bool {
         self == &other.front_normalised_name
     }

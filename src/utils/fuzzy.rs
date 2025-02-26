@@ -36,7 +36,7 @@ impl ToChars for Box<str> {
     }
 }
 
-fn jaro_winkler<A: AsRef<str> + PartialEq<B> + ToChars, B: AsRef<str> + ToChars>(
+fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(
     a: &A,
     b: &B,
 ) -> f32 {
@@ -91,9 +91,9 @@ fn jaro_winkler<A: AsRef<str> + PartialEq<B> + ToChars, B: AsRef<str> + ToChars>
     (matches / len_a as f32 + matches / len_b as f32 + match_diff / matches) / 3.0
 }
 
-pub fn best_jaro_match<
-    A: AsRef<str> + PartialEq<B> + ToChars,
-    B: AsRef<str> + ToChars,
+pub fn winkliest_match<
+    A: PartialEq<B> + ToChars,
+    B: ToChars,
     I: AsRef<[B]> + IntoIterator<Item = B>,
 >(
     target: A,
