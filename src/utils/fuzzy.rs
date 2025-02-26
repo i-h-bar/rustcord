@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::fmt::Display;
 use std::str::Chars;
 
 pub trait ToChars {

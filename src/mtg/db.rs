@@ -10,7 +10,6 @@ use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
-use std::collections::HashMap;
 use std::str::Chars;
 use uuid::Uuid;
 
