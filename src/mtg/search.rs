@@ -2,6 +2,8 @@ use std::time::Duration;
 
 use log;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use serenity::all::Embed;
+use serenity::builder::CreateEmbed;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 

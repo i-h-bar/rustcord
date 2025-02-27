@@ -15,6 +15,10 @@ impl ImageFetcher {
         }
     }
 
+    pub fn fetch_uri(&self, image_id: &str) -> String {
+        format!("{}{}.png", &self.image_dir, image_id)
+    }
+
     pub async fn fetch(&self, card: &FuzzyFound) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
         let front = tokio::fs::read(format!("{}{}.png", &self.image_dir, &card.front_image_id))
             .await
@@ -30,4 +34,6 @@ impl ImageFetcher {
 
         (front, back)
     }
+
+
 }

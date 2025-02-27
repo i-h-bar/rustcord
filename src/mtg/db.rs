@@ -10,14 +10,21 @@ use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::collections::HashMap;
+use std::env;
+use serenity::all::{Embed, EmbedImage, CreateEmbed};
+use serenity::model::Color;
 use uuid::Uuid;
+use crate::mtg::images::ImageFetcher;
+use crate::utils::colours::get_colour_identity;
 
 pub struct FuzzyFound {
     pub front_id: Uuid,
     pub front_name: String,
     pub front_normalised_name: String,
+    pub front_scryfall_url: String,
     pub front_image_id: Uuid,
     pub front_mana_cost: String,
+    pub front_colour_identity: Vec<String>,
     pub front_power: Option<String>,
     pub front_toughness: Option<String>,
     pub front_loyalty: Option<String>,
@@ -27,8 +34,10 @@ pub struct FuzzyFound {
     pub front_oracle_text: String,
     pub back_id: Option<Uuid>,
     pub back_name: Option<String>,
+    pub back_scryfall_url: Option<String>,
     pub back_image_id: Option<Uuid>,
     pub back_mana_cost: Option<String>,
+    pub back_colour_identity: Option<Vec<String>>,
     pub back_power: Option<String>,
     pub back_toughness: Option<String>,
     pub back_loyalty: Option<String>,
@@ -39,14 +48,32 @@ pub struct FuzzyFound {
     pub release_date: Date,
 }
 
+
+impl FuzzyFound {
+    pub fn to_embed(self) -> CreateEmbed {
+        let rules_text = format!("{}\n\n{}", self.front_type_line, self.front_oracle_text);
+        let title = format!("{}        {}", self.front_name, self.front_mana_cost);
+
+        CreateEmbed::default()
+            .attachment(format!("{}.png", self.front_image_id.to_string()))
+            .url(self.front_scryfall_url)
+            .title(title)
+            .description(rules_text)
+            .colour(get_colour_identity(self.front_colour_identity))
+    }
+}
+
+
 impl<'r> FromRow<'r, PgRow> for FuzzyFound {
     fn from_row(row: &'r PgRow) -> Result<Self, Error> {
         Ok(FuzzyFound {
             front_id: row.get::<Uuid, &str>("front_id"),
             front_name: row.get::<String, &str>("front_name"),
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
+            front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
             front_image_id: row.get::<Uuid, &str>("front_image_id"),
             front_mana_cost: row.get::<String, &str>("front_mana_cost"),
+            front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
             front_power: row.get::<Option<String>, &str>("front_power"),
             front_toughness: row.get::<Option<String>, &str>("front_toughness"),
             front_loyalty: row.get::<Option<String>, &str>("front_loyalty"),
@@ -56,8 +83,10 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             front_oracle_text: row.get::<String, &str>("front_oracle_text"),
             back_id: row.get::<Option<Uuid>, &str>("back_id"),
             back_name: row.get::<Option<String>, &str>("back_name"),
+            back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
             back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
             back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
+            back_colour_identity: row.get::<Option<Vec<String>>, &str>("back_colour_identity"),
             back_power: row.get::<Option<String>, &str>("back_power"),
             back_toughness: row.get::<Option<String>, &str>("back_toughness"),
             back_loyalty: row.get::<Option<String>, &str>("back_loyalty"),
