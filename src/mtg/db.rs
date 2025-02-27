@@ -5,11 +5,12 @@ use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
 };
 use crate::utils;
+use crate::utils::fuzzy::ToChars;
 use regex::Captures;
 use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
-use std::collections::HashMap;
+use std::str::Chars;
 use std::env;
 use serenity::all::{Embed, EmbedImage, CreateEmbed};
 use serenity::model::Color;
@@ -63,6 +64,18 @@ impl FuzzyFound {
     }
 }
 
+
+impl ToChars for FuzzyFound {
+    fn to_chars(&self) -> Chars<'_> {
+        self.front_normalised_name.chars()
+    }
+}
+
+impl PartialEq<FuzzyFound> for &str {
+    fn eq(&self, other: &FuzzyFound) -> bool {
+        self == &other.front_normalised_name
+    }
+}
 
 impl<'r> FromRow<'r, PgRow> for FuzzyFound {
     fn from_row(row: &'r PgRow) -> Result<Self, Error> {
