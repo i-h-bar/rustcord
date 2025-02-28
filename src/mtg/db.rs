@@ -53,17 +53,17 @@ impl FuzzyFound {
     pub fn to_embed(self) -> ((CreateEmbed, String), (Option<CreateEmbed>, Option<String>)) {
         let stats = if let Some(power) = self.front_power {
             let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
-            format!("{}/{}", power, toughness)
+            format!("\n\n{}/{}", power, toughness)
         } else if let Some(loyalty) = self.front_loyalty {
-            loyalty
+            format!("\n\n{}", loyalty)
         } else if let Some(defence) = self.front_defence {
-            defence
+            format!("\n\n{}", defence)
         } else {
-            "0".to_string()
+            "".to_string()
         };
 
         let rules_text = format!(
-            "{}\n\n{}\n\n{}",
+            "{}\n\n{}{}",
             self.front_type_line, self.front_oracle_text, stats
         );
         let title = format!("{}        {}", self.front_name, self.front_mana_cost);
@@ -78,18 +78,20 @@ impl FuzzyFound {
         let back = if let Some(name) = self.back_name {
             let stats = if let Some(power) = self.back_power {
                 let toughness = self.back_toughness.unwrap_or_else(|| "0".to_string());
-                format!("{}/{}", power, toughness)
+                format!("\n\n{}/{}", power, toughness)
             } else if let Some(loyalty) = self.back_loyalty {
-                loyalty
+                format!("\n\n{}", loyalty)
             } else if let Some(defence) = self.back_defence {
-                defence
+                format!("\n\n{}", defence)
             } else {
-                "0".to_string()
+                "".to_string()
             };
 
-            let rules_text = format!(
+            let back_rules_text = format!(
                 "{}\n\n{}\n\n{}",
-                self.front_type_line, self.front_oracle_text, stats
+                self.back_type_line.unwrap_or_else(|| "".to_string()),
+                self.back_oracle_text.unwrap_or_else(|| "".to_string()),
+                stats
             );
             let title = if let Some(mana_cost) = self.back_mana_cost {
                 format!("{}        {}", name, mana_cost)
@@ -108,7 +110,7 @@ impl FuzzyFound {
                     ))
                     .url(url)
                     .title(title)
-                    .description(rules_text)
+                    .description(back_rules_text)
                     .colour(get_colour_identity(
                         self.back_colour_identity.unwrap_or_else(|| Vec::new()),
                     )),
