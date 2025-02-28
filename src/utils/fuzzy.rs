@@ -35,10 +35,7 @@ impl ToChars for Box<str> {
     }
 }
 
-fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(
-    a: &A,
-    b: &B,
-) -> f32 {
+fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 {
     if a == b {
         return 1.0;
     }

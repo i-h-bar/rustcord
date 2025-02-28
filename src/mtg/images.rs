@@ -34,6 +34,4 @@ impl ImageFetcher {
 
         (front, back)
     }
-
-
 }

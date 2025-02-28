@@ -1,13 +1,15 @@
-pub(crate) mod fuzzy;
 pub mod colours;
+pub(crate) mod fuzzy;
 
+use crate::mtg::db::FuzzyFound;
 use log;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serenity::all::{Context, CreateAttachment, CreateEmbed, CreateMessage, Embed, Message, MessageBuilder};
+use serenity::all::{
+    Context, CreateAttachment, CreateEmbed, CreateMessage, Embed, Message, MessageBuilder,
+};
 use serenity::model::Colour;
 use unicode_normalization::UnicodeNormalization;
-use crate::mtg::db::FuzzyFound;
 
 const CARD_QUERY_RE: &str = r#"(?i)\[\[(.*?)(:?(?:\s)?\|(?:\s)?(:?set(?:\s)?=(?:\s)?(.*?)?)?)?(:?(?:\s)?\|(?:\s)?(:?artist(?:\s)?=(?:\s)?(.*?)?)?)?]]"#;
 
@@ -35,7 +37,6 @@ pub async fn send(content: &str, msg: &Message, ctx: &Context) {
         }
     }
 }
-
 
 pub async fn send_image(
     image: &Vec<u8>,

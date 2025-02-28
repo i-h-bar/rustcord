@@ -4,19 +4,19 @@ use crate::db::PSQL;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
 };
+use crate::mtg::images::ImageFetcher;
 use crate::utils;
+use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
 use regex::Captures;
+use serenity::all::{CreateEmbed, Embed, EmbedImage};
+use serenity::model::Color;
 use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
-use std::str::Chars;
 use std::env;
-use serenity::all::{Embed, EmbedImage, CreateEmbed};
-use serenity::model::Color;
+use std::str::Chars;
 use uuid::Uuid;
-use crate::mtg::images::ImageFetcher;
-use crate::utils::colours::get_colour_identity;
 
 pub struct FuzzyFound {
     pub front_id: Uuid,
@@ -49,10 +49,23 @@ pub struct FuzzyFound {
     pub release_date: Date,
 }
 
-
 impl FuzzyFound {
     pub fn to_embed(self) -> CreateEmbed {
-        let rules_text = format!("{}\n\n{}", self.front_type_line, self.front_oracle_text);
+        let stats = if let Some(power) = self.front_power {
+            let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
+            format!("{}/{}", power, toughness)
+        } else if let Some(loyalty) = self.front_loyalty {
+            loyalty
+        } else if let Some(defence) = self.front_defence {
+            defence
+        } else {
+            "0".to_string()
+        };
+
+        let rules_text = format!(
+            "{}\n\n{}\n\n{}",
+            self.front_type_line, self.front_oracle_text, stats
+        );
         let title = format!("{}        {}", self.front_name, self.front_mana_cost);
 
         CreateEmbed::default()
@@ -63,7 +76,6 @@ impl FuzzyFound {
             .colour(get_colour_identity(self.front_colour_identity))
     }
 }
-
 
 impl ToChars for FuzzyFound {
     fn to_chars(&self) -> Chars<'_> {
