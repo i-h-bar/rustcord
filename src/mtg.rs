@@ -35,15 +35,16 @@ impl<'a> Handler {
         msg: &Message,
         ctx: &Context,
     ) {
+        let ((front, front_image_id), (back, back_image_id)) = card.to_embed();
         let message = if let Some(front_image) = front_image {
             CreateMessage::new().add_file(CreateAttachment::bytes(
                 front_image,
-                format!("{}.png", card.front_image_id),
+                format!("{}.png", front_image_id),
             ))
         } else {
             CreateMessage::new()
         }
-        .add_embed(card.to_embed());
+        .add_embed(front);
 
         match msg.channel_id.send_message(&ctx.http, message).await {
             Err(why) => {
@@ -51,6 +52,29 @@ impl<'a> Handler {
             }
             Ok(_) => {
                 log::info!("Sent embed")
+            }
+        }
+
+        if let Some(back) = back {
+            if let Some(back_image_id) = back_image_id {
+                let message = if let Some(back_image) = back_image {
+                    CreateMessage::new().add_file(CreateAttachment::bytes(
+                        back_image,
+                        format!("{}.png", back_image_id),
+                    ))
+                } else {
+                    CreateMessage::new()
+                }
+                .add_embed(back);
+
+                match msg.channel_id.send_message(&ctx.http, message).await {
+                    Err(why) => {
+                        log::warn!("Error sending image - {why:?}")
+                    }
+                    Ok(_) => {
+                        log::info!("Sent embed")
+                    }
+                }
             }
         }
     }

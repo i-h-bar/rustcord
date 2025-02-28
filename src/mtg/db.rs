@@ -50,7 +50,7 @@ pub struct FuzzyFound {
 }
 
 impl FuzzyFound {
-    pub fn to_embed(self) -> CreateEmbed {
+    pub fn to_embed(self) -> ((CreateEmbed, String), (Option<CreateEmbed>, Option<String>)) {
         let stats = if let Some(power) = self.front_power {
             let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
             format!("{}/{}", power, toughness)
@@ -68,12 +68,65 @@ impl FuzzyFound {
         );
         let title = format!("{}        {}", self.front_name, self.front_mana_cost);
 
-        CreateEmbed::default()
+        let front = CreateEmbed::default()
             .attachment(format!("{}.png", self.front_image_id.to_string()))
             .url(self.front_scryfall_url)
             .title(title)
             .description(rules_text)
-            .colour(get_colour_identity(self.front_colour_identity))
+            .colour(get_colour_identity(self.front_colour_identity));
+
+        let back = if let Some(name) = self.back_name {
+            let stats = if let Some(power) = self.back_power {
+                let toughness = self.back_toughness.unwrap_or_else(|| "0".to_string());
+                format!("{}/{}", power, toughness)
+            } else if let Some(loyalty) = self.back_loyalty {
+                loyalty
+            } else if let Some(defence) = self.back_defence {
+                defence
+            } else {
+                "0".to_string()
+            };
+
+            let rules_text = format!(
+                "{}\n\n{}\n\n{}",
+                self.front_type_line, self.front_oracle_text, stats
+            );
+            let title = if let Some(mana_cost) = self.back_mana_cost {
+                format!("{}        {}", name, mana_cost)
+            } else {
+                name
+            };
+
+            let url = self.back_scryfall_url.unwrap_or_else(|| "".to_string());
+            Some(
+                CreateEmbed::default()
+                    .attachment(format!(
+                        "{}.png",
+                        self.back_image_id
+                            .unwrap_or_else(|| Uuid::default())
+                            .to_string()
+                    ))
+                    .url(url)
+                    .title(title)
+                    .description(rules_text)
+                    .colour(get_colour_identity(
+                        self.back_colour_identity.unwrap_or_else(|| Vec::new()),
+                    )),
+            )
+        } else {
+            None
+        };
+
+        let back_image_id = if let Some(image_id) = self.back_image_id {
+            Some(image_id.to_string())
+        } else {
+            None
+        };
+
+        (
+            (front, self.front_image_id.to_string()),
+            (back, back_image_id),
+        )
     }
 }
 
