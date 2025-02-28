@@ -88,7 +88,7 @@ impl FuzzyFound {
             };
 
             let back_rules_text = format!(
-                "{}\n\n{}\n\n{}",
+                "{}\n\n{}{}",
                 self.back_type_line.unwrap_or_else(|| "".to_string()),
                 self.back_oracle_text.unwrap_or_else(|| "".to_string()),
                 stats
