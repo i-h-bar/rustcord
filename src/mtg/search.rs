@@ -3,7 +3,7 @@ use std::time::Duration;
 use log;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serenity::all::Embed;
-use serenity::builder::CreateEmbed;
+use serenity::builder::{CreateAttachment, CreateEmbed};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 
@@ -12,7 +12,7 @@ use crate::mtg::db::{FuzzyFound, QueryParams};
 use crate::mtg::images::ImageFetcher;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
-pub type CardAndImage = (FuzzyFound, (Option<Vec<u8>>, Option<Vec<u8>>));
+pub type CardAndImage = (FuzzyFound, (Option<CreateAttachment>, Option<CreateAttachment>));
 
 pub struct MTG {
     http_client: reqwest::Client,

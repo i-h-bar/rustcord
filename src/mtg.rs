@@ -30,17 +30,14 @@ impl<'a> Handler {
     async fn send_embed(
         &self,
         card: FuzzyFound,
-        front_image: Option<Vec<u8>>,
-        back_image: Option<Vec<u8>>,
+        front_image: Option<CreateAttachment>,
+        back_image: Option<CreateAttachment>,
         msg: &Message,
         ctx: &Context,
     ) {
         let ((front, front_image_id), (back, back_image_id)) = card.to_embed();
         let message = if let Some(front_image) = front_image {
-            CreateMessage::new().add_file(CreateAttachment::bytes(
-                front_image,
-                format!("{}.png", front_image_id),
-            ))
+            CreateMessage::new().add_file(front_image)
         } else {
             CreateMessage::new()
         }
@@ -56,12 +53,9 @@ impl<'a> Handler {
         }
 
         if let Some(back) = back {
-            if let Some(back_image_id) = back_image_id {
+            if back_image_id.is_some() {
                 let message = if let Some(back_image) = back_image {
-                    CreateMessage::new().add_file(CreateAttachment::bytes(
-                        back_image,
-                        format!("{}.png", back_image_id),
-                    ))
+                    CreateMessage::new().add_file(back_image)
                 } else {
                     CreateMessage::new()
                 }
