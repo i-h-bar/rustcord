@@ -1,6 +1,5 @@
 use regex::Captures;
 
-
 pub fn add_emoji(cap: &Captures) -> String {
     match &cap[0] {
         "{T}" => "<:tap:1341154606524403804>",
@@ -88,5 +87,6 @@ pub fn add_emoji(cap: &Captures) -> String {
         "{L}" => "<:L_:1345440671821074553>",
         "{D}" => "",
         default => default,
-    }.to_string()
+    }
+    .to_string()
 }

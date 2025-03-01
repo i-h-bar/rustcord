@@ -1,12 +1,14 @@
 mod queries;
 
 use crate::db::PSQL;
+use crate::emoji::add_emoji;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
 };
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
+use crate::utils::REGEX_COLLECTION;
 use regex::Captures;
 use serenity::all::CreateEmbed;
 use sqlx::postgres::PgRow;
@@ -14,8 +16,6 @@ use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use uuid::Uuid;
-use crate::emoji::add_emoji;
-use crate::utils::REGEX_COLLECTION;
 
 pub struct FuzzyFound {
     pub front_id: Uuid,
@@ -61,13 +61,14 @@ impl FuzzyFound {
             "".to_string()
         };
 
-        let front_oracle_text = REGEX_COLLECTION.symbols.replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(&cap));
+        let front_oracle_text = REGEX_COLLECTION
+            .symbols
+            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(&cap));
 
-        let rules_text = format!(
-            "{}\n\n{}{}",
-            self.front_type_line, front_oracle_text, stats
-        );
-        let mana_cost = REGEX_COLLECTION.symbols.replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(&cap));
+        let rules_text = format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats);
+        let mana_cost = REGEX_COLLECTION
+            .symbols
+            .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(&cap));
         let title = format!("{}        {}", self.front_name, mana_cost);
 
         let front = CreateEmbed::default()
@@ -89,7 +90,9 @@ impl FuzzyFound {
                 "".to_string()
             };
             let back_oracle_text = self.back_oracle_text.unwrap_or_else(|| "".to_string());
-            let back_oracle_text = REGEX_COLLECTION.symbols.replace_all(&back_oracle_text, |cap: &Captures| add_emoji(&cap));
+            let back_oracle_text = REGEX_COLLECTION
+                .symbols
+                .replace_all(&back_oracle_text, |cap: &Captures| add_emoji(&cap));
 
             let back_rules_text = format!(
                 "{}\n\n{}{}",
@@ -98,7 +101,9 @@ impl FuzzyFound {
                 stats
             );
             let title = if let Some(mana_cost) = self.back_mana_cost {
-                let mana_cost = REGEX_COLLECTION.symbols.replace_all(&mana_cost, |cap: &Captures| add_emoji(&cap));
+                let mana_cost = REGEX_COLLECTION
+                    .symbols
+                    .replace_all(&mana_cost, |cap: &Captures| add_emoji(&cap));
                 format!("{}        {}", name, mana_cost)
             } else {
                 name

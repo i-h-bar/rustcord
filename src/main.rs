@@ -13,10 +13,10 @@ use crate::help::HELP;
 use crate::mtg::search::MTG;
 
 mod db;
+pub mod emoji;
 mod help;
 pub mod mtg;
 mod utils;
-pub mod emoji;
 
 struct Handler {
     mtg: MTG,
