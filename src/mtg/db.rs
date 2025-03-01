@@ -50,7 +50,7 @@ pub struct FuzzyFound {
 }
 
 impl FuzzyFound {
-    pub fn to_embed(self) -> ((CreateEmbed, String), (Option<CreateEmbed>, Option<String>)) {
+    pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
         let stats = if let Some(power) = self.front_power {
             let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
             format!("\n\n{}/{}", power, toughness)
@@ -119,16 +119,7 @@ impl FuzzyFound {
             None
         };
 
-        let back_image_id = if let Some(image_id) = self.back_image_id {
-            Some(image_id.to_string())
-        } else {
-            None
-        };
-
-        (
-            (front, self.front_image_id.to_string()),
-            (back, back_image_id),
-        )
+        (front, back)
     }
 }
 
