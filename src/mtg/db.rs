@@ -14,6 +14,8 @@ use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use uuid::Uuid;
+use crate::emoji::{add_emoji, GREEN, TAP};
+use crate::utils::REGEX_COLLECTION;
 
 pub struct FuzzyFound {
     pub front_id: Uuid,
@@ -59,11 +61,14 @@ impl FuzzyFound {
             "".to_string()
         };
 
+        let front_oracle_text = REGEX_COLLECTION.symbols.replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(&cap));
+
         let rules_text = format!(
             "{}\n\n{}{}",
-            self.front_type_line, self.front_oracle_text, stats
+            self.front_type_line, front_oracle_text, stats
         );
-        let title = format!("{}        {}", self.front_name, self.front_mana_cost);
+        let mana_cost = REGEX_COLLECTION.symbols.replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(&cap));
+        let title = format!("{}        {}", self.front_name, mana_cost);
 
         let front = CreateEmbed::default()
             .attachment(format!("{}.png", self.front_image_id.to_string()))
@@ -87,7 +92,7 @@ impl FuzzyFound {
             let back_rules_text = format!(
                 "{}\n\n{}{}",
                 self.back_type_line.unwrap_or_else(|| "".to_string()),
-                self.back_oracle_text.unwrap_or_else(|| "".to_string()),
+                self.back_oracle_text.unwrap_or_else(|| "".to_string()).replace("{T}", TAP),
                 stats
             );
             let title = if let Some(mana_cost) = self.back_mana_cost {

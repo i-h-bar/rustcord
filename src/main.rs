@@ -16,6 +16,7 @@ mod db;
 mod help;
 pub mod mtg;
 mod utils;
+pub mod emoji;
 
 struct Handler {
     mtg: MTG,
