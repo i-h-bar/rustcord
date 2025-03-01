@@ -1,8 +1,7 @@
 use crate::mtg::db::FuzzyFound;
 use crate::mtg::search::CardAndImage;
 use crate::{utils, Handler};
-use serenity::all::{Context, CreateAttachment, CreateMessage, Embed, Message};
-use serenity::builder::CreateEmbed;
+use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 
 pub mod db;
 mod images;
@@ -16,14 +15,6 @@ impl<'a> Handler {
                 self.send_embed(card, front_image, back_image, &msg, &ctx)
                     .await;
             }
-        }
-    }
-
-    async fn send_image(&self, image: &Option<Vec<u8>>, name: &str, msg: &Message, ctx: &Context) {
-        if let Some(image) = image {
-            utils::send_image(&image, &format!("{}.png", &name), None, &msg, &ctx).await;
-        } else {
-            utils::send("Failed to find card :(", &msg, &ctx).await;
         }
     }
 
@@ -43,14 +34,7 @@ impl<'a> Handler {
         }
         .add_embed(front);
 
-        match msg.channel_id.send_message(&ctx.http, message).await {
-            Err(why) => {
-                log::warn!("Error sending image - {why:?}")
-            }
-            Ok(_) => {
-                log::info!("Sent embed")
-            }
-        }
+        utils::send_message(message, &msg, &ctx).await;
 
         if let Some(back) = back {
             let message = if let Some(back_image) = back_image {
@@ -60,14 +44,7 @@ impl<'a> Handler {
             }
             .add_embed(back);
 
-            match msg.channel_id.send_message(&ctx.http, message).await {
-                Err(why) => {
-                    log::warn!("Error sending image - {why:?}")
-                }
-                Ok(_) => {
-                    log::info!("Sent embed")
-                }
-            }
+            utils::send_message(message, &msg, &ctx).await;
         }
     }
 }

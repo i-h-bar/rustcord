@@ -4,17 +4,14 @@ use crate::db::PSQL;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
 };
-use crate::mtg::images::ImageFetcher;
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
 use regex::Captures;
-use serenity::all::{CreateEmbed, Embed, EmbedImage};
-use serenity::model::Color;
+use serenity::all::CreateEmbed;
 use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
-use std::env;
 use std::str::Chars;
 use uuid::Uuid;
 

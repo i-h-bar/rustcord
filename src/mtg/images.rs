@@ -1,6 +1,6 @@
 use crate::mtg::db::FuzzyFound;
-use std::env;
 use serenity::all::CreateAttachment;
+use std::env;
 
 pub struct ImageFetcher {
     image_dir: String,
@@ -16,13 +16,19 @@ impl ImageFetcher {
         }
     }
 
-    pub async fn fetch(&self, card: &FuzzyFound) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
+    pub async fn fetch(
+        &self,
+        card: &FuzzyFound,
+    ) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
         let image = tokio::fs::read(format!("{}{}.png", &self.image_dir, &card.front_image_id))
             .await
             .ok();
 
         let front = if let Some(image) = image {
-            Some(CreateAttachment::bytes(image, format!("{}.png", card.front_image_id)))
+            Some(CreateAttachment::bytes(
+                image,
+                format!("{}.png", card.front_image_id),
+            ))
         } else {
             None
         };
@@ -33,7 +39,10 @@ impl ImageFetcher {
                 .ok();
 
             if let Some(image) = image {
-                Some(CreateAttachment::bytes(image, format!("{}.png", back_image_id)))
+                Some(CreateAttachment::bytes(
+                    image,
+                    format!("{}.png", back_image_id),
+                ))
             } else {
                 None
             }
