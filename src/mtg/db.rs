@@ -18,37 +18,41 @@ use std::str::Chars;
 use uuid::Uuid;
 
 pub struct FuzzyFound {
-    pub front_id: Uuid,
-    pub front_name: String,
-    pub front_normalised_name: String,
-    pub front_scryfall_url: String,
-    pub front_image_id: Uuid,
-    pub front_mana_cost: String,
-    pub front_colour_identity: Vec<String>,
-    pub front_power: Option<String>,
-    pub front_toughness: Option<String>,
-    pub front_loyalty: Option<String>,
-    pub front_defence: Option<String>,
-    pub front_type_line: String,
-    pub front_keywords: Vec<String>,
-    pub front_oracle_text: String,
-    pub back_id: Option<Uuid>,
-    pub back_name: Option<String>,
-    pub back_scryfall_url: Option<String>,
-    pub back_image_id: Option<Uuid>,
-    pub back_mana_cost: Option<String>,
-    pub back_colour_identity: Option<Vec<String>>,
-    pub back_power: Option<String>,
-    pub back_toughness: Option<String>,
-    pub back_loyalty: Option<String>,
-    pub back_defence: Option<String>,
-    pub back_type_line: Option<String>,
-    pub back_keywords: Option<Vec<String>>,
-    pub back_oracle_text: Option<String>,
-    pub release_date: Date,
+    front_id: Uuid,
+    front_name: String,
+    front_normalised_name: String,
+    front_scryfall_url: String,
+    front_image_id: Uuid,
+    front_mana_cost: String,
+    front_colour_identity: Vec<String>,
+    front_power: Option<String>,
+    front_toughness: Option<String>,
+    front_loyalty: Option<String>,
+    front_defence: Option<String>,
+    front_type_line: String,
+    front_keywords: Vec<String>,
+    front_oracle_text: String,
+    back_id: Option<Uuid>,
+    back_name: Option<String>,
+    back_scryfall_url: Option<String>,
+    back_image_id: Option<Uuid>,
+    back_mana_cost: Option<String>,
+    back_colour_identity: Option<Vec<String>>,
+    back_power: Option<String>,
+    back_toughness: Option<String>,
+    back_loyalty: Option<String>,
+    back_defence: Option<String>,
+    back_type_line: Option<String>,
+    back_keywords: Option<Vec<String>>,
+    back_oracle_text: Option<String>,
+    release_date: Date,
 }
 
 impl FuzzyFound {
+    pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
+        (&self.front_image_id, self.back_image_id.as_ref())
+    }
+
     pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
         let stats = if let Some(power) = self.front_power {
             let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
