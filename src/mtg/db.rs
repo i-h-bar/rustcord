@@ -14,7 +14,7 @@ use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use uuid::Uuid;
-use crate::emoji::{add_emoji, GREEN, TAP};
+use crate::emoji::add_emoji;
 use crate::utils::REGEX_COLLECTION;
 
 pub struct FuzzyFound {
@@ -88,14 +88,17 @@ impl FuzzyFound {
             } else {
                 "".to_string()
             };
+            let back_oracle_text = self.back_oracle_text.unwrap_or_else(|| "".to_string());
+            let back_oracle_text = REGEX_COLLECTION.symbols.replace_all(&back_oracle_text, |cap: &Captures| add_emoji(&cap));
 
             let back_rules_text = format!(
                 "{}\n\n{}{}",
                 self.back_type_line.unwrap_or_else(|| "".to_string()),
-                self.back_oracle_text.unwrap_or_else(|| "".to_string()).replace("{T}", TAP),
+                back_oracle_text,
                 stats
             );
             let title = if let Some(mana_cost) = self.back_mana_cost {
+                let mana_cost = REGEX_COLLECTION.symbols.replace_all(&mana_cost, |cap: &Captures| add_emoji(&cap));
                 format!("{}        {}", name, mana_cost)
             } else {
                 name
