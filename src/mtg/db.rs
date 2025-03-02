@@ -8,13 +8,14 @@ use crate::mtg::db::queries::{
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
-use crate::utils::REGEX_COLLECTION;
+use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serenity::all::CreateEmbed;
 use sqlx::postgres::PgRow;
 use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
+use tokio::time::Instant;
 use uuid::Uuid;
 
 pub struct FuzzyFound {
@@ -54,6 +55,8 @@ impl FuzzyFound {
     }
 
     pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
+        let start = Instant::now();
+
         let stats = if let Some(power) = self.front_power {
             let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
             format!("\n\n{}/{}", power, toughness)
@@ -68,6 +71,7 @@ impl FuzzyFound {
         let front_oracle_text = REGEX_COLLECTION
             .symbols
             .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(&cap));
+        let front_oracle_text = italicise_reminder_text(&front_oracle_text);
 
         let rules_text = format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats);
         let mana_cost = REGEX_COLLECTION
@@ -97,6 +101,7 @@ impl FuzzyFound {
             let back_oracle_text = REGEX_COLLECTION
                 .symbols
                 .replace_all(&back_oracle_text, |cap: &Captures| add_emoji(&cap));
+            let back_oracle_text = italicise_reminder_text(&back_oracle_text);
 
             let back_rules_text = format!(
                 "{}\n\n{}{}",
@@ -132,6 +137,8 @@ impl FuzzyFound {
         } else {
             None
         };
+
+        log::info!("Format lifetime: {} us", start.elapsed().as_micros());
 
         (front, back)
     }
