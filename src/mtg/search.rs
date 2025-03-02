@@ -17,14 +17,14 @@ pub struct MTG {
     images: ImageFetcher,
 }
 
-impl<'a> MTG {
+impl MTG {
     pub async fn new() -> Self {
         let images = ImageFetcher::new();
 
         Self { images }
     }
 
-    pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<CardAndImage>> {
+    pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardAndImage>> {
         let start = Instant::now();
         let cards = join_all(
             REGEX_COLLECTION
