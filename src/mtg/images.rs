@@ -27,10 +27,7 @@ impl ImageFetcher {
             .ok();
 
         let front = if let Some(image) = image {
-            Some(CreateAttachment::bytes(
-                image,
-                format!("{}.png", front_id),
-            ))
+            Some(CreateAttachment::bytes(image, format!("{}.png", front_id)))
         } else {
             None
         };
@@ -41,10 +38,7 @@ impl ImageFetcher {
                 .ok();
 
             if let Some(image) = image {
-                Some(CreateAttachment::bytes(
-                    image,
-                    format!("{}.png", back_id),
-                ))
+                Some(CreateAttachment::bytes(image, format!("{}.png", back_id)))
             } else {
                 None
             }

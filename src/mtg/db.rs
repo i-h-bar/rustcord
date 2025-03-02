@@ -12,14 +12,12 @@ use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serenity::all::CreateEmbed;
 use sqlx::postgres::PgRow;
-use sqlx::types::time::Date;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
 
 pub struct FuzzyFound {
-    front_id: Uuid,
     front_name: String,
     front_normalised_name: String,
     front_scryfall_url: String,
@@ -31,9 +29,7 @@ pub struct FuzzyFound {
     front_loyalty: Option<String>,
     front_defence: Option<String>,
     front_type_line: String,
-    front_keywords: Vec<String>,
     front_oracle_text: String,
-    back_id: Option<Uuid>,
     back_name: Option<String>,
     back_scryfall_url: Option<String>,
     back_image_id: Option<Uuid>,
@@ -44,9 +40,7 @@ pub struct FuzzyFound {
     back_loyalty: Option<String>,
     back_defence: Option<String>,
     back_type_line: Option<String>,
-    back_keywords: Option<Vec<String>>,
     back_oracle_text: Option<String>,
-    release_date: Date,
 }
 
 impl FuzzyFound {
@@ -159,7 +153,6 @@ impl PartialEq<FuzzyFound> for &str {
 impl<'r> FromRow<'r, PgRow> for FuzzyFound {
     fn from_row(row: &'r PgRow) -> Result<Self, Error> {
         Ok(FuzzyFound {
-            front_id: row.get::<Uuid, &str>("front_id"),
             front_name: row.get::<String, &str>("front_name"),
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
             front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
@@ -171,9 +164,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             front_loyalty: row.get::<Option<String>, &str>("front_loyalty"),
             front_defence: row.get::<Option<String>, &str>("front_defence"),
             front_type_line: row.get::<String, &str>("front_type_line"),
-            front_keywords: row.get::<Vec<String>, &str>("front_keywords"),
             front_oracle_text: row.get::<String, &str>("front_oracle_text"),
-            back_id: row.get::<Option<Uuid>, &str>("back_id"),
             back_name: row.get::<Option<String>, &str>("back_name"),
             back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
             back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
@@ -184,9 +175,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_loyalty: row.get::<Option<String>, &str>("back_loyalty"),
             back_defence: row.get::<Option<String>, &str>("back_defence"),
             back_type_line: row.get::<Option<String>, &str>("back_type_line"),
-            back_keywords: row.get::<Option<Vec<String>>, &str>("back_keywords"),
             back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
-            release_date: row.get::<Date, &str>("release_date"),
         })
     }
 }

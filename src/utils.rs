@@ -4,7 +4,7 @@ pub(crate) mod fuzzy;
 use log;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
+use serenity::all::{Context, CreateMessage, Message};
 use unicode_normalization::UnicodeNormalization;
 
 const CARD_QUERY_RE: &str = r#"(?i)\[\[(.*?)(:?(?:\s)?\|(?:\s)?(:?set(?:\s)?=(?:\s)?(.*?)?)?)?(:?(?:\s)?\|(?:\s)?(:?artist(?:\s)?=(?:\s)?(.*?)?)?)?]]"#;
@@ -61,7 +61,8 @@ pub fn normalise(name: &str) -> String {
 }
 
 pub fn italicise_reminder_text(text: &str) -> String {
-    REGEX_COLLECTION.reminder_text.replace_all(text, |cap: &Captures| format!("(*{}*)", &cap[1])
-
-    ).to_string()
+    REGEX_COLLECTION
+        .reminder_text
+        .replace_all(text, |cap: &Captures| format!("(*{}*)", &cap[1]))
+        .to_string()
 }

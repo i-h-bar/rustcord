@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use log;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use serenity::builder::CreateAttachment;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
@@ -17,26 +14,14 @@ pub type CardAndImage = (
 );
 
 pub struct MTG {
-    http_client: reqwest::Client,
     images: ImageFetcher,
 }
 
 impl<'a> MTG {
     pub async fn new() -> Self {
-        let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static("Rust Discord Bot"));
-        let http_client = reqwest::Client::builder()
-            .default_headers(headers)
-            .timeout(Duration::new(30, 0))
-            .build()
-            .expect("Failed HTTP Client build");
-
         let images = ImageFetcher::new();
 
-        Self {
-            http_client,
-            images,
-        }
+        Self { images }
     }
 
     pub async fn parse_message(&'a self, msg: &'a str) -> Vec<Option<CardAndImage>> {

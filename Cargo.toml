@@ -8,8 +8,6 @@ regex = "1.11.0"
 dotenv = "0.15.0"
 serenity = "0.12.2"
 tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread"] }
-reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], default-features = false }
-serde = { version = "1.0.210", features = ["derive"] }
 sqlx = { version = "0.8.2", features = [ "runtime-tokio", "postgres", "uuid", "time" ] }
 uuid = { version = "1.10.0", features = ["v4"] }
 log = "0.4.22"
