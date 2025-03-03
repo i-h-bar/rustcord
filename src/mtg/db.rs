@@ -218,7 +218,31 @@ impl PSQL {
         normalised_name: &str,
     ) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(&format!(
-            r#"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            r#"
+            select  front_name,
+                    front_normalised_name,
+                    front_scryfall_url,
+                    front_image_id,
+                    front_mana_cost,
+                    front_colour_identity,
+                    front_power,
+                    front_toughness,
+                    front_loyalty,
+                    front_defence,
+                    front_type_line,
+                    front_oracle_text,
+                    back_name,
+                    back_scryfall_url,
+                    back_image_id,
+                    back_mana_cost,
+                    back_colour_identity,
+                    back_power,
+                    back_toughness,
+                    back_loyalty,
+                    back_defence,
+                    back_type_line,
+                    back_oracle_text
+            from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             set_name.replace(" ", "_")
         ))
         .bind(&normalised_name)
@@ -270,7 +294,31 @@ impl PSQL {
         normalised_name: &str,
     ) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(&format!(
-            r#"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            r#"
+            select  front_name,
+                    front_normalised_name,
+                    front_scryfall_url,
+                    front_image_id,
+                    front_mana_cost,
+                    front_colour_identity,
+                    front_power,
+                    front_toughness,
+                    front_loyalty,
+                    front_defence,
+                    front_type_line,
+                    front_oracle_text,
+                    back_name,
+                    back_scryfall_url,
+                    back_image_id,
+                    back_mana_cost,
+                    back_colour_identity,
+                    back_power,
+                    back_toughness,
+                    back_loyalty,
+                    back_defence,
+                    back_type_line,
+                    back_oracle_text
+            from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             artist.replace(" ", "_")
         ))
         .bind(&normalised_name)
