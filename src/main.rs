@@ -13,8 +13,9 @@ use crate::help::HELP;
 use crate::mtg::search::MTG;
 
 mod db;
+pub mod emoji;
 mod help;
-mod mtg;
+pub mod mtg;
 mod utils;
 
 struct Handler {
@@ -38,7 +39,7 @@ impl EventHandler for Handler {
             utils::send(HELP, &msg, &ctx).await
         } else {
             for card in self.mtg.parse_message(&msg.content).await {
-                self.card_response(&card, &msg, &ctx).await;
+                self.card_response(card, &msg, &ctx).await;
             }
         }
     }

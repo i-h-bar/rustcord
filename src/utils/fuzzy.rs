@@ -1,83 +1,120 @@
-use rayon::prelude::*;
-use std::cmp;
-use std::sync::Arc;
+use std::cmp::Ordering;
+use std::str::Chars;
 
-pub fn lev(a: &str, b: &str) -> usize {
-    if a.is_empty() {
-        return b.chars().count();
-    } else if b.is_empty() {
-        return a.chars().count();
-    }
-
-    let mut dcol: Vec<usize> = (0..(b.len() + 1)).collect();
-    let mut t_last = 0;
-    for (i, sc) in a.chars().enumerate() {
-        let mut current = i;
-        dcol[0] = current + 1;
-        for (j, tc) in b.chars().enumerate() {
-            let next = dcol[j + 1];
-            if sc == tc {
-                dcol[j + 1] = current;
-            } else {
-                dcol[j + 1] = cmp::min(current, next);
-                dcol[j + 1] = cmp::min(dcol[j + 1], dcol[j]) + 1;
-            }
-            current = next;
-            t_last = j;
-        }
-    }
-    dcol[t_last + 1]
+pub trait ToChars {
+    fn to_chars(&self) -> Chars<'_>;
 }
 
-pub fn best_match_lev<'a, I: IntoParallelRefIterator<'a, Item = &'a Arc<str>>>(
-    a: &str,
-    items: &'a I,
-) -> Option<&'a Arc<str>> {
-    Some(
-        items
-            .par_iter()
-            .map(|item: &Arc<str>| {
-                let dist = lev(&a, item.as_ref());
-                (item, dist)
-            })
-            .min_by(|(_, x), (_, y)| x.cmp(y))?
-            .0,
-    )
+impl ToChars for str {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for &str {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for &String {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for String {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+impl ToChars for Box<str> {
+    fn to_chars(&self) -> Chars<'_> {
+        self.chars()
+    }
+}
+
+fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 {
+    if a == b {
+        return 1.0;
+    }
+
+    let a: Vec<char> = a.to_chars().collect();
+    let b: Vec<char> = b.to_chars().collect();
+    let len_a = a.len();
+    let len_b = b.len();
+    let max_dist = (len_a.max(len_b) / 2) - 1;
+    let mut matches = 0;
+    let mut hash_a: Vec<u8> = vec![0; len_a];
+    let mut hash_b: Vec<u8> = vec![0; len_b];
+
+    for i in 0..len_a {
+        for j in 0.max(i as isize - max_dist as isize) as usize..len_b.min(i + max_dist + 1) {
+            if a[i] == b[j] && hash_b[j] == 0 {
+                hash_a[i] = 1;
+                hash_b[j] = 1;
+                matches += 1;
+                break;
+            }
+        }
+    }
+
+    if matches == 0 {
+        return 0.0;
+    }
+
+    let mut t = 0;
+    let mut point = 0;
+
+    for i in 0..len_a {
+        if hash_a[i] != 0 {
+            while hash_b[point] == 0 {
+                point += 1;
+            }
+
+            if a[i] != b[point] {
+                t += 1;
+            }
+            point += 1;
+        }
+    }
+
+    let t = t / 2;
+
+    let match_diff = (matches - t) as f32;
+    let matches = matches as f32;
+    (matches / len_a as f32 + matches / len_b as f32 + match_diff / matches) / 3.0
+}
+
+pub fn winkliest_match<
+    A: PartialEq<B> + ToChars,
+    B: ToChars,
+    I: AsRef<[B]> + IntoIterator<Item = B>,
+>(
+    target: A,
+    heap: I,
+) -> Option<B> {
+    let (_, closest_match) = heap
+        .into_iter()
+        .map(|needle| {
+            let distance = jaro_winkler(&target, &needle);
+            (distance, needle)
+        })
+        .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less))?;
+
+    Some(closest_match)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
-    fn test_lev() {
-        assert_eq!(lev("sitting", "kitten"), 3)
-    }
+    fn test_jaro_winkler() {
+        let a = "CRATE";
+        let b = "TRACE";
 
-    #[test]
-    fn test_best_match() {
-        let a = vec!["sitting".to_string(), "kitten".to_string()];
-        let b = "sitting";
-
-        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
-    }
-
-    #[test]
-    fn test_best_match_2() {
-        let a = vec!["sitting".to_string(), "kitten".to_string()];
-        let b = "setting";
-
-        assert_eq!(best_match_lev(&b, &a).unwrap(), a.get(0).unwrap());
-    }
-
-    #[test]
-    fn test_best_match_hash_map() {
-        let mut a: HashSet<String> = HashSet::new();
-        a.insert("sitting".to_string());
-        a.insert("kitten".to_string());
-        let b = "setting";
-
-        assert_eq!(best_match_lev(&b, &a).unwrap(), &"sitting".to_string());
+        assert_eq!(jaro_winkler(&a, &b), 0.73333335)
     }
 }
