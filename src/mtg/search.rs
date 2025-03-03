@@ -25,16 +25,13 @@ impl MTG {
     }
 
     pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardAndImage>> {
-        let start = Instant::now();
-        let cards = join_all(
+        join_all(
             REGEX_COLLECTION
                 .cards
                 .captures_iter(&msg)
                 .filter_map(|capture| Some(self.find_card(QueryParams::from(capture)?))),
         )
-        .await;
-        log::info!("Query lifetime: {} ms", start.elapsed().as_millis());
-        cards
+        .await
     }
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
