@@ -29,7 +29,7 @@ where word_similarity(front_normalised_name, $1) > 0.50;
 pub const FUZZY_SEARCH_SET_NAME: &str = r#"
 select array_agg(normalised_name)
     from set
-where word_similarity(normalised_name, $1) > 0.50
+where word_similarity(normalised_name, $1) > 0.25
 "#;
 
 pub const FUZZY_SEARCH_ARTIST: &str = r#"

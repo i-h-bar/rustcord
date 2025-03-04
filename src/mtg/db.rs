@@ -270,7 +270,13 @@ impl PSQL {
                 log::warn!("Failed set name fetch - {why}");
                 None
             }
-            Ok(row) => Some(row.get::<Vec<String>, &str>("array_agg")),
+            Ok(row) => {
+                if let Ok(row) = row.try_get::<Vec<String>, &str>("array_agg") {
+                    Some(row)
+                } else {
+                    None
+                }
+            },
         }
     }
 
@@ -284,7 +290,13 @@ impl PSQL {
                 log::warn!("Failed artist fetch - {why}");
                 None
             }
-            Ok(row) => Some(row.get::<Vec<String>, &str>("array_agg")),
+            Ok(row) => {
+                if let Ok(row) = row.try_get::<Vec<String>, &str>("array_agg") {
+                    Some(row)
+                } else {
+                    None
+                }
+            },
         }
     }
 
