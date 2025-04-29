@@ -8,7 +8,7 @@ use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
 
-use crate::db::PSQL;
+use crate::db::Psql;
 use crate::help::HELP;
 use crate::mtg::search::MTG;
 
@@ -53,7 +53,7 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv().ok();
     env_logger::init();
-    PSQL::init().await;
+    Psql::init().await;
 
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES

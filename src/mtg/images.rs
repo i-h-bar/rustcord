@@ -4,7 +4,7 @@ use std::env;
 
 pub struct ImageFetcher {
     image_dir: String,
-    illustration_dir: String,
+    // illustration_dir: String,
 }
 
 impl ImageFetcher {
@@ -12,7 +12,7 @@ impl ImageFetcher {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
         Self {
             image_dir: format!("{}/images/", &base_dir),
-            illustration_dir: format!("{}/illustrations/", &base_dir),
+            // illustration_dir: format!("{}/illustrations/", &base_dir),
         }
     }
 
@@ -26,22 +26,14 @@ impl ImageFetcher {
             .await
             .ok();
 
-        let front = if let Some(image) = image {
-            Some(CreateAttachment::bytes(image, format!("{}.png", front_id)))
-        } else {
-            None
-        };
+        let front = image.map(|image| CreateAttachment::bytes(image, format!("{}.png", front_id)));
 
         let back = if let Some(back_id) = back_id {
             let image = tokio::fs::read(format!("{}{}.png", &self.image_dir, &back_id))
                 .await
                 .ok();
 
-            if let Some(image) = image {
-                Some(CreateAttachment::bytes(image, format!("{}.png", back_id)))
-            } else {
-                None
-            }
+            image.map(|image| CreateAttachment::bytes(image, format!("{}.png", back_id)))
         } else {
             None
         };

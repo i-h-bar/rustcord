@@ -3,7 +3,7 @@ use serenity::builder::CreateAttachment;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 
-use crate::db::PSQL;
+use crate::db::Psql;
 use crate::mtg::db::{FuzzyFound, QueryParams};
 use crate::mtg::images::ImageFetcher;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
@@ -28,14 +28,14 @@ impl MTG {
         join_all(
             REGEX_COLLECTION
                 .cards
-                .captures_iter(&msg)
+                .captures_iter(msg)
                 .filter_map(|capture| Some(self.find_card(QueryParams::from(capture)?))),
         )
         .await
     }
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
-        let potentials = PSQL::get()?.fuzzy_search_distinct(&normalised_name).await?;
+        let potentials = Psql::get()?.fuzzy_search_distinct(normalised_name).await?;
         fuzzy::winkliest_match(normalised_name, potentials)
     }
 
@@ -44,11 +44,11 @@ impl MTG {
         abbreviation: &str,
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
-        let set_name = PSQL::get()?
-            .set_name_from_abbreviation(&abbreviation)
+        let set_name = Psql::get()?
+            .set_name_from_abbreviation(abbreviation)
             .await?;
-        let potentials = PSQL::get()?
-            .fuzzy_search_set(&set_name, &normalised_name)
+        let potentials = Psql::get()?
+            .fuzzy_search_set(&set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(normalised_name, potentials)
     }
@@ -58,21 +58,21 @@ impl MTG {
         normalised_set_name: &str,
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
-        let potentials = PSQL::get()?
+        let potentials = Psql::get()?
             .fuzzy_search_set_name(normalised_set_name)
             .await?;
         let set_name = fuzzy::winkliest_match(normalised_set_name, potentials)?;
-        let potentials = PSQL::get()?
-            .fuzzy_search_set(&set_name, &normalised_name)
+        let potentials = Psql::get()?
+            .fuzzy_search_set(&set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(normalised_name, potentials)
     }
 
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
-        let potentials = PSQL::get()?.fuzzy_search_for_artist(artist).await?;
+        let potentials = Psql::get()?.fuzzy_search_for_artist(artist).await?;
         let best_artist = fuzzy::winkliest_match(artist, potentials)?;
-        let potentials = PSQL::get()?
-            .fuzzy_search_artist(&best_artist, &normalised_name)
+        let potentials = Psql::get()?
+            .fuzzy_search_artist(&best_artist, normalised_name)
             .await?;
 
         fuzzy::winkliest_match(normalised_name, potentials)
@@ -82,11 +82,11 @@ impl MTG {
         let start = Instant::now();
 
         let found_card = if let Some(set_code) = &query.set_code {
-            self.search_set_abbreviation(&set_code, &query.name).await?
+            self.search_set_abbreviation(set_code, &query.name).await?
         } else if let Some(set_name) = &query.set_name {
-            self.search_set_name(&set_name, &query.name).await?
+            self.search_set_name(set_name, &query.name).await?
         } else if let Some(artist) = &query.artist {
-            self.search_artist(&artist, &query.name).await?
+            self.search_artist(artist, &query.name).await?
         } else {
             self.search_distinct_cards(&query.name).await?
         };
