@@ -115,11 +115,7 @@ impl FuzzyFound {
             let url = self.back_scryfall_url.unwrap_or_default();
             Some(
                 CreateEmbed::default()
-                    .attachment(format!(
-                        "{}.png",
-                        self.back_image_id
-                            .unwrap_or_default()
-                    ))
+                    .attachment(format!("{}.png", self.back_image_id.unwrap_or_default()))
                     .url(url)
                     .title(title)
                     .description(back_rules_text)
@@ -270,12 +266,8 @@ impl Psql {
                 None
             }
             Ok(row) => {
-                if let Ok(row) = row.try_get::<Vec<String>, &str>("array_agg") {
-                    Some(row)
-                } else {
-                    None
-                }
-            },
+                row.try_get::<Vec<String>, &str>("array_agg").ok()
+            }
         }
     }
 
@@ -290,12 +282,8 @@ impl Psql {
                 None
             }
             Ok(row) => {
-                if let Ok(row) = row.try_get::<Vec<String>, &str>("array_agg") {
-                    Some(row)
-                } else {
-                    None
-                }
-            },
+                row.try_get::<Vec<String>, &str>("array_agg").ok()
+            }
         }
     }
 
@@ -371,7 +359,9 @@ impl QueryParams {
             None => (None, None),
         };
 
-        let artist = capture.get(7).map(|artist| utils::normalise(artist.as_str()));
+        let artist = capture
+            .get(7)
+            .map(|artist| utils::normalise(artist.as_str()));
 
         Some(Self {
             name,
