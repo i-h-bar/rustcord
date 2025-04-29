@@ -265,9 +265,7 @@ impl Psql {
                 log::warn!("Failed set name fetch - {why}");
                 None
             }
-            Ok(row) => {
-                row.try_get::<Vec<String>, &str>("array_agg").ok()
-            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
         }
     }
 
@@ -281,9 +279,7 @@ impl Psql {
                 log::warn!("Failed artist fetch - {why}");
                 None
             }
-            Ok(row) => {
-                row.try_get::<Vec<String>, &str>("array_agg").ok()
-            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
         }
     }
 
