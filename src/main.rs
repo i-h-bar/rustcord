@@ -3,7 +3,10 @@ extern crate core;
 use std::env;
 
 use dotenv::dotenv;
-use serenity::all::{Command, CreateInteractionResponse, CreateInteractionResponseMessage, GatewayIntents, Interaction, Message, Ready};
+use serenity::all::{
+    Command, CreateInteractionResponse, CreateInteractionResponseMessage, GatewayIntents,
+    Interaction, Message, Ready,
+};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
@@ -45,21 +48,19 @@ impl EventHandler for Handler {
             }
         }
     }
-    
+
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
             log::info!("Received command: {command:#?}");
-            
+
             let content = match command.data.name.as_str() {
-                "play" => {
-                    match commands::play::run(&ctx, &command).await {
-                        Err(e) => Some(e.to_string()),
-                        Ok(_) => None
-                    }
-                }
-                _ => Some(format!("Unknown command: {command:#?}"))
+                "play" => match commands::play::run(&ctx, &command).await {
+                    Err(e) => Some(e.to_string()),
+                    Ok(_) => None,
+                },
+                _ => Some(format!("Unknown command: {command:#?}")),
             };
-            
+
             if let Some(content) = content {
                 let data = CreateInteractionResponseMessage::new().content(content);
                 let builder = CreateInteractionResponse::Message(data);

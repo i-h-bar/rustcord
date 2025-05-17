@@ -1,10 +1,12 @@
 use serenity::all::{CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption};
 use serenity::prelude::*;
 
-pub(crate) async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
+pub(crate) async fn run(
+    ctx: &Context,
+    interaction: &CommandInteraction,
+) -> Result<(), serenity::Error> {
     Ok(())
 }
-
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("play")
