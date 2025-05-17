@@ -6,7 +6,7 @@ use tokio::time::Instant;
 use crate::db::Psql;
 use crate::mtg::db::{FuzzyFound, QueryParams};
 use crate::mtg::images::ImageFetcher;
-use crate::utils::{fuzzy, REGEX_COLLECTION};
+use crate::utils::{fuzzy, fuzzy_match_set_name, REGEX_COLLECTION};
 
 pub type CardAndImage = (
     FuzzyFound,
@@ -58,10 +58,7 @@ impl MTG {
         normalised_set_name: &str,
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
-        let potentials = Psql::get()?
-            .fuzzy_search_set_name(normalised_set_name)
-            .await?;
-        let set_name = fuzzy::winkliest_match(normalised_set_name, potentials)?;
+        let set_name = fuzzy_match_set_name(normalised_set_name).await?;
         let potentials = Psql::get()?
             .fuzzy_search_set(&set_name, normalised_name)
             .await?;

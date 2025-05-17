@@ -2,9 +2,7 @@ mod queries;
 
 use crate::db::Psql;
 use crate::emoji::add_emoji;
-use crate::mtg::db::queries::{
-    FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
-};
+use crate::mtg::db::queries::{FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD_FROM_DISTINCT};
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
@@ -18,7 +16,7 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 pub struct FuzzyFound {
-    front_name: String,
+    pub front_name: String,
     front_normalised_name: String,
     front_scryfall_url: String,
     front_image_id: Uuid,
@@ -328,6 +326,59 @@ impl Psql {
                 .into_iter()
                 .map(|row| FuzzyFound::from_row(&row).ok())
                 .collect(),
+        }
+    }
+    
+    pub async fn random_distinct_card(&self) -> Option<FuzzyFound> {
+        match sqlx::query(RANDOM_CARD_FROM_DISTINCT).fetch_one(&self.pool).await {
+            Err(why) => {
+                log::warn!("Failed random card fetch - {why}");
+                None
+            }
+            Ok(row) => FuzzyFound::from_row(&row).ok()
+        }
+    }
+
+    pub async fn random_card_from_set(
+        &self,
+        set_name: &str,
+    ) -> Option<FuzzyFound> {
+        match sqlx::query(&format!(
+            r#"
+            select  front_name,
+                    front_normalised_name,
+                    front_scryfall_url,
+                    front_image_id,
+                    front_mana_cost,
+                    front_colour_identity,
+                    front_power,
+                    front_toughness,
+                    front_loyalty,
+                    front_defence,
+                    front_type_line,
+                    front_oracle_text,
+                    back_name,
+                    back_scryfall_url,
+                    back_image_id,
+                    back_mana_cost,
+                    back_colour_identity,
+                    back_power,
+                    back_toughness,
+                    back_loyalty,
+                    back_defence,
+                    back_type_line,
+                    back_oracle_text
+            from set_{} order by random() limit 1;"#,
+            set_name.replace(" ", "_")
+        ))
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
     }
 }

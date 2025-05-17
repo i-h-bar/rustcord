@@ -1,10 +1,35 @@
-use serenity::all::{CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption};
+use serenity::all::{CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage, ResolvedValue};
 use serenity::prelude::*;
+use crate::db::Psql;
+use crate::utils::fuzzy_match_set_name;
 
 pub(crate) async fn run(
     ctx: &Context,
     interaction: &CommandInteraction,
 ) -> Result<(), serenity::Error> {
+    let options = interaction.data.options();
+    let db = Psql::get().ok_or(serenity::Error::Other(""))?;
+    let random_card = if options.is_empty() {
+        db.random_distinct_card().await
+    } else {
+        let set_name = options.get(0).ok_or(serenity::Error::Other(""))?;
+        let set_name = match set_name.value {
+            ResolvedValue::String(name) => Ok(name),
+            _ => Err(serenity::Error::Other("")),
+        }?;
+        
+        let set_name = fuzzy_match_set_name(set_name).await.ok_or(serenity::Error::Other(""))?;
+        db.random_card_from_set(&set_name).await
+    };
+    
+    if let Some(card) = random_card {
+        let response = CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(&card.front_name));
+        interaction.create_response(&ctx.http, response).await?;
+    } else {
+        return Err(serenity::Error::Other(""))
+    }
+    
+    println!("{:?}", options);
     Ok(())
 }
 
