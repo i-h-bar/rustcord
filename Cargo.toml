@@ -1,6 +1,6 @@
 [package]
 name = "rustcord"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]
@@ -16,9 +16,9 @@ unicode-normalization = "0.1.24"
 once_cell = "1.20.2"
 
 [dev-dependencies]
-pre-commit-hooks = "0.3"
+pre-commit = "0.5.2"
 
 [package.metadata.precommit]
-fmt = "cargo fmt"
-sort = "cargo sort"
-cippy = "cargo clippy -w"
+fmt = "cargo fmt -- --write-mode diff 2>&1"
+clippy = "cargo clippy -- -D warning 2>&1"
+test = "cargo test 2>&1"
