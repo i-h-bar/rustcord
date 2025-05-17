@@ -1,7 +1,6 @@
 pub mod colours;
 pub(crate) mod fuzzy;
 
-use log;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serenity::all::{Context, CreateMessage, Message};

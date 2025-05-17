@@ -1,6 +1,6 @@
 mod queries;
 
-use crate::db::PSQL;
+use crate::db::Psql;
 use crate::emoji::add_emoji;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
@@ -64,17 +64,17 @@ impl FuzzyFound {
 
         let front_oracle_text = REGEX_COLLECTION
             .symbols
-            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(&cap));
+            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(cap));
         let front_oracle_text = italicise_reminder_text(&front_oracle_text);
 
         let rules_text = format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats);
         let mana_cost = REGEX_COLLECTION
             .symbols
-            .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(&cap));
+            .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
         let title = format!("{}        {}", self.front_name, mana_cost);
 
         let front = CreateEmbed::default()
-            .attachment(format!("{}.png", self.front_image_id.to_string()))
+            .attachment(format!("{}.png", self.front_image_id))
             .url(self.front_scryfall_url)
             .title(title)
             .description(rules_text)
@@ -91,41 +91,36 @@ impl FuzzyFound {
             } else {
                 "".to_string()
             };
-            let back_oracle_text = self.back_oracle_text.unwrap_or_else(|| "".to_string());
+            let back_oracle_text = self.back_oracle_text.unwrap_or_default();
             let back_oracle_text = REGEX_COLLECTION
                 .symbols
-                .replace_all(&back_oracle_text, |cap: &Captures| add_emoji(&cap));
+                .replace_all(&back_oracle_text, |cap: &Captures| add_emoji(cap));
             let back_oracle_text = italicise_reminder_text(&back_oracle_text);
 
             let back_rules_text = format!(
                 "{}\n\n{}{}",
-                self.back_type_line.unwrap_or_else(|| "".to_string()),
+                self.back_type_line.unwrap_or_default(),
                 back_oracle_text,
                 stats
             );
             let title = if let Some(mana_cost) = self.back_mana_cost {
                 let mana_cost = REGEX_COLLECTION
                     .symbols
-                    .replace_all(&mana_cost, |cap: &Captures| add_emoji(&cap));
+                    .replace_all(&mana_cost, |cap: &Captures| add_emoji(cap));
                 format!("{}        {}", name, mana_cost)
             } else {
                 name
             };
 
-            let url = self.back_scryfall_url.unwrap_or_else(|| "".to_string());
+            let url = self.back_scryfall_url.unwrap_or_default();
             Some(
                 CreateEmbed::default()
-                    .attachment(format!(
-                        "{}.png",
-                        self.back_image_id
-                            .unwrap_or_else(|| Uuid::default())
-                            .to_string()
-                    ))
+                    .attachment(format!("{}.png", self.back_image_id.unwrap_or_default()))
                     .url(url)
                     .title(title)
                     .description(back_rules_text)
                     .colour(get_colour_identity(
-                        self.back_colour_identity.unwrap_or_else(|| Vec::new()),
+                        self.back_colour_identity.unwrap_or_default(),
                     )),
             )
         } else {
@@ -180,10 +175,10 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
     }
 }
 
-impl PSQL {
+impl Psql {
     pub async fn fuzzy_search_distinct(&self, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
-            .bind(&normalised_name)
+            .bind(normalised_name)
             .fetch_all(&self.pool)
             .await
         {
@@ -200,7 +195,7 @@ impl PSQL {
 
     pub async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
         match sqlx::query(NORMALISED_SET_NAME)
-            .bind(&abbreviation)
+            .bind(abbreviation)
             .fetch_one(&self.pool)
             .await
         {
@@ -245,7 +240,7 @@ impl PSQL {
             from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             set_name.replace(" ", "_")
         ))
-        .bind(&normalised_name)
+        .bind(normalised_name)
         .fetch_all(&self.pool)
         .await
         {
@@ -262,7 +257,7 @@ impl PSQL {
 
     pub async fn fuzzy_search_set_name(&self, normalised_name: &str) -> Option<Vec<String>> {
         match sqlx::query(FUZZY_SEARCH_SET_NAME)
-            .bind(&normalised_name)
+            .bind(normalised_name)
             .fetch_one(&self.pool)
             .await
         {
@@ -270,19 +265,13 @@ impl PSQL {
                 log::warn!("Failed set name fetch - {why}");
                 None
             }
-            Ok(row) => {
-                if let Ok(row) = row.try_get::<Vec<String>, &str>("array_agg") {
-                    Some(row)
-                } else {
-                    None
-                }
-            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
         }
     }
 
     pub async fn fuzzy_search_for_artist(&self, normalised_name: &str) -> Option<Vec<String>> {
         match sqlx::query(FUZZY_SEARCH_ARTIST)
-            .bind(&normalised_name)
+            .bind(normalised_name)
             .fetch_one(&self.pool)
             .await
         {
@@ -290,13 +279,7 @@ impl PSQL {
                 log::warn!("Failed artist fetch - {why}");
                 None
             }
-            Ok(row) => {
-                if let Ok(row) = row.try_get::<Vec<String>, &str>("array_agg") {
-                    Some(row)
-                } else {
-                    None
-                }
-            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
         }
     }
 
@@ -333,7 +316,7 @@ impl PSQL {
             from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             artist.replace(" ", "_")
         ))
-        .bind(&normalised_name)
+        .bind(normalised_name)
         .fetch_all(&self.pool)
         .await
         {
@@ -356,10 +339,10 @@ pub struct QueryParams {
     pub artist: Option<String>,
 }
 
-impl<'a> QueryParams {
-    pub fn from(capture: Captures<'a>) -> Option<Self> {
+impl QueryParams {
+    pub fn from(capture: Captures<'_>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str();
-        let name = utils::normalise(&raw_name);
+        let name = utils::normalise(raw_name);
         let (set_code, set_name) = match capture.get(4) {
             Some(set) => {
                 let set = set.as_str();
@@ -372,10 +355,9 @@ impl<'a> QueryParams {
             None => (None, None),
         };
 
-        let artist = match capture.get(7) {
-            Some(artist) => Some(utils::normalise(&artist.as_str())),
-            None => None,
-        };
+        let artist = capture
+            .get(7)
+            .map(|artist| utils::normalise(artist.as_str()));
 
         Some(Self {
             name,

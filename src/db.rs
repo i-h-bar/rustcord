@@ -3,14 +3,14 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use std::env;
 
-static DB_INSTANCE: OnceCell<PSQL> = OnceCell::new();
+static DB_INSTANCE: OnceCell<Psql> = OnceCell::new();
 
 #[derive(Debug)]
-pub struct PSQL {
+pub struct Psql {
     pub(crate) pool: Pool<Postgres>,
 }
 
-impl PSQL {
+impl Psql {
     pub async fn init() {
         let instance = Self::new().await;
         DB_INSTANCE
