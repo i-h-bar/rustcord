@@ -1,4 +1,4 @@
 
 lint:
 	@cargo fmt
-	@cargo clippy -- -D warning
+	@cargo clippy -- -D warnings
