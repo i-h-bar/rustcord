@@ -7,12 +7,12 @@ pub mod db;
 mod images;
 pub mod search;
 
-impl<'a> Handler {
-    pub async fn card_response(&'a self, card: Option<CardAndImage>, msg: &Message, ctx: &Context) {
+impl Handler {
+    pub async fn card_response(&self, card: Option<CardAndImage>, msg: &Message, ctx: &Context) {
         match card {
-            None => utils::send("Failed to find card :(", &msg, &ctx).await,
+            None => utils::send("Failed to find card :(", msg, ctx).await,
             Some((card, (front_image, back_image))) => {
-                self.send_embed(card, front_image, back_image, &msg, &ctx)
+                self.send_embed(card, front_image, back_image, msg, ctx)
                     .await;
             }
         }
@@ -34,7 +34,7 @@ impl<'a> Handler {
         }
         .add_embed(front);
 
-        utils::send_message(message, &msg, &ctx).await;
+        utils::send_message(message, msg, ctx).await;
 
         if let Some(back) = back {
             let message = if let Some(back_image) = back_image {
@@ -44,7 +44,7 @@ impl<'a> Handler {
             }
             .add_embed(back);
 
-            utils::send_message(message, &msg, &ctx).await;
+            utils::send_message(message, msg, ctx).await;
         }
     }
 }

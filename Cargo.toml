@@ -14,11 +14,3 @@ log = "0.4.22"
 env_logger = "0.11.5"
 unicode-normalization = "0.1.24"
 once_cell = "1.20.2"
-
-[dev-dependencies]
-pre-commit = "0.5.2"
-
-[package.metadata.precommit]
-fmt = "cargo fmt -- --write-mode diff 2>&1"
-clippy = "cargo clippy -- -D warning 2>&1"
-test = "cargo test 2>&1"

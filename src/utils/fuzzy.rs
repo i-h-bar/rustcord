@@ -101,7 +101,7 @@ pub fn winkliest_match<
             let distance = jaro_winkler(&target, &needle);
             (distance, needle)
         })
-        .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less))?;
+        .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
 
     Some(closest_match)
 }

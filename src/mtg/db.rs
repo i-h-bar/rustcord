@@ -276,7 +276,7 @@ impl PSQL {
                 } else {
                     None
                 }
-            },
+            }
         }
     }
 
@@ -296,7 +296,7 @@ impl PSQL {
                 } else {
                     None
                 }
-            },
+            }
         }
     }
 
