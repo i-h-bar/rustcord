@@ -2,7 +2,10 @@ mod queries;
 
 use crate::db::Psql;
 use crate::emoji::add_emoji;
-use crate::mtg::db::queries::{FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD_FROM_DISTINCT};
+use crate::mtg::db::queries::{
+    FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
+    RANDOM_CARD_FROM_DISTINCT,
+};
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
@@ -328,21 +331,21 @@ impl Psql {
                 .collect(),
         }
     }
-    
+
     pub async fn random_distinct_card(&self) -> Option<FuzzyFound> {
-        match sqlx::query(RANDOM_CARD_FROM_DISTINCT).fetch_one(&self.pool).await {
+        match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
+            .fetch_one(&self.pool)
+            .await
+        {
             Err(why) => {
                 log::warn!("Failed random card fetch - {why}");
                 None
             }
-            Ok(row) => FuzzyFound::from_row(&row).ok()
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
     }
 
-    pub async fn random_card_from_set(
-        &self,
-        set_name: &str,
-    ) -> Option<FuzzyFound> {
+    pub async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
         match sqlx::query(&format!(
             r#"
             select  front_name,
@@ -371,8 +374,8 @@ impl Psql {
             from set_{} order by random() limit 1;"#,
             set_name.replace(" ", "_")
         ))
-            .fetch_one(&self.pool)
-            .await
+        .fetch_one(&self.pool)
+        .await
         {
             Err(why) => {
                 log::warn!("Failed search set fetch - {why}");

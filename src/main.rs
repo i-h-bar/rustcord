@@ -51,14 +51,21 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
-            log::info!("Received command: {:?} from {}", command.data.name, command.channel_id);
+            log::info!(
+                "Received command: {:?} from {}",
+                command.data.name,
+                command.channel_id
+            );
 
             let content = match command.data.name.as_str() {
                 "play" => match commands::play::run(&ctx, &command).await {
                     Err(e) => Some(e.to_string()),
                     Ok(_) => None,
                 },
-                _ => Some(format!("Unknown command: {:?} from {}", command.data.name, command.channel_id)),
+                _ => Some(format!(
+                    "Unknown command: {:?} from {}",
+                    command.data.name, command.channel_id
+                )),
             };
 
             if let Some(content) = content {
