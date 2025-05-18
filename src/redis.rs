@@ -1,4 +1,4 @@
-use redis::{AsyncCommands, Client, ToRedisArgs};
+use redis::{AsyncCommands, Client, SetExpiry, SetOptions, ToRedisArgs};
 use std::env;
 use tokio::sync::OnceCell;
 
@@ -20,7 +20,6 @@ impl Redis {
     async fn new() -> Self {
         let url = env::var("REDIS_URL").expect("REDIS_URL must be set");
         let client = Client::open(url).expect("failed to open redis client");
-
         Self { client }
     }
 
@@ -36,7 +35,7 @@ impl Redis {
         self.client
             .get_multiplexed_async_connection()
             .await?
-            .set(key, value)
+            .set_options(key, value, SetOptions::default().with_expiration(SetExpiry::EX(3600)))
             .await
     }
 }
