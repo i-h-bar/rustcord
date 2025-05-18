@@ -12,7 +12,7 @@ use crate::utils::fuzzy::ToChars;
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
-use serenity::all::CreateEmbed;
+use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
@@ -46,6 +46,7 @@ pub struct FuzzyFound {
     back_defence: Option<String>,
     back_type_line: Option<String>,
     back_oracle_text: Option<String>,
+    artist: String,
 }
 
 impl FuzzyFound {
@@ -90,7 +91,8 @@ impl FuzzyFound {
             .url(self.front_scryfall_url)
             .title(title)
             .description(rules_text)
-            .colour(get_colour_identity(self.front_colour_identity));
+            .colour(get_colour_identity(self.front_colour_identity))
+            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
 
         let back = if let Some(name) = self.back_name {
             let stats = if let Some(power) = self.back_power {
@@ -133,7 +135,8 @@ impl FuzzyFound {
                     .description(back_rules_text)
                     .colour(get_colour_identity(
                         self.back_colour_identity.unwrap_or_default(),
-                    )),
+                    ))
+                    .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist))),
             )
         } else {
             None
@@ -146,9 +149,13 @@ impl FuzzyFound {
 
     pub fn to_initial_game_embed(&self) -> CreateEmbed {
         CreateEmbed::default()
-            .attachment(format!("{}.png", self.front_illustration_id.unwrap_or_default()))
+            .attachment(format!(
+                "{}.png",
+                self.front_illustration_id.unwrap_or_default()
+            ))
             .title("????")
             .description("????")
+            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)))
     }
 }
 
@@ -192,6 +199,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_defence: row.get::<Option<String>, &str>("back_defence"),
             back_type_line: row.get::<Option<String>, &str>("back_type_line"),
             back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
+            artist: row.get::<String, &str>("artist"),
         })
     }
 }

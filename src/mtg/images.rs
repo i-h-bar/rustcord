@@ -51,7 +51,7 @@ async fn fetch_image(
     image_dir: &str,
     (front_id, back_id): (Option<&Uuid>, Option<&Uuid>),
 ) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
-    let front = if let  Some(front_id) = front_id {
+    let front = if let Some(front_id) = front_id {
         let image = tokio::fs::read(format!("{}{}.png", image_dir, front_id))
             .await
             .ok();
