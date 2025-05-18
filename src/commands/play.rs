@@ -48,7 +48,7 @@ pub(crate) async fn run(
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
 
-        if Redis::get()
+        if Redis::instance()
             .ok_or(serenity::Error::Other("Error contacting redis"))?
             .set(
                 interaction.channel_id.to_string(),

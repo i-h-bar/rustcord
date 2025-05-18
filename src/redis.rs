@@ -1,4 +1,4 @@
-use redis::{AsyncCommands, Client, SetExpiry, SetOptions, ToRedisArgs};
+use redis::{AsyncCommands, Client, FromRedisValue, SetExpiry, SetOptions, ToRedisArgs};
 use std::env;
 use tokio::sync::OnceCell;
 
@@ -23,8 +23,21 @@ impl Redis {
         Self { client }
     }
 
-    pub fn get() -> Option<&'static Self> {
+    pub fn instance() -> Option<&'static Self> {
         REDIS_INSTANCE.get()
+    }
+
+    pub async fn get<K: ToRedisArgs + Send + Sync, V: FromRedisValue + Send + Sync>(
+        &self,
+        key: K,
+    ) -> Option<V> {
+        self.client
+            .get_multiplexed_async_connection()
+            .await
+            .ok()?
+            .get(key)
+            .await
+            .ok()?
     }
 
     pub async fn set<K: ToRedisArgs + Send + Sync, V: ToRedisArgs + Send + Sync>(
@@ -35,7 +48,11 @@ impl Redis {
         self.client
             .get_multiplexed_async_connection()
             .await?
-            .set_options(key, value, SetOptions::default().with_expiration(SetExpiry::EX(86400)))
+            .set_options(
+                key,
+                value,
+                SetOptions::default().with_expiration(SetExpiry::EX(86400)),
+            )
             .await
     }
 }
