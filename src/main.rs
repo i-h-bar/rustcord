@@ -23,6 +23,7 @@ mod game;
 mod help;
 pub mod mtg;
 mod utils;
+mod redis;
 
 struct Handler {
     mtg: MTG,
