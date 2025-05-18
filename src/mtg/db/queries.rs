@@ -18,5 +18,5 @@ where word_similarity(normalised_name, $1) > 0.50
 pub const NORMALISED_SET_NAME: &str = r#"select normalised_name from set where abbreviation = $1"#;
 
 pub const RANDOM_CARD_FROM_DISTINCT: &str = r#"
-select * from distinct_cards order by random() limit 1;
+select * from distinct_cards where front_illustration_id is not null order by random() limit 1;
 "#;

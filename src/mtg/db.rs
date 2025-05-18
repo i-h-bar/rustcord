@@ -25,7 +25,7 @@ pub struct FuzzyFound {
     front_normalised_name: String,
     front_scryfall_url: String,
     front_image_id: Uuid,
-    front_illustration_id: Uuid,
+    front_illustration_id: Option<Uuid>,
     front_mana_cost: String,
     front_colour_identity: Vec<String>,
     front_power: Option<String>,
@@ -49,13 +49,13 @@ pub struct FuzzyFound {
 }
 
 impl FuzzyFound {
-    pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
-        (&self.front_image_id, self.back_image_id.as_ref())
+    pub fn image_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
+        (Some(&self.front_image_id), self.back_image_id.as_ref())
     }
 
-    pub fn illustration_ids(&self) -> (&Uuid, Option<&Uuid>) {
+    pub fn illustration_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
         (
-            &self.front_illustration_id,
+            self.front_illustration_id.as_ref(),
             self.back_illustration_id.as_ref(),
         )
     }
@@ -146,7 +146,7 @@ impl FuzzyFound {
 
     pub fn to_initial_game_embed(&self) -> CreateEmbed {
         CreateEmbed::default()
-            .attachment(format!("{}.png", self.front_illustration_id))
+            .attachment(format!("{}.png", self.front_illustration_id.unwrap_or_default()))
             .title("????")
             .description("????")
     }
@@ -171,7 +171,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
             front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
             front_image_id: row.get::<Uuid, &str>("front_image_id"),
-            front_illustration_id: row.get::<Uuid, &str>("front_illustration_id"),
+            front_illustration_id: row.get::<Option<Uuid>, &str>("front_illustration_id"),
             front_mana_cost: row.get::<String, &str>("front_mana_cost"),
             front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
             front_power: row.get::<Option<String>, &str>("front_power"),
@@ -319,7 +319,7 @@ impl Psql {
 
     pub async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
         match sqlx::query(&format!(
-            r#"select * from set_{} order by random() limit 1;"#,
+            r#"select * from set_{} where front_illustration_id is not null order by random() limit 1;"#,
             set_name.replace(" ", "_")
         ))
         .fetch_one(&self.pool)

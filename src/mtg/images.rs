@@ -49,13 +49,17 @@ impl ImageFetcher {
 
 async fn fetch_image(
     image_dir: &str,
-    (front_id, back_id): (&Uuid, Option<&Uuid>),
+    (front_id, back_id): (Option<&Uuid>, Option<&Uuid>),
 ) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
-    let image = tokio::fs::read(format!("{}{}.png", image_dir, front_id))
-        .await
-        .ok();
+    let front = if let  Some(front_id) = front_id {
+        let image = tokio::fs::read(format!("{}{}.png", image_dir, front_id))
+            .await
+            .ok();
 
-    let front = image.map(|image| CreateAttachment::bytes(image, format!("{}.png", front_id)));
+        image.map(|image| CreateAttachment::bytes(image, format!("{}.png", front_id)))
+    } else {
+        None
+    };
 
     let back = if let Some(back_id) = back_id {
         let image = tokio::fs::read(format!("{}{}.png", image_dir, &back_id))
