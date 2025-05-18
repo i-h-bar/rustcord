@@ -13,15 +13,11 @@ pub type CardAndImage = (
     (Option<CreateAttachment>, Option<CreateAttachment>),
 );
 
-pub struct MTG {
-    images: ImageFetcher,
-}
+pub struct MTG {}
 
 impl MTG {
     pub async fn new() -> Self {
-        let images = ImageFetcher::new();
-
-        Self { images }
+        Self {}
     }
 
     pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardAndImage>> {
@@ -94,7 +90,7 @@ impl MTG {
             start.elapsed().as_millis()
         );
 
-        let images = self.images.fetch(&found_card).await;
+        let images = ImageFetcher::get()?.fetch(&found_card).await;
 
         Some((found_card, images))
     }
