@@ -35,7 +35,7 @@ impl Redis {
         self.client
             .get_multiplexed_async_connection()
             .await?
-            .set_options(key, value, SetOptions::default().with_expiration(SetExpiry::EX(3600)))
+            .set_options(key, value, SetOptions::default().with_expiration(SetExpiry::EX(86400)))
             .await
     }
 }
