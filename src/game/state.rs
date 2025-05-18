@@ -1,12 +1,15 @@
 use crate::mtg::db::FuzzyFound;
-use serenity::all::{CreateAttachment, CreateEmbed};
+use serde::{Deserialize, Serialize};
+use serenity::all::CreateEmbed;
 
+#[derive(Debug, Deserialize, Serialize)]
 pub enum Difficulty {
     Easy,
     Medium,
     Hard,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GameState {
     card: FuzzyFound,
     difficulty: Difficulty,
@@ -14,10 +17,7 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn from(
-        card: FuzzyFound,
-        difficulty: Difficulty,
-    ) -> Self {
+    pub fn from(card: FuzzyFound, difficulty: Difficulty) -> Self {
         Self {
             card,
             difficulty,

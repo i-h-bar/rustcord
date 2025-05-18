@@ -11,6 +11,7 @@ use crate::utils::colours::get_colour_identity;
 use crate::utils::fuzzy::ToChars;
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
+use serde::{Deserialize, Serialize};
 use serenity::all::CreateEmbed;
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
@@ -18,6 +19,7 @@ use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct FuzzyFound {
     pub front_name: String,
     front_normalised_name: String,

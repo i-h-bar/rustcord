@@ -15,6 +15,7 @@ use crate::db::Psql;
 use crate::help::HELP;
 use crate::mtg::images::ImageFetcher;
 use crate::mtg::search::MTG;
+use crate::redis::Redis;
 
 mod commands;
 mod db;
@@ -22,8 +23,8 @@ pub mod emoji;
 mod game;
 mod help;
 pub mod mtg;
+pub mod redis;
 mod utils;
-mod redis;
 
 struct Handler {
     mtg: MTG,
@@ -95,6 +96,7 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
     Psql::init().await;
+    Redis::init().await;
     ImageFetcher::init();
 
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");

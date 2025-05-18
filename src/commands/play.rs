@@ -1,6 +1,7 @@
 use crate::db::Psql;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
+use crate::redis::Redis;
 use crate::utils::fuzzy_match_set_name;
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
@@ -46,6 +47,18 @@ pub(crate) async fn run(
 
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
+
+        if Redis::get()
+            .ok_or(serenity::Error::Other("Error contacting redis"))?
+            .set(
+                interaction.channel_id.to_string(),
+                ron::to_string(&game_state).unwrap(),
+            )
+            .await
+            .is_err()
+        {
+            return Err(serenity::Error::Other("Could not save game state."));
+        };
     } else {
         return Err(serenity::Error::Other("Could not respond to interaction."));
     }
