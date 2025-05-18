@@ -23,6 +23,7 @@ pub struct FuzzyFound {
     front_normalised_name: String,
     front_scryfall_url: String,
     front_image_id: Uuid,
+    front_illustration_id: Uuid,
     front_mana_cost: String,
     front_colour_identity: Vec<String>,
     front_power: Option<String>,
@@ -34,6 +35,7 @@ pub struct FuzzyFound {
     back_name: Option<String>,
     back_scryfall_url: Option<String>,
     back_image_id: Option<Uuid>,
+    back_illustration_id: Option<Uuid>,
     back_mana_cost: Option<String>,
     back_colour_identity: Option<Vec<String>>,
     back_power: Option<String>,
@@ -47,6 +49,10 @@ pub struct FuzzyFound {
 impl FuzzyFound {
     pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
         (&self.front_image_id, self.back_image_id.as_ref())
+    }
+    
+    pub fn illustration_ids(&self) -> (&Uuid, Option<&Uuid>) {
+        (&self.front_illustration_id, self.back_illustration_id.as_ref())
     }
 
     pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
@@ -153,6 +159,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
             front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
             front_image_id: row.get::<Uuid, &str>("front_image_id"),
+            front_illustration_id: row.get::<Uuid, &str>("front_illustration_id"),
             front_mana_cost: row.get::<String, &str>("front_mana_cost"),
             front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
             front_power: row.get::<Option<String>, &str>("front_power"),
@@ -164,6 +171,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_name: row.get::<Option<String>, &str>("back_name"),
             back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
             back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
+            back_illustration_id: row.get::<Option<Uuid>, &str>("back_illustration_id"),
             back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
             back_colour_identity: row.get::<Option<Vec<String>>, &str>("back_colour_identity"),
             back_power: row.get::<Option<String>, &str>("back_power"),
@@ -214,31 +222,7 @@ impl Psql {
         normalised_name: &str,
     ) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(&format!(
-            r#"
-            select  front_name,
-                    front_normalised_name,
-                    front_scryfall_url,
-                    front_image_id,
-                    front_mana_cost,
-                    front_colour_identity,
-                    front_power,
-                    front_toughness,
-                    front_loyalty,
-                    front_defence,
-                    front_type_line,
-                    front_oracle_text,
-                    back_name,
-                    back_scryfall_url,
-                    back_image_id,
-                    back_mana_cost,
-                    back_colour_identity,
-                    back_power,
-                    back_toughness,
-                    back_loyalty,
-                    back_defence,
-                    back_type_line,
-                    back_oracle_text
-            from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            r#"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             set_name.replace(" ", "_")
         ))
         .bind(normalised_name)
@@ -290,31 +274,7 @@ impl Psql {
         normalised_name: &str,
     ) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(&format!(
-            r#"
-            select  front_name,
-                    front_normalised_name,
-                    front_scryfall_url,
-                    front_image_id,
-                    front_mana_cost,
-                    front_colour_identity,
-                    front_power,
-                    front_toughness,
-                    front_loyalty,
-                    front_defence,
-                    front_type_line,
-                    front_oracle_text,
-                    back_name,
-                    back_scryfall_url,
-                    back_image_id,
-                    back_mana_cost,
-                    back_colour_identity,
-                    back_power,
-                    back_toughness,
-                    back_loyalty,
-                    back_defence,
-                    back_type_line,
-                    back_oracle_text
-            from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            r#"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             artist.replace(" ", "_")
         ))
         .bind(normalised_name)
@@ -347,31 +307,7 @@ impl Psql {
 
     pub async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
         match sqlx::query(&format!(
-            r#"
-            select  front_name,
-                    front_normalised_name,
-                    front_scryfall_url,
-                    front_image_id,
-                    front_mana_cost,
-                    front_colour_identity,
-                    front_power,
-                    front_toughness,
-                    front_loyalty,
-                    front_defence,
-                    front_type_line,
-                    front_oracle_text,
-                    back_name,
-                    back_scryfall_url,
-                    back_image_id,
-                    back_mana_cost,
-                    back_colour_identity,
-                    back_power,
-                    back_toughness,
-                    back_loyalty,
-                    back_defence,
-                    back_type_line,
-                    back_oracle_text
-            from set_{} order by random() limit 1;"#,
+            r#"select * from set_{} order by random() limit 1;"#,
             set_name.replace(" ", "_")
         ))
         .fetch_one(&self.pool)

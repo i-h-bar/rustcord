@@ -13,6 +13,7 @@ use serenity::prelude::*;
 
 use crate::db::Psql;
 use crate::help::HELP;
+use crate::mtg::images::ImageFetcher;
 use crate::mtg::search::MTG;
 
 mod commands;
@@ -93,6 +94,7 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
     Psql::init().await;
+    ImageFetcher::init();
 
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES

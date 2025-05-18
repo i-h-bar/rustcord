@@ -1,10 +1,12 @@
 use crate::db::Psql;
 use crate::utils::fuzzy_match_set_name;
+use crate::mtg::images::ImageFetcher;
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, ResolvedValue,
 };
 use serenity::prelude::*;
+
 
 pub(crate) async fn run(
     ctx: &Context,
@@ -30,9 +32,15 @@ pub(crate) async fn run(
     };
 
     if let Some(card) = random_card {
-        let response = CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(&card.front_name),
-        );
+        let (front_image, _) = ImageFetcher::get().ok_or(serenity::Error::Other(""))?.fetch_illustration(&card).await;
+        let (front, _) = card.to_embed();
+        let response = if let Some(front_image) = front_image {
+            CreateInteractionResponseMessage::new().add_file(front_image)
+        } else {
+            CreateInteractionResponseMessage::new()
+        }.add_embed(front);
+        
+        let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
     } else {
         return Err(serenity::Error::Other("Could not respond to interaction."));

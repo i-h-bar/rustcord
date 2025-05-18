@@ -4,7 +4,7 @@ use crate::{utils, Handler};
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 
 pub mod db;
-mod images;
+pub(crate) mod images;
 pub mod search;
 
 impl Handler {
