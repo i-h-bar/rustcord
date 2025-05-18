@@ -11,22 +11,16 @@ pub struct GameState {
     card: FuzzyFound,
     difficulty: Difficulty,
     guess_number: usize,
-    image: CreateAttachment,
-    pub(crate) illustration: CreateAttachment,
 }
 
 impl GameState {
     pub fn from(
         card: FuzzyFound,
         difficulty: Difficulty,
-        image: CreateAttachment,
-        illustration: CreateAttachment,
     ) -> Self {
         Self {
             card,
             difficulty,
-            image,
-            illustration,
             guess_number: 0,
         }
     }

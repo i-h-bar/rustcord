@@ -36,15 +36,12 @@ pub(crate) async fn run(
         let (Some(illustration), _) = image_fetcher.fetch_illustration(&card).await else {
             return Err(serenity::Error::Other("Cannot fetch illustration data."));
         };
-        let (Some(image), _) = image_fetcher.fetch(&card).await else {
-            return Err(serenity::Error::Other("No image found"));
-        };
 
-        let game_state = GameState::from(card, Difficulty::Easy, image, illustration);
+        let game_state = GameState::from(card, Difficulty::Easy);
 
         let front = game_state.to_embed();
         let response = CreateInteractionResponseMessage::new()
-            .add_file(game_state.illustration)
+            .add_file(illustration)
             .add_embed(front);
 
         let response = CreateInteractionResponse::Message(response);
