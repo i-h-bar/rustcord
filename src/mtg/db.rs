@@ -50,9 +50,12 @@ impl FuzzyFound {
     pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
         (&self.front_image_id, self.back_image_id.as_ref())
     }
-    
+
     pub fn illustration_ids(&self) -> (&Uuid, Option<&Uuid>) {
-        (&self.front_illustration_id, self.back_illustration_id.as_ref())
+        (
+            &self.front_illustration_id,
+            self.back_illustration_id.as_ref(),
+        )
     }
 
     pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
@@ -137,6 +140,13 @@ impl FuzzyFound {
         log::info!("Format lifetime: {} us", start.elapsed().as_micros());
 
         (front, back)
+    }
+
+    pub fn to_initial_game_embed(&self) -> CreateEmbed {
+        CreateEmbed::default()
+            .attachment(format!("{}.png", self.front_illustration_id))
+            .title("????")
+            .description("????")
     }
 }
 

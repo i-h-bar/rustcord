@@ -1,12 +1,12 @@
 use crate::db::Psql;
-use crate::utils::fuzzy_match_set_name;
+use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
+use crate::utils::fuzzy_match_set_name;
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, ResolvedValue,
 };
 use serenity::prelude::*;
-
 
 pub(crate) async fn run(
     ctx: &Context,
@@ -32,21 +32,27 @@ pub(crate) async fn run(
     };
 
     if let Some(card) = random_card {
-        let (front_image, _) = ImageFetcher::get().ok_or(serenity::Error::Other(""))?.fetch_illustration(&card).await;
-        let (front, _) = card.to_embed();
-        let response = if let Some(front_image) = front_image {
-            CreateInteractionResponseMessage::new().add_file(front_image)
-        } else {
-            CreateInteractionResponseMessage::new()
-        }.add_embed(front);
-        
+        let image_fetcher = ImageFetcher::get().ok_or(serenity::Error::Other(""))?;
+        let (Some(illustration), _) = image_fetcher.fetch_illustration(&card).await else {
+            return Err(serenity::Error::Other("Cannot fetch illustration data."));
+        };
+        let (Some(image), _) = image_fetcher.fetch(&card).await else {
+            return Err(serenity::Error::Other("No image found"));
+        };
+
+        let game_state = GameState::from(card, Difficulty::Easy, image, illustration);
+
+        let front = game_state.to_embed();
+        let response = CreateInteractionResponseMessage::new()
+            .add_file(game_state.illustration)
+            .add_embed(front);
+
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
     } else {
         return Err(serenity::Error::Other("Could not respond to interaction."));
     }
 
-    println!("{:?}", options);
     Ok(())
 }
 

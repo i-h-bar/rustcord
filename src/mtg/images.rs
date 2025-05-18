@@ -1,12 +1,10 @@
 use crate::mtg::db::FuzzyFound;
+use once_cell::sync::OnceCell;
 use serenity::all::CreateAttachment;
 use std::env;
-use once_cell::sync::OnceCell;
 use uuid::Uuid;
-use crate::db::Psql;
 
 static FETCHER_INSTANCE: OnceCell<ImageFetcher> = OnceCell::new();
-
 
 #[derive(Debug)]
 pub struct ImageFetcher {
@@ -17,9 +15,11 @@ pub struct ImageFetcher {
 impl ImageFetcher {
     pub fn init() {
         let instance = Self::new();
-        FETCHER_INSTANCE.set(instance).expect("Failed to set instance of image_fetcher");
+        FETCHER_INSTANCE
+            .set(instance)
+            .expect("Failed to set instance of image_fetcher");
     }
-    
+
     pub fn new() -> Self {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
         Self {
@@ -27,8 +27,10 @@ impl ImageFetcher {
             illustration_dir: format!("{}/illustrations/", &base_dir),
         }
     }
-    
-    pub fn get() -> Option<&'static ImageFetcher> { FETCHER_INSTANCE.get() }
+
+    pub fn get() -> Option<&'static ImageFetcher> {
+        FETCHER_INSTANCE.get()
+    }
 
     pub async fn fetch(
         &self,
@@ -36,14 +38,19 @@ impl ImageFetcher {
     ) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
         fetch_image(&self.image_dir, card.image_ids()).await
     }
-    
-    pub async fn fetch_illustration(&self, card: &FuzzyFound) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
+
+    pub async fn fetch_illustration(
+        &self,
+        card: &FuzzyFound,
+    ) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
         fetch_image(&self.illustration_dir, card.illustration_ids()).await
     }
 }
 
-
-async fn fetch_image(image_dir: &str, (front_id, back_id): (&Uuid, Option<&Uuid>)) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
+async fn fetch_image(
+    image_dir: &str,
+    (front_id, back_id): (&Uuid, Option<&Uuid>),
+) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
     let image = tokio::fs::read(format!("{}{}.png", image_dir, front_id))
         .await
         .ok();
