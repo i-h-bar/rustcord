@@ -28,4 +28,13 @@ impl GameState {
     pub fn to_embed(&self) -> CreateEmbed {
         self.card.to_initial_game_embed()
     }
+
+    pub fn to_full_embed(self) -> CreateEmbed {
+        let (embed, _) = self.card.to_embed();
+        embed
+    }
+
+    pub fn card(&self) -> &FuzzyFound {
+        &self.card
+    }
 }

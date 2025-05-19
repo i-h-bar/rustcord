@@ -55,4 +55,15 @@ impl Redis {
             )
             .await
     }
+
+    pub async fn delete<K: ToRedisArgs + Send + Sync>(
+        &self,
+        key: K,
+    ) -> Result<(), redis::RedisError> {
+        self.client
+            .get_multiplexed_async_connection()
+            .await?
+            .del(key)
+            .await
+    }
 }

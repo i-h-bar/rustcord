@@ -68,7 +68,7 @@ pub(crate) async fn run(
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("play")
-        .description("Guess the card")
+        .description("Start a guess the card game")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
