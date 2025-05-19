@@ -148,13 +148,7 @@ impl FuzzyFound {
         (front, back)
     }
 
-    pub fn to_game_embed(&self, difficulty: &Difficulty, guesses: usize) -> CreateEmbed {
-        let multiplier = match difficulty {
-            Difficulty::Hard => 3,
-            Difficulty::Medium => 2,
-            Difficulty::Easy => 1,
-        };
-        
+    pub fn to_game_embed(&self, multiplier: usize, guesses: usize) -> CreateEmbed {
         let mut embed = CreateEmbed::default()
             .attachment(format!(
                 "{}.png",
@@ -165,15 +159,15 @@ impl FuzzyFound {
             .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
 
         if guesses > multiplier {
-            embed = embed.description(self.rules_text());
-        }
-
-        if guesses > multiplier * 2 {
             let mana_cost = REGEX_COLLECTION
                 .symbols
                 .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
             let title = format!("????        {}", mana_cost);
-            embed = embed.title(title);
+            embed = embed.title(title).colour(get_colour_identity(self.front_colour_identity.clone()));
+        }
+
+        if guesses > multiplier * 2 {
+            embed = embed.description(self.rules_text());
         }
 
         embed
