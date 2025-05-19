@@ -37,11 +37,11 @@ impl GameState {
     pub fn card(&self) -> &FuzzyFound {
         &self.card
     }
-    
+
     pub fn number_of_guesses(&self) -> usize {
         self.guess_number
     }
-    
+
     pub fn add_guess(&mut self) {
         self.guess_number += 1;
     }

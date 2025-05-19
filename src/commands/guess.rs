@@ -3,11 +3,9 @@ use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
 use crate::utils::fuzzy;
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateAllowedMentions, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateMessage, MessageBuilder, ResolvedValue,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
-use std::fmt::format;
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
     let game_state_string: String = Redis::instance()
@@ -17,9 +15,9 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .ok_or(serenity::Error::Other("No game found"))?;
     let mut game_state: GameState =
         ron::from_str(&game_state_string).map_err(|_| serenity::Error::Other(""))?;
-    
+
     game_state.add_guess();
-    
+
     let guess = match interaction
         .data
         .options()
@@ -39,17 +37,20 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         else {
             return Err(serenity::Error::Other("No card image"));
         };
-        
+
         let number_of_guesses = game_state.number_of_guesses();
         let guess_plural = if number_of_guesses > 1 {
             "guesses"
-        }  else {
+        } else {
             "guess"
         };
 
         let message = MessageBuilder::new()
             .mention(&interaction.user)
-            .push(&format!(" has won after {} {}!", number_of_guesses, guess_plural))
+            .push(&format!(
+                " has won after {} {}!",
+                number_of_guesses, guess_plural
+            ))
             .build();
 
         let embed = game_state.to_full_embed();
