@@ -15,9 +15,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .get(interaction.channel_id.to_string())
         .await
         .ok_or(serenity::Error::Other("No game found"))?;
-    let game_state: GameState =
+    let mut game_state: GameState =
         ron::from_str(&game_state_string).map_err(|_| serenity::Error::Other(""))?;
-
+    
+    game_state.add_guess();
+    
     let guess = match interaction
         .data
         .options()
@@ -37,20 +39,25 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         else {
             return Err(serenity::Error::Other("No card image"));
         };
-
-        let embed = game_state.to_full_embed();
+        
+        let number_of_guesses = game_state.number_of_guesses();
+        let guess_plural = if number_of_guesses > 1 {
+            "guesses"
+        }  else {
+            "guess"
+        };
 
         let message = MessageBuilder::new()
             .mention(&interaction.user)
-            .push(" Won!")
+            .push(&format!(" has won after {} {}!", number_of_guesses, guess_plural))
             .build();
-        if let Err(why) = interaction.channel_id.say(&ctx.http, &message).await {
-            log::warn!("Error sending message: {why:?}");
-        }
+
+        let embed = game_state.to_full_embed();
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)
-            .add_embed(embed);
+            .add_embed(embed)
+            .content(message);
 
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
@@ -72,6 +79,18 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
 
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
+
+        if Redis::instance()
+            .ok_or(serenity::Error::Other("Error contacting redis"))?
+            .set(
+                interaction.channel_id.to_string(),
+                ron::to_string(&game_state).unwrap(),
+            )
+            .await
+            .is_err()
+        {
+            return Err(serenity::Error::Other("Could not save game state."));
+        };
     }
 
     Ok(())
