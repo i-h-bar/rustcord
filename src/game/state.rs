@@ -26,7 +26,7 @@ impl GameState {
     }
 
     pub fn to_embed(&self) -> CreateEmbed {
-        self.card.to_initial_game_embed()
+        self.card.to_game_embed(&self.difficulty, self.guess_number)
     }
 
     pub fn to_full_embed(self) -> CreateEmbed {

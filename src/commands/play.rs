@@ -39,11 +39,10 @@ pub(crate) async fn run(
         };
 
         let game_state = GameState::from(card, Difficulty::Easy);
-
-        let front = game_state.to_embed();
+        
         let response = CreateInteractionResponseMessage::new()
             .add_file(illustration)
-            .add_embed(front);
+            .add_embed(game_state.to_embed());
 
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;

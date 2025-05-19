@@ -2,6 +2,7 @@ mod queries;
 
 use crate::db::Psql;
 use crate::emoji::add_emoji;
+use crate::game::state::{Difficulty, GameState};
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
     RANDOM_CARD_FROM_DISTINCT,
@@ -147,15 +148,58 @@ impl FuzzyFound {
         (front, back)
     }
 
-    pub fn to_initial_game_embed(&self) -> CreateEmbed {
-        CreateEmbed::default()
+    pub fn to_game_embed(&self, difficulty: &Difficulty, guesses: usize) -> CreateEmbed {
+        let multiplier = match difficulty {
+            Difficulty::Hard => 3,
+            Difficulty::Medium => 2,
+            Difficulty::Easy => 1,
+        };
+        
+        let mut embed = CreateEmbed::default()
             .attachment(format!(
                 "{}.png",
                 self.front_illustration_id.unwrap_or_default()
             ))
             .title("????")
             .description("????")
-            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)))
+            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
+
+        if guesses > multiplier {
+            embed = embed.description(self.rules_text());
+        }
+
+        if guesses > multiplier * 2 {
+            let mana_cost = REGEX_COLLECTION
+                .symbols
+                .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
+            let title = format!("????        {}", mana_cost);
+            embed = embed.title(title);
+        }
+
+        embed
+    }
+
+    fn rules_text(&self) -> String {
+        let stats = if let Some(power) = self.front_power.clone() {
+            let toughness = self
+                .front_toughness
+                .clone()
+                .unwrap_or_else(|| "0".to_string());
+            format!("\n\n{}/{}", power, toughness)
+        } else if let Some(loyalty) = self.front_loyalty.clone() {
+            format!("\n\n{}", loyalty)
+        } else if let Some(defence) = self.front_defence.clone() {
+            format!("\n\n{}", defence)
+        } else {
+            "".to_string()
+        };
+
+        let front_oracle_text = REGEX_COLLECTION
+            .symbols
+            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(cap));
+        let front_oracle_text = italicise_reminder_text(&front_oracle_text);
+
+        format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats)
     }
 }
 

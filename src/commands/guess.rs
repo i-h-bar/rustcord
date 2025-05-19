@@ -75,8 +75,14 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             );
         };
     } else {
+        let (Some(illustration), _) = ImageFetcher::get().ok_or(serenity::Error::Other(""))?.fetch_illustration(game_state.card()).await else {
+            return Err(serenity::Error::Other("Cannot fetch illustration data."));
+        };
+        
         let response = CreateInteractionResponseMessage::new()
-            .content(format!("'{}' was not the correct card", guess));
+            .content(format!("'{}' was not the correct card", guess))
+            .add_file(illustration)
+            .embed(game_state.to_embed());
 
         let response = CreateInteractionResponse::Message(response);
         interaction.create_response(&ctx.http, response).await?;
