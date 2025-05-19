@@ -1,7 +1,7 @@
 use crate::game::state::GameState;
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
-use crate::utils::fuzzy;
+use crate::utils::{fuzzy, normalise};
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
@@ -29,7 +29,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         _ => Err(serenity::Error::Other("")),
     }?;
 
-    if fuzzy::jaro_winkler(&guess, game_state.card()) > 0.75 {
+    if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
         let (Some(image), _) = ImageFetcher::get()
             .ok_or(serenity::Error::Other("No card image"))?
             .fetch(game_state.card())

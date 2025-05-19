@@ -23,7 +23,7 @@ use uuid::Uuid;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FuzzyFound {
     pub front_name: String,
-    front_normalised_name: String,
+    pub front_normalised_name: String,
     front_scryfall_url: String,
     front_image_id: Uuid,
     front_illustration_id: Option<Uuid>,
