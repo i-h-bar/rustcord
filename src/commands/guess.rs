@@ -37,7 +37,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         return;
     };
 
-    let game_state: GameState = match ron::from_str::<GameState>(&game_state_string) {
+    let game_state = match ron::from_str::<GameState>(&game_state_string) {
         Ok(mut game_state) => {
             game_state.add_guess();
             game_state
