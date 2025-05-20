@@ -3,66 +3,92 @@ use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
 use crate::utils::fuzzy_match_set_name;
-use serenity::all::{
-    CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage, ResolvedValue,
-};
+use serenity::all::{CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue};
+use serenity::all::FullEvent::ReactionAdd;
 use serenity::prelude::*;
 
 pub(crate) async fn run(
     ctx: &Context,
     interaction: &CommandInteraction,
-) -> Result<(), serenity::Error> {
+) {
     let options = interaction.data.options();
-    let db = Psql::get().ok_or(serenity::Error::Other("Error contacting cards database."))?;
+    let Some(db) = Psql::get() else {
+        log::warn!("failed to get Psql database");
+        return;
+    };
     let random_card = if options.is_empty() {
         db.random_distinct_card().await
     } else {
-        let set_name = options
-            .first()
-            .ok_or(serenity::Error::Other("No first option"))?;
-        let set_name = match set_name.value {
-            ResolvedValue::String(name) => Ok(name),
-            _ => Err(serenity::Error::Other("")),
-        }?;
+        let set_name = match match interaction.data.options().first() {
+            Some(option) => option,
+            None => {
+                log::warn!("no first option was supplied");
+                return;
+            }
+        }
+            .value
+        {
+            ResolvedValue::String(card) => card,
+            _ => {
+                log::warn!("couldn't resolve set name");
+                return;
+            }
+        };
 
-        let set_name = fuzzy_match_set_name(set_name)
-            .await
-            .ok_or(serenity::Error::Other("Unknown set name"))?;
+        let Some(set_name) = fuzzy_match_set_name(set_name)
+            .await else {
+            let message = MessageBuilder::new()
+                .mention(&interaction.user)
+                .push(" could not find set named ")
+                .push(set_name)
+                .build();
+            
+            let response = CreateInteractionResponseMessage::new().content(message);
+            if let Err(why) = interaction.create_response(ctx, CreateInteractionResponse::Message(response)).await {
+                log::error!("couldn't create interaction response: {:?}", why);
+            }
+            return;
+        };
         db.random_card_from_set(&set_name).await
     };
 
     if let Some(card) = random_card {
-        let image_fetcher = ImageFetcher::get().ok_or(serenity::Error::Other(""))?;
+        let Some(image_fetcher) = ImageFetcher::get() else {
+            log::warn!("failed to get image fetcher");
+            return;
+        };
         let (Some(illustration), _) = image_fetcher.fetch_illustration(&card).await else {
-            return Err(serenity::Error::Other("Cannot fetch illustration data."));
+            log::warn!("failed to get image");
+            return;
         };
 
         let game_state = GameState::from(card, Difficulty::Easy);
-        
+
         let response = CreateInteractionResponseMessage::new()
             .add_file(illustration)
             .add_embed(game_state.to_embed());
 
         let response = CreateInteractionResponse::Message(response);
-        interaction.create_response(&ctx.http, response).await?;
-
-        if Redis::instance()
-            .ok_or(serenity::Error::Other("Error contacting redis"))?
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::error!("couldn't create interaction response: {:?}", why);
+        };
+        let Some(redis) = Redis::instance() else {
+            log::warn!("failed to get redis connection");
+            return;
+        };
+        if let Err(why) = redis
             .set(
                 interaction.channel_id.to_string(),
                 ron::to_string(&game_state).unwrap(),
             )
             .await
-            .is_err()
         {
-            return Err(serenity::Error::Other("Could not save game state."));
+            log::warn!("couldn't set redis value: {:?}", why);
+            return;
         };
     } else {
-        return Err(serenity::Error::Other("Could not respond to interaction."));
+        log::warn!("Failed to get random card")
     }
-
-    Ok(())
 }
 
 pub fn register() -> CreateCommand {

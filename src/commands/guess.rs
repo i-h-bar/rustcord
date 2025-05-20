@@ -2,40 +2,78 @@ use crate::game::state::GameState;
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
 use crate::utils::{fuzzy, normalise};
+use ron::error::SpannedResult;
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), serenity::Error> {
-    let game_state_string: String = Redis::instance()
-        .ok_or(serenity::Error::Other("Error contacting cards database."))?
-        .get(interaction.channel_id.to_string())
-        .await
-        .ok_or(serenity::Error::Other("No game found"))?;
-    let mut game_state: GameState =
-        ron::from_str(&game_state_string).map_err(|_| serenity::Error::Other(""))?;
+pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+    let Some(redis) = Redis::instance() else {
+        log::warn!("failed to get redis instance");
+        return;
+    };
 
-    game_state.add_guess();
+    let Some(game_state_string): Option<String> =
+        redis.get(interaction.channel_id.to_string()).await
+    else {
+        let message = MessageBuilder::new()
+            .mention(&interaction.user)
+            .push(" no game found in ")
+            .push(
+                interaction
+                    .channel_id
+                    .name(ctx)
+                    .await
+                    .unwrap_or(interaction.channel_id.to_string()),
+            )
+            .build();
+        let response = CreateInteractionResponseMessage::new().content(message);
 
-    let guess = match interaction
-        .data
-        .options()
-        .first()
-        .ok_or(serenity::Error::Other("No card given in the guess"))?
-        .value
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        };
+
+        return;
+    };
+
+    let game_state: GameState = match ron::from_str::<GameState>(&game_state_string) {
+        Ok(mut game_state) => {
+            game_state.add_guess();
+            game_state
+        }
+        Err(why) => {
+            log::warn!("Couldn't parse game state: {}", why);
+            return;
+        }
+    };
+
+    let guess = match match interaction.data.options().first() {
+        Some(option) => option,
+        None => {
+            log::warn!("no first option was supplied");
+            return;
+        }
+    }
+    .value
     {
-        ResolvedValue::String(card) => Ok(card),
-        _ => Err(serenity::Error::Other("")),
-    }?;
+        ResolvedValue::String(card) => card,
+        _ => {
+            log::warn!("couldn't resolve game card");
+            return;
+        }
+    };
+
+    let Some(image_fetcher) = ImageFetcher::get() else {
+        log::warn!("couldn't get image fetcher");
+        return;
+    };
 
     if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
-        let (Some(image), _) = ImageFetcher::get()
-            .ok_or(serenity::Error::Other("No card image"))?
-            .fetch(game_state.card())
-            .await
-        else {
-            return Err(serenity::Error::Other("No card image"));
+        let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+            log::warn!("couldn't fetch image");
+            return;
         };
 
         let number_of_guesses = game_state.number_of_guesses();
@@ -61,13 +99,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             .content(message);
 
         let response = CreateInteractionResponse::Message(response);
-        interaction.create_response(&ctx.http, response).await?;
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        };
 
-        if let Err(why) = Redis::instance()
-            .ok_or(serenity::Error::Other("Error contacting redis"))?
-            .delete(interaction.channel_id.to_string())
-            .await
-        {
+        if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
             log::warn!(
                 "Error deleting key: '{}' from redis the response: {:?}",
                 interaction.channel_id.to_string(),
@@ -75,32 +111,32 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
             );
         };
     } else {
-        let (Some(illustration), _) = ImageFetcher::get().ok_or(serenity::Error::Other(""))?.fetch_illustration(game_state.card()).await else {
-            return Err(serenity::Error::Other("Cannot fetch illustration data."));
+        let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
+        else {
+            log::warn!("couldn't fetch illustration");
+            return;
         };
-        
+
         let response = CreateInteractionResponseMessage::new()
             .content(format!("'{}' was not the correct card", guess))
             .add_file(illustration)
             .embed(game_state.to_embed());
 
         let response = CreateInteractionResponse::Message(response);
-        interaction.create_response(&ctx.http, response).await?;
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        };
 
-        if Redis::instance()
-            .ok_or(serenity::Error::Other("Error contacting redis"))?
+        if let Err(why) = redis
             .set(
                 interaction.channel_id.to_string(),
                 ron::to_string(&game_state).unwrap(),
             )
             .await
-            .is_err()
         {
-            return Err(serenity::Error::Other("Could not save game state."));
+            log::warn!("Error while trying to set value in redis: {}", why);
         };
     }
-
-    Ok(())
 }
 
 pub fn register() -> CreateCommand {

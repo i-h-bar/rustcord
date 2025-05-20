@@ -163,7 +163,9 @@ impl FuzzyFound {
                 .symbols
                 .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
             let title = format!("????        {}", mana_cost);
-            embed = embed.title(title).colour(get_colour_identity(self.front_colour_identity.clone()));
+            embed = embed
+                .title(title)
+                .colour(get_colour_identity(self.front_colour_identity.clone()));
         }
 
         if guesses > multiplier * 2 {

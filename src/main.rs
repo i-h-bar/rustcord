@@ -60,28 +60,11 @@ impl EventHandler for Handler {
                 command.channel_id
             );
 
-            let content = match command.data.name.as_str() {
-                "play" => match commands::play::run(&ctx, &command).await {
-                    Err(e) => Some(e.to_string()),
-                    Ok(_) => None,
-                },
-                "guess" => match commands::guess::run(&ctx, &command).await {
-                    Err(e) => Some(e.to_string()),
-                    Ok(_) => None,
-                },
-                _ => Some(format!(
-                    "Unknown command: {:?} from {}",
-                    command.data.name, command.channel_id
-                )),
+            match command.data.name.as_str() {
+                "play" => commands::play::run(&ctx, &command).await,
+                "guess" => commands::guess::run(&ctx, &command).await,
+                _ => (),
             };
-
-            if let Some(content) = content {
-                let data = CreateInteractionResponseMessage::new().content(content);
-                let builder = CreateInteractionResponse::Message(data);
-                if let Err(why) = command.create_response(&ctx.http, builder).await {
-                    log::warn!("Cannot respond to slash command: {why}");
-                }
-            }
         }
     }
 

@@ -24,7 +24,7 @@ impl GameState {
             guess_number: 0,
         }
     }
-    
+
     pub fn multiplier(&self) -> usize {
         match self.difficulty {
             Difficulty::Hard => 3,
@@ -34,7 +34,8 @@ impl GameState {
     }
 
     pub fn to_embed(&self) -> CreateEmbed {
-        self.card.to_game_embed(self.multiplier(), self.guess_number)
+        self.card
+            .to_game_embed(self.multiplier(), self.guess_number)
     }
 
     pub fn to_full_embed(self) -> CreateEmbed {
