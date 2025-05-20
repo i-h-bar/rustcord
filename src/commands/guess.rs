@@ -2,7 +2,6 @@ use crate::game::state::GameState;
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
 use crate::utils::{fuzzy, normalise};
-use ron::error::SpannedResult;
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
@@ -70,7 +69,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         return;
     };
 
-    if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
+    if fuzzy::jaro_winkler(&normalise(guess), &game_state.card().front_normalised_name) > 0.75 {
         let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
             return;
@@ -85,13 +84,13 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
         let message = MessageBuilder::new()
             .mention(&interaction.user)
-            .push(&format!(
+            .push(format!(
                 " has won after {} {}!",
                 number_of_guesses, guess_plural
             ))
             .build();
 
-        let embed = game_state.to_full_embed();
+        let embed = game_state.convert_to_embed();
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)

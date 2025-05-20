@@ -38,7 +38,7 @@ impl GameState {
             .to_game_embed(self.multiplier(), self.guess_number)
     }
 
-    pub fn to_full_embed(self) -> CreateEmbed {
+    pub fn convert_to_embed(self) -> CreateEmbed {
         let (embed, _) = self.card.to_embed();
         embed
     }

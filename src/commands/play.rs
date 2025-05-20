@@ -3,14 +3,13 @@ use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
 use crate::utils::fuzzy_match_set_name;
-use serenity::all::{CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue};
-use serenity::all::FullEvent::ReactionAdd;
+use serenity::all::{
+    CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
+};
 use serenity::prelude::*;
 
-pub(crate) async fn run(
-    ctx: &Context,
-    interaction: &CommandInteraction,
-) {
+pub(crate) async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let options = interaction.data.options();
     let Some(db) = Psql::get() else {
         log::warn!("failed to get Psql database");
@@ -26,7 +25,7 @@ pub(crate) async fn run(
                 return;
             }
         }
-            .value
+        .value
         {
             ResolvedValue::String(card) => card,
             _ => {
@@ -35,16 +34,18 @@ pub(crate) async fn run(
             }
         };
 
-        let Some(set_name) = fuzzy_match_set_name(set_name)
-            .await else {
+        let Some(set_name) = fuzzy_match_set_name(set_name).await else {
             let message = MessageBuilder::new()
                 .mention(&interaction.user)
                 .push(" could not find set named ")
                 .push(set_name)
                 .build();
-            
+
             let response = CreateInteractionResponseMessage::new().content(message);
-            if let Err(why) = interaction.create_response(ctx, CreateInteractionResponse::Message(response)).await {
+            if let Err(why) = interaction
+                .create_response(ctx, CreateInteractionResponse::Message(response))
+                .await
+            {
                 log::error!("couldn't create interaction response: {:?}", why);
             }
             return;
@@ -84,7 +85,6 @@ pub(crate) async fn run(
             .await
         {
             log::warn!("couldn't set redis value: {:?}", why);
-            return;
         };
     } else {
         log::warn!("Failed to get random card")

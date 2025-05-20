@@ -3,10 +3,7 @@ extern crate core;
 use std::env;
 
 use dotenv::dotenv;
-use serenity::all::{
-    Command, CreateInteractionResponse, CreateInteractionResponseMessage, GatewayIntents,
-    Interaction, Message, Ready,
-};
+use serenity::all::{Command, GatewayIntents, Interaction, Message, Ready};
 use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
@@ -52,6 +49,20 @@ impl EventHandler for Handler {
         }
     }
 
+    async fn ready(&self, ctx: Context, _: Ready) {
+        match Command::create_global_command(&ctx, commands::play::register()).await {
+            Err(error) => log::warn!("Could not create command {:?}", error),
+            Ok(command) => log::info!("Created play command: {:?}", command),
+        };
+
+        match Command::create_global_command(&ctx, commands::guess::register()).await {
+            Err(error) => log::warn!("Could not create command {:?}", error),
+            Ok(command) => log::info!("Created play command: {:?}", command),
+        };
+
+        log::info!("Bot ready!")
+    }
+
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
             log::info!(
@@ -66,20 +77,6 @@ impl EventHandler for Handler {
                 _ => (),
             };
         }
-    }
-
-    async fn ready(&self, ctx: Context, _: Ready) {
-        match Command::create_global_command(&ctx, commands::play::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created play command: {:?}", command),
-        };
-
-        match Command::create_global_command(&ctx, commands::guess::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created play command: {:?}", command),
-        };
-
-        log::info!("Bot ready!")
     }
 }
 

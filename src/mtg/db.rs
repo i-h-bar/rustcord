@@ -2,7 +2,6 @@ mod queries;
 
 use crate::db::Psql;
 use crate::emoji::add_emoji;
-use crate::game::state::{Difficulty, GameState};
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
     RANDOM_CARD_FROM_DISTINCT,
