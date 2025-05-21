@@ -1,5 +1,4 @@
 use std::fmt;
-use serde::Deserialize;
 use serenity::all::{ResolvedOption, ResolvedValue};
 
 

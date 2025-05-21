@@ -12,7 +12,7 @@ use crate::utils;
 use crate::utils::parse::{ParseError, ResolveOption};
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let options: Options = match parse::options(interaction.data.options()) {
+    let Options { set } = match parse::options(interaction.data.options()) {
         Ok(options) => options,
         Err(err) => {
             log::warn!("{}", err);
@@ -24,7 +24,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         return;
     };
     
-    let random_card = if let Some(set_name) = options.set {
+    let random_card = if let Some(set_name) = set {
         let Some(matched_set) = fuzzy_match_set_name(&utils::normalise(&set_name)).await else {
             let message = MessageBuilder::new()
                 .mention(&interaction.user)
