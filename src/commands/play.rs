@@ -25,7 +25,13 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     };
     
     let random_card = if let Some(set_name) = set {
-        let Some(matched_set) = fuzzy_match_set_name(&utils::normalise(&set_name)).await else {
+        let matched_set = if set_name.chars().count() < 5 {
+            utils::set_from_abbreviation(&set_name).await
+        } else {
+            fuzzy_match_set_name(&utils::normalise(&set_name)).await 
+        };
+        
+        let Some(matched_set) = matched_set else {
             let message = MessageBuilder::new()
                 .mention(&interaction.user)
                 .push(" could not find set named ")

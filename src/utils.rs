@@ -74,3 +74,12 @@ pub async fn fuzzy_match_set_name(normalised_set_name: &str) -> Option<String> {
         .await?;
     fuzzy::winkliest_match(normalised_set_name, potentials)
 }
+
+
+pub async fn set_from_abbreviation(
+    abbreviation: &str,
+) -> Option<String> {
+    Psql::get()?
+    .set_name_from_abbreviation(abbreviation)
+    .await
+}
