@@ -1,12 +1,12 @@
 use crate::game::state::GameState;
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
+use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
-use crate::utils::parse::{ParseError, ResolveOption};
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let Options { guess } = match parse::options(interaction.data.options()) {
@@ -15,7 +15,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             log::warn!("Failed to parse guess: {}", err);
             return;
         }
-    }; 
+    };
 
     let Some(redis) = Redis::instance() else {
         log::warn!("failed to get redis instance");
@@ -103,31 +103,71 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             );
         };
     } else {
-        let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
-        else {
-            log::warn!("couldn't fetch illustration");
-            return;
-        };
+        if game_state.number_of_guesses() > game_state.max_guesses() {
+            if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
+                log::warn!(
+                    "Error deleting key: '{}' from redis the response: {:?}",
+                    interaction.channel_id.to_string(),
+                    why
+                );
+            }
 
-        let response = CreateInteractionResponseMessage::new()
-            .content(format!("'{}' was not the correct card", guess))
-            .add_file(illustration)
-            .embed(game_state.to_embed());
+            let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+                log::warn!("couldn't fetch image");
+                return;
+            };
+            let number_of_guesses = game_state.number_of_guesses();
+            let guess_plural = if number_of_guesses > 1 {
+                "guesses"
+            } else {
+                "guess"
+            };
 
-        let response = CreateInteractionResponse::Message(response);
-        if let Err(why) = interaction.create_response(&ctx.http, response).await {
-            log::warn!("couldn't create interaction: {}", why);
-        };
+            let message = MessageBuilder::new()
+                .push(format!(
+                    "You have all failed after {} {}!",
+                    number_of_guesses, guess_plural
+                ))
+                .build();
 
-        if let Err(why) = redis
-            .set(
-                interaction.channel_id.to_string(),
-                ron::to_string(&game_state).unwrap(),
-            )
-            .await
-        {
-            log::warn!("Error while trying to set value in redis: {}", why);
-        };
+            let embed = game_state.convert_to_embed();
+
+            let response = CreateInteractionResponseMessage::new()
+                .add_file(image)
+                .add_embed(embed)
+                .content(message);
+
+            let response = CreateInteractionResponse::Message(response);
+            if let Err(why) = interaction.create_response(&ctx.http, response).await {
+                log::warn!("couldn't create interaction: {}", why);
+            }
+        } else {
+            let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
+            else {
+                log::warn!("couldn't fetch illustration");
+                return;
+            };
+
+            let response = CreateInteractionResponseMessage::new()
+                .content(format!("'{}' was not the correct card", guess))
+                .add_file(illustration)
+                .embed(game_state.to_embed());
+
+            let response = CreateInteractionResponse::Message(response);
+            if let Err(why) = interaction.create_response(&ctx.http, response).await {
+                log::warn!("couldn't create interaction: {}", why);
+            };
+            
+            if let Err(why) = redis
+                .set(
+                    interaction.channel_id.to_string(),
+                    ron::to_string(&game_state).unwrap(),
+                )
+                .await
+            {
+                log::warn!("Error while trying to set value in redis: {}", why);
+            };
+        }
     }
 }
 
@@ -150,11 +190,13 @@ struct Options {
 
 impl ResolveOption for Options {
     fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
-        let Some((_, guess)) = options.first() else { return Err(ParseError::new("Could not get first option")) };
+        let Some((_, guess)) = options.first() else {
+            return Err(ParseError::new("Could not get first option"));
+        };
 
         let guess = match guess {
-            ResolvedValue::String(guess) => { guess.to_string() }
-            _ => { return Err(ParseError::new("ResolvedValue was not a string")) }
+            ResolvedValue::String(guess) => guess.to_string(),
+            _ => return Err(ParseError::new("ResolvedValue was not a string")),
         };
 
         Ok(Options { guess })

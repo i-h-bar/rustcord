@@ -33,6 +33,14 @@ impl GameState {
         }
     }
 
+    pub fn max_guesses(&self) -> usize {
+        match self.difficulty {
+            Difficulty::Hard => 8,
+            Difficulty::Medium => 12,
+            Difficulty::Easy => 16,
+        }
+    }
+
     pub fn to_embed(&self) -> CreateEmbed {
         self.card
             .to_game_embed(self.multiplier(), self.guess_number)

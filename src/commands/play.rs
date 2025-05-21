@@ -2,17 +2,17 @@ use crate::db::Psql;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
+use crate::utils;
+use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy_match_set_name, parse};
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
-use crate::utils;
-use crate::utils::parse::{ParseError, ResolveOption};
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let Options { set } = match parse::options(interaction.data.options()) {
+    let Options { set, difficulty } = match parse::options(interaction.data.options()) {
         Ok(options) => options,
         Err(err) => {
             log::warn!("{}", err);
@@ -23,14 +23,14 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         log::warn!("failed to get Psql database");
         return;
     };
-    
+
     let random_card = if let Some(set_name) = set {
         let matched_set = if set_name.chars().count() < 5 {
             utils::set_from_abbreviation(&set_name).await
         } else {
-            fuzzy_match_set_name(&utils::normalise(&set_name)).await 
+            fuzzy_match_set_name(&utils::normalise(&set_name)).await
         };
-        
+
         let Some(matched_set) = matched_set else {
             let message = MessageBuilder::new()
                 .mention(&interaction.user)
@@ -62,7 +62,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             return;
         };
 
-        let game_state = GameState::from(card, Difficulty::Easy);
+        let game_state = GameState::from(card, difficulty);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(illustration)
@@ -101,23 +101,52 @@ pub fn register() -> CreateCommand {
             )
             .required(false),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String, "difficulty", "what difficulty do you want to play at?"
+            )
+                .add_string_choice("Easy", "Easy")
+                .add_string_choice("Medium", "Medium")
+                .add_string_choice("Hard", "Hard")
+                .required(false),
+        )
 }
 
-struct Options{
+struct Options {
     set: Option<String>,
+    difficulty: Difficulty,
 }
-
 
 impl ResolveOption for Options {
     fn resolve(option: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
-        let Some((_, set_option)) = option.first() else { return Ok(Options{ set: None }) };
+        let mut set: Option<String> = None;
+        let mut difficulty: Difficulty = Difficulty::Easy;
         
-        let set = match set_option {
-            ResolvedValue::String(card) => { Some(card.to_string()) }
-            _ => { return Err(ParseError::new("ResolvedValue was not a string")) }
-        };
-        
-        Ok(Options { set })
+        for (name, value) in option {
+            match name {
+                "set" => {
+                    set = match value {
+                        ResolvedValue::String(card) => Some(card.to_string()),
+                        _ => return Err(ParseError::new("set ResolvedValue was not a string")),
+                    };
+                }
+                "difficulty" => {
+                    difficulty = match value {
+                        ResolvedValue::String(difficulty_string) => {
+                            match difficulty_string {
+                                "Easy" => Difficulty::Easy,
+                                "Medium" => Difficulty::Medium,
+                                "Hard" => Difficulty::Hard,
+                                default => return Err(ParseError::new(&format!("Could not parse {} into difficulty", default))),
+                            }
+                        },
+                        _ => return Err(ParseError::new("difficulty ResolvedValue was not a string")),
+                    };
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Options { set, difficulty })
     }
 }
-

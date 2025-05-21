@@ -1,6 +1,5 @@
-use std::fmt;
 use serenity::all::{ResolvedOption, ResolvedValue};
-
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct ParseError {
@@ -9,7 +8,9 @@ pub struct ParseError {
 
 impl ParseError {
     pub fn new(message: &str) -> Self {
-        Self { message: message.to_string() }
+        Self {
+            message: message.to_string(),
+        }
     }
 }
 
@@ -20,16 +21,16 @@ impl fmt::Display for ParseError {
 }
 
 pub trait ResolveOption {
-    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> where Self: Sized;
+    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
+    where
+        Self: Sized;
 }
 
 pub fn options<T: ResolveOption>(options: Vec<ResolvedOption>) -> Result<T, ParseError> {
-    let options: Vec<(&str, ResolvedValue)> =  options
+    let options: Vec<(&str, ResolvedValue)> = options
         .into_iter()
-        .map(|option| {
-            (option.name, option.value.clone()) 
-        })
+        .map(|option| (option.name, option.value.clone()))
         .collect();
-    
+
     T::resolve(options)
 }
