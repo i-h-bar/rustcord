@@ -2,39 +2,30 @@ use crate::db::Psql;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
-use crate::utils::fuzzy_match_set_name;
+use crate::utils::{fuzzy_match_set_name, parse};
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
+use crate::utils;
+use crate::utils::parse::{ParseError, ResolveOption};
 
-pub(crate) async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let options = interaction.data.options();
+pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+    let options: Options = match parse::options(interaction.data.options()) {
+        Ok(options) => options,
+        Err(err) => {
+            log::warn!("{}", err);
+            return;
+        }
+    };
     let Some(db) = Psql::get() else {
         log::warn!("failed to get Psql database");
         return;
     };
-    let random_card = if options.is_empty() {
-        db.random_distinct_card().await
-    } else {
-        let set_name = match match interaction.data.options().first() {
-            Some(option) => option,
-            None => {
-                log::warn!("no first option was supplied");
-                return;
-            }
-        }
-        .value
-        {
-            ResolvedValue::String(card) => card,
-            _ => {
-                log::warn!("couldn't resolve set name");
-                return;
-            }
-        };
-
-        let Some(set_name) = fuzzy_match_set_name(set_name).await else {
+    
+    let random_card = if let Some(set_name) = options.set {
+        let Some(matched_set) = fuzzy_match_set_name(&utils::normalise(&set_name)).await else {
             let message = MessageBuilder::new()
                 .mention(&interaction.user)
                 .push(" could not find set named ")
@@ -50,7 +41,9 @@ pub(crate) async fn run(ctx: &Context, interaction: &CommandInteraction) {
             }
             return;
         };
-        db.random_card_from_set(&set_name).await
+        db.random_card_from_set(&matched_set).await
+    } else {
+        db.random_distinct_card().await
     };
 
     if let Some(card) = random_card {
@@ -103,3 +96,22 @@ pub fn register() -> CreateCommand {
             .required(false),
         )
 }
+
+struct Options{
+    set: Option<String>,
+}
+
+
+impl ResolveOption for Options {
+    fn resolve(option: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
+        let Some((_, set_option)) = option.first() else { return Ok(Options{ set: None }) };
+        
+        let set = match set_option {
+            ResolvedValue::String(card) => { Some(card.to_string()) }
+            _ => { return Err(ParseError::new("ResolvedValue was not a string")) }
+        };
+        
+        Ok(Options { set })
+    }
+}
+

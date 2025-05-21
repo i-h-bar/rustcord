@@ -1,5 +1,6 @@
 pub mod colours;
 pub(crate) mod fuzzy;
+pub mod parse;
 
 use crate::db::Psql;
 use once_cell::sync::Lazy;

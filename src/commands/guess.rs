@@ -1,13 +1,22 @@
 use crate::game::state::GameState;
 use crate::mtg::images::ImageFetcher;
 use crate::redis::Redis;
-use crate::utils::{fuzzy, normalise};
+use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
+use crate::utils::parse::{ParseError, ResolveOption};
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+    let Options { guess } = match parse::options(interaction.data.options()) {
+        Ok(value) => value,
+        Err(err) => {
+            log::warn!("Failed to parse guess: {}", err);
+            return;
+        }
+    }; 
+
     let Some(redis) = Redis::instance() else {
         log::warn!("failed to get redis instance");
         return;
@@ -48,28 +57,12 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         }
     };
 
-    let guess = match match interaction.data.options().first() {
-        Some(option) => option,
-        None => {
-            log::warn!("no first option was supplied");
-            return;
-        }
-    }
-    .value
-    {
-        ResolvedValue::String(card) => card,
-        _ => {
-            log::warn!("couldn't resolve game card");
-            return;
-        }
-    };
-
     let Some(image_fetcher) = ImageFetcher::get() else {
         log::warn!("couldn't get image fetcher");
         return;
     };
 
-    if fuzzy::jaro_winkler(&normalise(guess), &game_state.card().front_normalised_name) > 0.75 {
+    if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
         let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
             return;
@@ -149,4 +142,21 @@ pub fn register() -> CreateCommand {
             )
             .required(true),
         )
+}
+
+struct Options {
+    guess: String,
+}
+
+impl ResolveOption for Options {
+    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
+        let Some((_, guess)) = options.first() else { return Err(ParseError::new("Could not get first option")) };
+
+        let guess = match guess {
+            ResolvedValue::String(guess) => { guess.to_string() }
+            _ => { return Err(ParseError::new("ResolvedValue was not a string")) }
+        };
+
+        Ok(Options { guess })
+    }
 }
