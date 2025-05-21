@@ -11,7 +11,8 @@ use serenity::all::{
 };
 use serenity::prelude::*;
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &CommandInteraction) { 
+    // todo! make a message response at the top and keep adding to it to clean up several message creations
     let Options { set, difficulty } = match parse::options(interaction.data.options()) {
         Ok(options) => options,
         Err(err) => {
@@ -121,7 +122,7 @@ impl ResolveOption for Options {
     fn resolve(option: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
         let mut set: Option<String> = None;
         let mut difficulty: Difficulty = Difficulty::Easy;
-        
+
         for (name, value) in option {
             match name {
                 "set" => {
