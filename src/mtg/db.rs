@@ -351,7 +351,7 @@ impl Psql {
         }
     }
 
-    pub async fn random_distinct_card(&self) -> Option<FuzzyFound> {
+    pub async fn random_card(&self) -> Option<FuzzyFound> {
         match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
             .fetch_one(&self.pool)
             .await

@@ -12,7 +12,6 @@ use serenity::all::{
 use serenity::prelude::*;
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    // todo! make a message response at the top and keep adding to it to clean up several message creations
     let Options { set, difficulty } = match parse::options(interaction.data.options()) {
         Ok(options) => options,
         Err(err) => {
@@ -50,7 +49,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         };
         db.random_card_from_set(&matched_set).await
     } else {
-        db.random_distinct_card().await
+        db.random_card().await
     };
 
     if let Some(card) = random_card {
