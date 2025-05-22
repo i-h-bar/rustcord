@@ -11,7 +11,7 @@ use serenity::all::{
 };
 use serenity::prelude::*;
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) { 
+pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     // todo! make a message response at the top and keep adding to it to clean up several message creations
     let Options { set, difficulty } = match parse::options(interaction.data.options()) {
         Ok(options) => options,

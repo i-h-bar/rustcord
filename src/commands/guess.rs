@@ -102,72 +102,70 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
                 why
             );
         };
-    } else {
-        if game_state.number_of_guesses() > game_state.max_guesses() {
-            if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
-                log::warn!(
-                    "Error deleting key: '{}' from redis the response: {:?}",
-                    interaction.channel_id.to_string(),
-                    why
-                );
-            }
-
-            let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
-                log::warn!("couldn't fetch image");
-                return;
-            };
-            let number_of_guesses = game_state.number_of_guesses();
-            let guess_plural = if number_of_guesses > 1 {
-                "guesses"
-            } else {
-                "guess"
-            };
-
-            let message = MessageBuilder::new()
-                .push(format!(
-                    "You have all failed after {} {}!",
-                    number_of_guesses, guess_plural
-                ))
-                .build();
-
-            let embed = game_state.convert_to_embed();
-
-            let response = CreateInteractionResponseMessage::new()
-                .add_file(image)
-                .add_embed(embed)
-                .content(message);
-
-            let response = CreateInteractionResponse::Message(response);
-            if let Err(why) = interaction.create_response(&ctx.http, response).await {
-                log::warn!("couldn't create interaction: {}", why);
-            }
-        } else {
-            let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
-            else {
-                log::warn!("couldn't fetch illustration");
-                return;
-            };
-
-            let response = CreateInteractionResponseMessage::new()
-                .content(format!("'{}' was not the correct card", guess))
-                .add_file(illustration)
-                .embed(game_state.to_embed());
-
-            let response = CreateInteractionResponse::Message(response);
-            if let Err(why) = interaction.create_response(&ctx.http, response).await {
-                log::warn!("couldn't create interaction: {}", why);
-            };
-            
-            if let Err(why) = redis
-                .set(
-                    interaction.channel_id.to_string(),
-                    ron::to_string(&game_state).unwrap(),
-                )
-                .await
-            {
-                log::warn!("Error while trying to set value in redis: {}", why);
-            };
+    } else if game_state.number_of_guesses() > game_state.max_guesses() {
+        if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
+            log::warn!(
+                "Error deleting key: '{}' from redis the response: {:?}",
+                interaction.channel_id.to_string(),
+                why
+            );
         }
+
+        let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+            log::warn!("couldn't fetch image");
+            return;
+        };
+        let number_of_guesses = game_state.number_of_guesses();
+        let guess_plural = if number_of_guesses > 1 {
+            "guesses"
+        } else {
+            "guess"
+        };
+
+        let message = MessageBuilder::new()
+            .push(format!(
+                "You have all failed after {} {}!",
+                number_of_guesses, guess_plural
+            ))
+            .build();
+
+        let embed = game_state.convert_to_embed();
+
+        let response = CreateInteractionResponseMessage::new()
+            .add_file(image)
+            .add_embed(embed)
+            .content(message);
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        }
+    } else {
+        let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
+        else {
+            log::warn!("couldn't fetch illustration");
+            return;
+        };
+
+        let response = CreateInteractionResponseMessage::new()
+            .content(format!("'{}' was not the correct card", guess))
+            .add_file(illustration)
+            .embed(game_state.to_embed());
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        };
+
+        if let Err(why) = redis
+            .set(
+                interaction.channel_id.to_string(),
+                ron::to_string(&game_state).unwrap(),
+            )
+            .await
+        {
+            log::warn!("Error while trying to set value in redis: {}", why);
+        };
     }
 }
 
