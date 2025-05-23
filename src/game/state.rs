@@ -13,6 +13,16 @@ pub enum Difficulty {
     Hard,
 }
 
+impl Difficulty {
+    pub fn to_string(&self) -> String {
+        match self {
+            Difficulty::Easy => "Easy".into(),
+            Difficulty::Medium => "Medium".into(),
+            Difficulty::Hard => "Hard".into(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GameState {
     card: FuzzyFound,
@@ -43,6 +53,10 @@ impl GameState {
             Difficulty::Medium => 12,
             Difficulty::Easy => 16,
         }
+    }
+    
+    pub fn difficulty(&self) -> &Difficulty {
+        &self.difficulty
     }
 
     pub fn to_embed(&self) -> CreateEmbed {

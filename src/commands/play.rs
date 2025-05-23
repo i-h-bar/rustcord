@@ -67,11 +67,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
         let game_state = GameState::from(card, difficulty);
 
-        let response = if let Some(set_of_card) = set_of_card{ 
+        let response = if let Some(set_of_card) = set_of_card { 
             CreateInteractionResponseMessage::new()
-                .content(format!("This card is from `{}`", set_of_card))
+                .content(format!("Difficulty is set to `{}`. This card is from `{}`", game_state.difficulty().to_string(), set_of_card))
         } else {
-            CreateInteractionResponseMessage::new()
+            CreateInteractionResponseMessage::new().content(format!("Difficulty is set to `{}`.", game_state.difficulty().to_string()))
         }
             .add_file(illustration)
             .add_embed(game_state.to_embed());
