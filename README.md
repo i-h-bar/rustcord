@@ -15,5 +15,5 @@ Additionally, you can put this mid-sentence as to not break your flow, as well a
 `I really love the artwork of [[the gitrog monster | set=bloomburrow commander]] it shows his true chonk, the classic [[gitrog monster | set=soi]] is not as cool.`
 
 
-This will bring images back like the following:
+This will bring images back like the following:  
 ![img.png](README_images/img.png)
