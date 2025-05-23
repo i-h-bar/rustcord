@@ -1,27 +1,32 @@
 mod queries;
 
-use crate::db::Psql;
-use crate::emoji::add_emoji;
+use crate::dbs::psql::Psql;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
+    RANDOM_CARD_FROM_DISTINCT,
 };
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
+use crate::utils::emoji::add_emoji;
 use crate::utils::fuzzy::ToChars;
+use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
-use serenity::all::CreateEmbed;
+use serde::{Deserialize, Serialize};
+use serenity::all::{CreateEmbed, CreateEmbedFooter, ResolvedValue};
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct FuzzyFound {
-    front_name: String,
-    front_normalised_name: String,
+    pub front_name: String,
+    pub front_normalised_name: String,
     front_scryfall_url: String,
     front_image_id: Uuid,
+    front_illustration_id: Option<Uuid>,
     front_mana_cost: String,
     front_colour_identity: Vec<String>,
     front_power: Option<String>,
@@ -33,6 +38,7 @@ pub struct FuzzyFound {
     back_name: Option<String>,
     back_scryfall_url: Option<String>,
     back_image_id: Option<Uuid>,
+    back_illustration_id: Option<Uuid>,
     back_mana_cost: Option<String>,
     back_colour_identity: Option<Vec<String>>,
     back_power: Option<String>,
@@ -41,11 +47,19 @@ pub struct FuzzyFound {
     back_defence: Option<String>,
     back_type_line: Option<String>,
     back_oracle_text: Option<String>,
+    artist: String,
 }
 
 impl FuzzyFound {
-    pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
-        (&self.front_image_id, self.back_image_id.as_ref())
+    pub fn image_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
+        (Some(&self.front_image_id), self.back_image_id.as_ref())
+    }
+
+    pub fn illustration_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
+        (
+            self.front_illustration_id.as_ref(),
+            self.back_illustration_id.as_ref(),
+        )
     }
 
     pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
@@ -78,7 +92,8 @@ impl FuzzyFound {
             .url(self.front_scryfall_url)
             .title(title)
             .description(rules_text)
-            .colour(get_colour_identity(self.front_colour_identity));
+            .colour(get_colour_identity(self.front_colour_identity))
+            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
 
         let back = if let Some(name) = self.back_name {
             let stats = if let Some(power) = self.back_power {
@@ -121,7 +136,8 @@ impl FuzzyFound {
                     .description(back_rules_text)
                     .colour(get_colour_identity(
                         self.back_colour_identity.unwrap_or_default(),
-                    )),
+                    ))
+                    .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist))),
             )
         } else {
             None
@@ -130,6 +146,56 @@ impl FuzzyFound {
         log::info!("Format lifetime: {} us", start.elapsed().as_micros());
 
         (front, back)
+    }
+
+    pub fn to_game_embed(&self, multiplier: usize, guesses: usize) -> CreateEmbed {
+        let mut embed = CreateEmbed::default()
+            .attachment(format!(
+                "{}.png",
+                self.front_illustration_id.unwrap_or_default()
+            ))
+            .title("????")
+            .description("????")
+            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
+
+        if guesses > multiplier {
+            let mana_cost = REGEX_COLLECTION
+                .symbols
+                .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
+            let title = format!("????        {}", mana_cost);
+            embed = embed
+                .title(title)
+                .colour(get_colour_identity(self.front_colour_identity.clone()));
+        }
+
+        if guesses > multiplier * 2 {
+            embed = embed.description(self.rules_text());
+        }
+
+        embed
+    }
+
+    fn rules_text(&self) -> String {
+        let stats = if let Some(power) = self.front_power.clone() {
+            let toughness = self
+                .front_toughness
+                .clone()
+                .unwrap_or_else(|| "0".to_string());
+            format!("\n\n{}/{}", power, toughness)
+        } else if let Some(loyalty) = self.front_loyalty.clone() {
+            format!("\n\n{}", loyalty)
+        } else if let Some(defence) = self.front_defence.clone() {
+            format!("\n\n{}", defence)
+        } else {
+            "".to_string()
+        };
+
+        let front_oracle_text = REGEX_COLLECTION
+            .symbols
+            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(cap));
+        let front_oracle_text = italicise_reminder_text(&front_oracle_text);
+
+        format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats)
     }
 }
 
@@ -152,6 +218,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
             front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
             front_image_id: row.get::<Uuid, &str>("front_image_id"),
+            front_illustration_id: row.get::<Option<Uuid>, &str>("front_illustration_id"),
             front_mana_cost: row.get::<String, &str>("front_mana_cost"),
             front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
             front_power: row.get::<Option<String>, &str>("front_power"),
@@ -163,6 +230,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_name: row.get::<Option<String>, &str>("back_name"),
             back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
             back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
+            back_illustration_id: row.get::<Option<Uuid>, &str>("back_illustration_id"),
             back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
             back_colour_identity: row.get::<Option<Vec<String>>, &str>("back_colour_identity"),
             back_power: row.get::<Option<String>, &str>("back_power"),
@@ -171,6 +239,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_defence: row.get::<Option<String>, &str>("back_defence"),
             back_type_line: row.get::<Option<String>, &str>("back_type_line"),
             back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
+            artist: row.get::<String, &str>("artist"),
         })
     }
 }
@@ -213,31 +282,7 @@ impl Psql {
         normalised_name: &str,
     ) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(&format!(
-            r#"
-            select  front_name,
-                    front_normalised_name,
-                    front_scryfall_url,
-                    front_image_id,
-                    front_mana_cost,
-                    front_colour_identity,
-                    front_power,
-                    front_toughness,
-                    front_loyalty,
-                    front_defence,
-                    front_type_line,
-                    front_oracle_text,
-                    back_name,
-                    back_scryfall_url,
-                    back_image_id,
-                    back_mana_cost,
-                    back_colour_identity,
-                    back_power,
-                    back_toughness,
-                    back_loyalty,
-                    back_defence,
-                    back_type_line,
-                    back_oracle_text
-            from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            r#"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             set_name.replace(" ", "_")
         ))
         .bind(normalised_name)
@@ -289,31 +334,7 @@ impl Psql {
         normalised_name: &str,
     ) -> Option<Vec<FuzzyFound>> {
         match sqlx::query(&format!(
-            r#"
-            select  front_name,
-                    front_normalised_name,
-                    front_scryfall_url,
-                    front_image_id,
-                    front_mana_cost,
-                    front_colour_identity,
-                    front_power,
-                    front_toughness,
-                    front_loyalty,
-                    front_defence,
-                    front_type_line,
-                    front_oracle_text,
-                    back_name,
-                    back_scryfall_url,
-                    back_image_id,
-                    back_mana_cost,
-                    back_colour_identity,
-                    back_power,
-                    back_toughness,
-                    back_loyalty,
-                    back_defence,
-                    back_type_line,
-                    back_oracle_text
-            from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            r#"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
             artist.replace(" ", "_")
         ))
         .bind(normalised_name)
@@ -328,6 +349,35 @@ impl Psql {
                 .into_iter()
                 .map(|row| FuzzyFound::from_row(&row).ok())
                 .collect(),
+        }
+    }
+
+    pub async fn random_card(&self) -> Option<FuzzyFound> {
+        match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed random card fetch - {why}");
+                None
+            }
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
+        }
+    }
+
+    pub async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
+        match sqlx::query(&format!(
+            r#"select * from set_{} where front_illustration_id is not null order by random() limit 1;"#,
+            set_name.replace(" ", "_")
+        ))
+        .fetch_one(&self.pool)
+        .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
         }
     }
 }
@@ -364,6 +414,58 @@ impl QueryParams {
             artist,
             set_code,
             set_name,
+        })
+    }
+}
+
+impl ResolveOption for QueryParams {
+    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
+    where
+        Self: Sized,
+    {
+        let mut card_name = None;
+        let mut set_name = None;
+        let mut set_code = None;
+        let mut artist = None;
+
+        for (name, value) in options {
+            match name {
+                "name" => {
+                    card_name = match value {
+                        ResolvedValue::String(card) => Some(card.to_string()),
+                        _ => return Err(ParseError::new("Name was not a string")),
+                    }
+                }
+                "set" => {
+                    let set = match value {
+                        ResolvedValue::String(set) => set.to_string(),
+                        _ => return Err(ParseError::new("Name was not a string")),
+                    };
+                    if set.chars().count() < 5 {
+                        set_code = Some(set);
+                    } else {
+                        set_name = Some(set);
+                    }
+                }
+                "artist" => {
+                    artist = match value {
+                        ResolvedValue::String(artist) => Some(artist.to_string()),
+                        _ => return Err(ParseError::new("Artist was not a string")),
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let Some(name) = card_name else {
+            return Err(ParseError::new("No name found in query params"));
+        };
+
+        Ok(Self {
+            name,
+            set_name,
+            set_code,
+            artist,
         })
     }
 }

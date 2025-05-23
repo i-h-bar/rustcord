@@ -1,5 +1,8 @@
 pub mod colours;
+pub mod emoji;
 pub(crate) mod fuzzy;
+pub mod help;
+pub mod parse;
 
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
