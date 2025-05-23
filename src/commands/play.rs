@@ -125,7 +125,7 @@ struct Options {
 impl ResolveOption for Options {
     fn resolve(option: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
         let mut set: Option<String> = None;
-        let mut difficulty: Difficulty = Difficulty::Easy;
+        let mut difficulty: Difficulty = Difficulty::Medium;
 
         for (name, value) in option {
             match name {

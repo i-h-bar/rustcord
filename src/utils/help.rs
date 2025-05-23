@@ -2,7 +2,7 @@ pub const HELP: &str =
     "
  ```ansi
 \u{001b}[1;10;4;31mThe Guessing Game:\u{001b}[0m
-To play the guessing game use the \u{001b}[1;34m/play\u{001b}[0m command. This has two options: the set you want to pull the card from; and the difficulty (Easy, Medium, or Hard) this defaults to Easy.
+To play the guessing game use the \u{001b}[1;34m/play\u{001b}[0m command. This has two options: the set you want to pull the card from; and the difficulty (Easy, Medium, or Hard) this defaults to Medium.
 
 To guess a card use the \u{001b}[1;34m/guess\u{001b}[0m command and the bot will tell you if you are correct or not (slight typos are forgiven so no need to be super accurate with spelling).
 
@@ -26,5 +26,9 @@ Additionally, you can put this mid-sentence as to not break your flow, as well a
 \u{001b}[1;34m/help\u{001b}[0m - Options: () - Show this message.
 \u{001b}[1;34m/play\u{001b}[0m - Options: (set, difficulty) - Start a game of guess the Magic the Gathering card.
 \u{001b}[1;34m/guess\u{001b}[0m - Options: () - Make a guess for an active guess the card game.
+
+
+\u{001b}[1;10;4;31mHaving issues?\u{001b}[0m
+Please raise a ticket here https://github.com/i-h-bar/rustcord/issues
 ```
     ";

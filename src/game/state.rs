@@ -52,9 +52,9 @@ impl GameState {
 
     pub fn max_guesses(&self) -> usize {
         match self.difficulty {
-            Difficulty::Hard => 8,
-            Difficulty::Medium => 12,
-            Difficulty::Easy => 16,
+            Difficulty::Hard => 4,
+            Difficulty::Medium => 6,
+            Difficulty::Easy => 8,
         }
     }
 
@@ -93,16 +93,20 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
     let Some(game_state_string): Option<String> =
         redis.get(interaction.channel_id.to_string()).await
     else {
+        let name = if let Some(channel) = &interaction.channel {
+            if let Some(name) = &channel.name {
+                name.to_owned()
+            } else {
+                String::from("this channel")
+            }
+        } else {
+            String::from("this channel")
+        };
+        
         let message = MessageBuilder::new()
             .mention(&interaction.user)
             .push(" no game found in ")
-            .push(
-                interaction
-                    .channel_id
-                    .name(ctx)
-                    .await
-                    .unwrap_or(interaction.channel_id.to_string()),
-            )
+            .push(name)
             .build();
         let response = CreateInteractionResponseMessage::new().content(message);
 

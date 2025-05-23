@@ -24,7 +24,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.author.id == ctx.cache.current_user().id {
+        if msg.author.id == ctx.cache.current_user().id || msg.author.bot {
             return;
         } else if msg.content == "!help" {
             utils::send(HELP, &msg, &ctx).await
@@ -60,13 +60,18 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        
         if let Interaction::Command(command) = interaction {
+            if command.user.bot {
+                return;
+            }
+            
             log::info!(
                 "Received command: {:?} from {}",
                 command.data.name,
                 command.channel_id
             );
-
+            
             match command.data.name.as_str() {
                 "help" => commands::help::run(&ctx, &command).await,
                 "search" => commands::search::run(&ctx, &command).await,

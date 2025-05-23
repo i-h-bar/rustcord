@@ -59,7 +59,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         };
 
         state::delete(interaction).await;
-    } else if game_state.number_of_guesses() > game_state.max_guesses() {
+    } else if game_state.number_of_guesses() >= game_state.max_guesses() {
         state::delete(interaction).await;
 
         let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
@@ -97,7 +97,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             log::warn!("couldn't fetch illustration");
             return;
         };
-        let remaining_guesses = game_state.max_guesses() - game_state.number_of_guesses() + 1;
+        let remaining_guesses = game_state.max_guesses() - game_state.number_of_guesses();
         let guess_plural = if remaining_guesses > 1 {
             "guesses"
         } else {
