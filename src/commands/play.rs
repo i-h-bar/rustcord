@@ -2,9 +2,9 @@ use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
-use crate::utils;
+use crate::{mtg, utils};
 use crate::utils::parse::{ParseError, ResolveOption};
-use crate::utils::{fuzzy_match_set_name, parse};
+use crate::utils::parse;
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
@@ -28,9 +28,9 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
     let random_card = if let Some(set_name) = set {
         let matched_set = if set_name.chars().count() < 5 {
-            utils::set_from_abbreviation(&set_name).await
+            mtg::search::set_from_abbreviation(&set_name).await
         } else {
-            fuzzy_match_set_name(&utils::normalise(&set_name)).await
+            mtg::search::fuzzy_match_set_name(&utils::normalise(&set_name)).await
         };
 
         let Some(matched_set) = matched_set else {

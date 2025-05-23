@@ -11,7 +11,6 @@ use serenity::prelude::*;
 use dbs::psql::Psql;
 use utils::help::HELP;
 use crate::mtg::images::ImageFetcher;
-use crate::mtg::search::MTG;
 use dbs::redis::Redis;
 
 mod commands;
@@ -20,17 +19,7 @@ pub mod mtg;
 mod utils;
 mod dbs;
 
-struct Handler {
-    mtg: MTG,
-}
-
-impl Handler {
-    async fn new() -> Self {
-        Self {
-            mtg: MTG::new().await,
-        }
-    }
-}
+struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -40,7 +29,7 @@ impl EventHandler for Handler {
         } else if msg.content == "!help" {
             utils::send(HELP, &msg, &ctx).await
         } else {
-            for card in self.mtg.parse_message(&msg.content).await {
+            for card in mtg::search::parse_message(&msg.content).await {
                 self.card_response(card, &msg, &ctx).await;
             }
         }
@@ -101,10 +90,9 @@ async fn main() {
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
-
-    let handler = Handler::new().await;
+    
     let mut client = Client::builder(&token, intents)
-        .event_handler(handler)
+        .event_handler(Handler)
         .await
         .expect("Error creating client");
 

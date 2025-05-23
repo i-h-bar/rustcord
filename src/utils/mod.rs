@@ -69,14 +69,3 @@ pub fn italicise_reminder_text(text: &str) -> String {
         .replace_all(text, |cap: &Captures| format!("(*{}*)", &cap[1]))
         .to_string()
 }
-
-pub async fn fuzzy_match_set_name(normalised_set_name: &str) -> Option<String> {
-    let potentials = Psql::get()?
-        .fuzzy_search_set_name(normalised_set_name)
-        .await?;
-    fuzzy::winkliest_match(normalised_set_name, potentials)
-}
-
-pub async fn set_from_abbreviation(abbreviation: &str) -> Option<String> {
-    Psql::get()?.set_name_from_abbreviation(abbreviation).await
-}
