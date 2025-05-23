@@ -1,14 +1,15 @@
 mod queries;
 
 use crate::dbs::psql::Psql;
-use crate::utils::emoji::add_emoji;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
     RANDOM_CARD_FROM_DISTINCT,
 };
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
+use crate::utils::emoji::add_emoji;
 use crate::utils::fuzzy::ToChars;
+use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,6 @@ use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
-use crate::utils::parse::{ParseError, ResolveOption};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FuzzyFound {
@@ -421,23 +421,25 @@ impl QueryParams {
 impl ResolveOption for QueryParams {
     fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
     where
-        Self: Sized
-    {   
+        Self: Sized,
+    {
         let mut card_name = None;
         let mut set_name = None;
         let mut set_code = None;
         let mut artist = None;
-        
+
         for (name, value) in options {
             match name {
-                "name" => card_name = match value {
-                    ResolvedValue::String(card) => Some(card.to_string()),
-                    _ => return Err(ParseError::new("Name was not a string"))
-                },
+                "name" => {
+                    card_name = match value {
+                        ResolvedValue::String(card) => Some(card.to_string()),
+                        _ => return Err(ParseError::new("Name was not a string")),
+                    }
+                }
                 "set" => {
                     let set = match value {
                         ResolvedValue::String(set) => set.to_string(),
-                        _ => return Err(ParseError::new("Name was not a string"))
+                        _ => return Err(ParseError::new("Name was not a string")),
                     };
                     if set.chars().count() < 5 {
                         set_code = Some(set);
@@ -445,18 +447,25 @@ impl ResolveOption for QueryParams {
                         set_name = Some(set);
                     }
                 }
-                "artist" => artist = match value {
-                    ResolvedValue::String(artist) => Some(artist.to_string()),
-                    _ => return Err(ParseError::new("Artist was not a string"))
-                },
+                "artist" => {
+                    artist = match value {
+                        ResolvedValue::String(artist) => Some(artist.to_string()),
+                        _ => return Err(ParseError::new("Artist was not a string")),
+                    }
+                }
                 _ => {}
             }
         }
-        
+
         let Some(name) = card_name else {
-            return Err(ParseError::new("No name found in query params"))
+            return Err(ParseError::new("No name found in query params"));
         };
-        
-        Ok(Self{name, set_name, set_code, artist})
+
+        Ok(Self {
+            name,
+            set_name,
+            set_code,
+            artist,
+        })
     }
 }

@@ -1,10 +1,11 @@
-use crate::mtg::db::FuzzyFound;
 use crate::dbs::redis::Redis;
+use crate::mtg::db::FuzzyFound;
 use serde::{Deserialize, Serialize};
 use serenity::all::{
     CommandInteraction, Context, CreateEmbed, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,
 };
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Difficulty {
@@ -13,13 +14,15 @@ pub enum Difficulty {
     Hard,
 }
 
-impl Difficulty {
-    pub fn to_string(&self) -> String {
-        match self {
-            Difficulty::Easy => "Easy".into(),
-            Difficulty::Medium => "Medium".into(),
-            Difficulty::Hard => "Hard".into(),
-        }
+impl Display for Difficulty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            Difficulty::Easy => "Easy",
+            Difficulty::Medium => "Medium",
+            Difficulty::Hard => "Hard",
+        };
+
+        write!(f, "{}", string)
     }
 }
 

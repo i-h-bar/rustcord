@@ -11,8 +11,7 @@ pub async fn card_response(card: Option<CardAndImage>, msg: &Message, ctx: &Cont
     match card {
         None => utils::send("Failed to find card :(", msg, ctx).await,
         Some((card, (front_image, back_image))) => {
-            send_embed(card, front_image, back_image, msg, ctx)
-                .await;
+            send_embed(card, front_image, back_image, msg, ctx).await;
         }
     }
 }

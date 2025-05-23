@@ -1,8 +1,10 @@
-use serenity::all::{CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage};
-use crate::{mtg, utils};
+use crate::mtg;
 use crate::mtg::db::QueryParams;
 use crate::utils::parse;
-
+use serenity::all::{
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage,
+};
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let query_params = match parse::options::<QueryParams>(interaction.data.options()) {
         Ok(params) => params,
@@ -11,7 +13,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             return;
         }
     };
-    
+
     let card = mtg::search::find_card(query_params).await;
     if let Some((card, (front_image, back_image))) = card {
         let (front, back) = card.to_embed();
@@ -20,14 +22,15 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         } else {
             CreateInteractionResponseMessage::new()
         }
-            .add_embed(front);
+        .add_embed(front);
 
         if let Some(back) = back {
             message = if let Some(back_image) = back_image {
                 message.add_file(back_image)
             } else {
                 message
-            }.add_embed(back);
+            }
+            .add_embed(back);
         };
 
         if let Err(why) = interaction
@@ -36,7 +39,6 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         {
             log::error!("couldn't create interaction response: {:?}", why);
         }
-        
     } else {
         let response = CreateInteractionResponseMessage::new()
             .content("Could not find card :(")
@@ -50,16 +52,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     }
 }
 
-
 pub fn register() -> CreateCommand {
     CreateCommand::new("search")
         .description("Search for a card")
         .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "name",
-                "Name of the card",
-            )
+            CreateCommandOption::new(CommandOptionType::String, "name", "Name of the card")
                 .required(true),
         )
         .add_option(

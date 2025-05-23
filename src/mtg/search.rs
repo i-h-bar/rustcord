@@ -28,10 +28,7 @@ async fn search_distinct_cards(normalised_name: &str) -> Option<FuzzyFound> {
     fuzzy::winkliest_match(normalised_name, potentials)
 }
 
-async fn search_set_abbreviation(
-    abbreviation: &str,
-    normalised_name: &str,
-) -> Option<FuzzyFound> {
+async fn search_set_abbreviation(abbreviation: &str, normalised_name: &str) -> Option<FuzzyFound> {
     let set_name = set_from_abbreviation(abbreviation).await?;
     let potentials = Psql::get()?
         .fuzzy_search_set(&set_name, normalised_name)
@@ -39,10 +36,7 @@ async fn search_set_abbreviation(
     fuzzy::winkliest_match(normalised_name, potentials)
 }
 
-async fn search_set_name(
-    normalised_set_name: &str,
-    normalised_name: &str,
-) -> Option<FuzzyFound> {
+async fn search_set_name(normalised_set_name: &str, normalised_name: &str) -> Option<FuzzyFound> {
     let set_name = fuzzy_match_set_name(normalised_set_name).await?;
     let potentials = Psql::get()?
         .fuzzy_search_set(&set_name, normalised_name)

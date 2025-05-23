@@ -2,9 +2,9 @@ use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
-use crate::{mtg, utils};
-use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::parse;
+use crate::utils::parse::{ParseError, ResolveOption};
+use crate::{mtg, utils};
 use serenity::all::{
     CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
@@ -70,13 +70,13 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         let response = if let Some(set_of_card) = set_of_card {
             CreateInteractionResponseMessage::new().content(format!(
                 "Difficulty is set to `{}`. This card is from `{}`",
-                game_state.difficulty().to_string(),
+                game_state.difficulty(),
                 set_of_card
             ))
         } else {
             CreateInteractionResponseMessage::new().content(format!(
                 "Difficulty is set to `{}`.",
-                game_state.difficulty().to_string()
+                game_state.difficulty()
             ))
         }
         .add_file(illustration)

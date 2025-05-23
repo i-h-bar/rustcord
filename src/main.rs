@@ -8,16 +8,16 @@ use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
 
-use dbs::psql::Psql;
-use utils::help::HELP;
 use crate::mtg::images::ImageFetcher;
+use dbs::psql::Psql;
 use dbs::redis::Redis;
+use utils::help::HELP;
 
 mod commands;
+mod dbs;
 mod game;
 pub mod mtg;
 mod utils;
-mod dbs;
 
 struct Handler;
 
@@ -38,22 +38,22 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, _: Ready) {
         match Command::create_global_command(&ctx, commands::play::register()).await {
             Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created play command"),
+            Ok(_) => log::info!("Created play command"),
         };
 
         match Command::create_global_command(&ctx, commands::guess::register()).await {
             Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created guess command"),
+            Ok(_) => log::info!("Created guess command"),
         };
 
         match Command::create_global_command(&ctx, commands::help::register()).await {
             Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created help command"),
+            Ok(_) => log::info!("Created help command"),
         };
 
         match Command::create_global_command(&ctx, commands::search::register()).await {
             Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created search command"),
+            Ok(_) => log::info!("Created search command"),
         };
 
         log::info!("Bot ready!")
@@ -90,7 +90,7 @@ async fn main() {
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
-    
+
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
         .await
