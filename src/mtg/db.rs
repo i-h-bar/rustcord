@@ -12,12 +12,13 @@ use crate::utils::fuzzy::ToChars;
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
-use serenity::all::{CreateEmbed, CreateEmbedFooter};
+use serenity::all::{CreateEmbed, CreateEmbedFooter, ResolvedValue};
 use sqlx::postgres::PgRow;
 use sqlx::{Error, FromRow, Row};
 use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
+use crate::utils::parse::{ParseError, ResolveOption};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FuzzyFound {
@@ -414,5 +415,48 @@ impl QueryParams {
             set_code,
             set_name,
         })
+    }
+}
+
+impl ResolveOption for QueryParams {
+    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
+    where
+        Self: Sized
+    {   
+        let mut card_name = None;
+        let mut set_name = None;
+        let mut set_code = None;
+        let mut artist = None;
+        
+        for (name, value) in options {
+            match name {
+                "name" => card_name = match value {
+                    ResolvedValue::String(card) => Some(card.to_string()),
+                    _ => return Err(ParseError::new("Name was not a string"))
+                },
+                "set" => {
+                    let set = match value {
+                        ResolvedValue::String(set) => set.to_string(),
+                        _ => return Err(ParseError::new("Name was not a string"))
+                    };
+                    if set.chars().count() < 5 {
+                        set_code = Some(set);
+                    } else {
+                        set_name = Some(set);
+                    }
+                }
+                "artist" => artist = match value {
+                    ResolvedValue::String(artist) => Some(artist.to_string()),
+                    _ => return Err(ParseError::new("Artist was not a string"))
+                },
+                _ => {}
+            }
+        }
+        
+        let Some(name) = card_name else {
+            return Err(ParseError::new("No name found in query params"))
+        };
+        
+        Ok(Self{name, set_name, set_code, artist})
     }
 }
