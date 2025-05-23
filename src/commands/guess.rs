@@ -97,9 +97,15 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             log::warn!("couldn't fetch illustration");
             return;
         };
+        let remaining_guesses = game_state.max_guesses() - game_state.number_of_guesses() + 1;
+        let guess_plural = if remaining_guesses > 1 { 
+            "guesses"
+        } else { 
+            "guess"
+        };
 
         let response = CreateInteractionResponseMessage::new()
-            .content(format!("'{}' was not the correct card", guess))
+            .content(format!("'{}' was not the correct card. You have {} {} remaining", guess, remaining_guesses, guess_plural))
             .add_file(illustration)
             .embed(game_state.to_embed());
 
