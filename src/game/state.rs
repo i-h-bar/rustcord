@@ -1,5 +1,5 @@
 use crate::mtg::db::FuzzyFound;
-use crate::redis::Redis;
+use crate::dbs::redis::Redis;
 use serde::{Deserialize, Serialize};
 use serenity::all::{
     CommandInteraction, Context, CreateEmbed, CreateInteractionResponse,

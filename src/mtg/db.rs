@@ -1,7 +1,7 @@
 mod queries;
 
-use crate::db::Psql;
-use crate::emoji::add_emoji;
+use crate::dbs::psql::Psql;
+use crate::utils::emoji::add_emoji;
 use crate::mtg::db::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
     RANDOM_CARD_FROM_DISTINCT,

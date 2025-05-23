@@ -1,8 +1,10 @@
 pub mod colours;
 pub(crate) mod fuzzy;
 pub mod parse;
+pub mod emoji;
+pub mod help;
 
-use crate::db::Psql;
+use crate::dbs::psql::Psql;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serenity::all::{Context, CreateMessage, Message};

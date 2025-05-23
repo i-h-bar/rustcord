@@ -3,7 +3,7 @@ use serenity::builder::CreateAttachment;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 
-use crate::db::Psql;
+use crate::dbs::psql::Psql;
 use crate::mtg::db::{FuzzyFound, QueryParams};
 use crate::mtg::images::ImageFetcher;
 use crate::utils;

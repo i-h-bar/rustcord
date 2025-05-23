@@ -8,20 +8,17 @@ use serenity::async_trait;
 use serenity::client::EventHandler;
 use serenity::prelude::*;
 
-use crate::db::Psql;
-use crate::help::HELP;
+use dbs::psql::Psql;
+use utils::help::HELP;
 use crate::mtg::images::ImageFetcher;
 use crate::mtg::search::MTG;
-use crate::redis::Redis;
+use dbs::redis::Redis;
 
 mod commands;
-mod db;
-pub mod emoji;
 mod game;
-mod help;
 pub mod mtg;
-pub mod redis;
 mod utils;
+mod dbs;
 
 struct Handler {
     mtg: MTG,

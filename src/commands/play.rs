@@ -1,4 +1,4 @@
-use crate::db::Psql;
+use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;

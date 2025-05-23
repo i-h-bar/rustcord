@@ -1,4 +1,4 @@
-use crate::help::HELP;
+use crate::utils::help::HELP;
 use serenity::all::{
     CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage,
