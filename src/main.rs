@@ -57,7 +57,12 @@ impl EventHandler for Handler {
 
         match Command::create_global_command(&ctx, commands::guess::register()).await {
             Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(command) => log::info!("Created play command: {:?}", command),
+            Ok(command) => log::info!("Created guess command: {:?}", command),
+        };
+
+        match Command::create_global_command(&ctx, commands::help::register()).await {
+            Err(error) => log::warn!("Could not create command {:?}", error),
+            Ok(command) => log::info!("Created help command: {:?}", command),
         };
 
         log::info!("Bot ready!")
@@ -72,6 +77,7 @@ impl EventHandler for Handler {
             );
 
             match command.data.name.as_str() {
+                "help" => commands::help::run(&ctx, &command).await,
                 "play" => commands::play::run(&ctx, &command).await,
                 "guess" => commands::guess::run(&ctx, &command).await,
                 _ => (),

@@ -54,7 +54,7 @@ impl GameState {
             Difficulty::Easy => 16,
         }
     }
-    
+
     pub fn difficulty(&self) -> &Difficulty {
         &self.difficulty
     }

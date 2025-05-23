@@ -20,7 +20,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             return;
         }
     };
-    let mut set_of_card =  None;
+    let mut set_of_card = None;
     let Some(db) = Psql::get() else {
         log::warn!("failed to get Psql database");
         return;
@@ -67,14 +67,20 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
         let game_state = GameState::from(card, difficulty);
 
-        let response = if let Some(set_of_card) = set_of_card { 
-            CreateInteractionResponseMessage::new()
-                .content(format!("Difficulty is set to `{}`. This card is from `{}`", game_state.difficulty().to_string(), set_of_card))
+        let response = if let Some(set_of_card) = set_of_card {
+            CreateInteractionResponseMessage::new().content(format!(
+                "Difficulty is set to `{}`. This card is from `{}`",
+                game_state.difficulty().to_string(),
+                set_of_card
+            ))
         } else {
-            CreateInteractionResponseMessage::new().content(format!("Difficulty is set to `{}`.", game_state.difficulty().to_string()))
+            CreateInteractionResponseMessage::new().content(format!(
+                "Difficulty is set to `{}`.",
+                game_state.difficulty().to_string()
+            ))
         }
-            .add_file(illustration)
-            .add_embed(game_state.to_embed());
+        .add_file(illustration)
+        .add_embed(game_state.to_embed());
 
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
