@@ -6,7 +6,6 @@ use tokio::time::Instant;
 use crate::dbs::psql::Psql;
 use crate::mtg::db::{FuzzyFound, QueryParams};
 use crate::mtg::images::ImageFetcher;
-use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 
 pub type CardAndImage = (
@@ -61,7 +60,7 @@ async fn search_artist(artist: &str, normalised_name: &str) -> Option<FuzzyFound
     fuzzy::winkliest_match(normalised_name, potentials)
 }
 
-async fn find_card(query: QueryParams) -> Option<CardAndImage> {
+pub async fn find_card(query: QueryParams) -> Option<CardAndImage> {
     let start = Instant::now();
 
     let found_card = if let Some(set_code) = &query.set_code {

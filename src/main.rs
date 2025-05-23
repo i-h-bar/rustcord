@@ -30,7 +30,7 @@ impl EventHandler for Handler {
             utils::send(HELP, &msg, &ctx).await
         } else {
             for card in mtg::search::parse_message(&msg.content).await {
-                self.card_response(card, &msg, &ctx).await;
+                mtg::card_response(card, &msg, &ctx).await;
             }
         }
     }
