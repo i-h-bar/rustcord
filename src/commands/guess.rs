@@ -1,6 +1,5 @@
-use crate::game::state::GameState;
+use crate::game::state;
 use crate::mtg::images::ImageFetcher;
-use crate::redis::Redis;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
@@ -17,48 +16,12 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         }
     };
 
-    let Some(redis) = Redis::instance() else {
-        log::warn!("failed to get redis instance");
-        return;
-    };
-
-    let Some(game_state_string): Option<String> =
-        redis.get(interaction.channel_id.to_string()).await
-    else {
-        let message = MessageBuilder::new()
-            .mention(&interaction.user)
-            .push(" no game found in ")
-            .push(
-                interaction
-                    .channel_id
-                    .name(ctx)
-                    .await
-                    .unwrap_or(interaction.channel_id.to_string()),
-            )
-            .build();
-        let response = CreateInteractionResponseMessage::new().content(message);
-
-        let response = CreateInteractionResponse::Message(response);
-        if let Err(why) = interaction.create_response(&ctx.http, response).await {
-            log::warn!("couldn't create interaction: {}", why);
-        };
-
-        return;
-    };
-
-    let game_state = match ron::from_str::<GameState>(&game_state_string) {
-        Ok(mut game_state) => {
-            game_state.add_guess();
-            game_state
-        }
-        Err(why) => {
-            log::warn!("Couldn't parse game state: {}", why);
-            return;
-        }
-    };
-
     let Some(image_fetcher) = ImageFetcher::get() else {
         log::warn!("couldn't get image fetcher");
+        return;
+    };
+
+    let Some(game_state) = state::fetch(ctx, interaction).await else {
         return;
     };
 
@@ -95,21 +58,9 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             log::warn!("couldn't create interaction: {}", why);
         };
 
-        if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
-            log::warn!(
-                "Error deleting key: '{}' from redis the response: {:?}",
-                interaction.channel_id.to_string(),
-                why
-            );
-        };
+        state::delete(interaction).await;
     } else if game_state.number_of_guesses() > game_state.max_guesses() {
-        if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
-            log::warn!(
-                "Error deleting key: '{}' from redis the response: {:?}",
-                interaction.channel_id.to_string(),
-                why
-            );
-        }
+        state::delete(interaction).await;
 
         let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
@@ -156,16 +107,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
         };
-
-        if let Err(why) = redis
-            .set(
-                interaction.channel_id.to_string(),
-                ron::to_string(&game_state).unwrap(),
-            )
-            .await
-        {
-            log::warn!("Error while trying to set value in redis: {}", why);
-        };
+        state::add(&game_state, interaction).await;
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::db::Psql;
+use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::mtg::images::ImageFetcher;
-use crate::redis::Redis;
 use crate::utils;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy_match_set_name, parse};
@@ -72,19 +72,8 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::error!("couldn't create interaction response: {:?}", why);
         };
-        let Some(redis) = Redis::instance() else {
-            log::warn!("failed to get redis connection");
-            return;
-        };
-        if let Err(why) = redis
-            .set(
-                interaction.channel_id.to_string(),
-                ron::to_string(&game_state).unwrap(),
-            )
-            .await
-        {
-            log::warn!("couldn't set redis value: {:?}", why);
-        };
+
+        state::add(&game_state, interaction).await;
     } else {
         log::warn!("Failed to get random card")
     }
@@ -103,12 +92,14 @@ pub fn register() -> CreateCommand {
         )
         .add_option(
             CreateCommandOption::new(
-                CommandOptionType::String, "difficulty", "what difficulty do you want to play at?"
+                CommandOptionType::String,
+                "difficulty",
+                "what difficulty do you want to play at?",
             )
-                .add_string_choice("Easy", "Easy")
-                .add_string_choice("Medium", "Medium")
-                .add_string_choice("Hard", "Hard")
-                .required(false),
+            .add_string_choice("Easy", "Easy")
+            .add_string_choice("Medium", "Medium")
+            .add_string_choice("Hard", "Hard")
+            .required(false),
         )
 }
 
@@ -132,15 +123,22 @@ impl ResolveOption for Options {
                 }
                 "difficulty" => {
                     difficulty = match value {
-                        ResolvedValue::String(difficulty_string) => {
-                            match difficulty_string {
-                                "Easy" => Difficulty::Easy,
-                                "Medium" => Difficulty::Medium,
-                                "Hard" => Difficulty::Hard,
-                                default => return Err(ParseError::new(&format!("Could not parse {} into difficulty", default))),
+                        ResolvedValue::String(difficulty_string) => match difficulty_string {
+                            "Easy" => Difficulty::Easy,
+                            "Medium" => Difficulty::Medium,
+                            "Hard" => Difficulty::Hard,
+                            default => {
+                                return Err(ParseError::new(&format!(
+                                    "Could not parse {} into difficulty",
+                                    default
+                                )))
                             }
                         },
-                        _ => return Err(ParseError::new("difficulty ResolvedValue was not a string")),
+                        _ => {
+                            return Err(ParseError::new(
+                                "difficulty ResolvedValue was not a string",
+                            ))
+                        }
                     };
                 }
                 _ => {}
