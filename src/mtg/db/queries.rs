@@ -51,7 +51,8 @@ pub const RANDOM_CARD_FROM_DISTINCT: &str = r#"
                    back_rule.oracle_text        as back_oracle_text,
             
                    front.release_date           as release_date,
-                   artist.name                  as artist
+                   artist.name                  as artist,
+                   set.name                     as set_name
             from card front
                      left join card back on front.backside_id = back.id
                      left join rule front_rule on front.rule_id = front_rule.id

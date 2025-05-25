@@ -10,7 +10,6 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
-use titlecase::titlecase;
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let Options { set, difficulty } = match parse::options(interaction.data.options()) {
@@ -20,7 +19,6 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             return;
         }
     };
-    let mut set_of_card = None;
     let Some(db) = Psql::get() else {
         log::warn!("failed to get Psql database");
         return;
@@ -49,7 +47,6 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             }
             return;
         };
-        set_of_card = Some(titlecase(&matched_set));
         db.random_card_from_set(&matched_set).await
     } else {
         db.random_card().await
@@ -67,17 +64,16 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
         let game_state = GameState::from(card, difficulty);
 
-        let response = if let Some(set_of_card) = set_of_card {
-            CreateInteractionResponseMessage::new().content(format!(
-                "Difficulty is set to `{}`. This card is from `{}`",
-                game_state.difficulty(),
-                set_of_card
-            ))
-        } else {
-            CreateInteractionResponseMessage::new().content(format!(
+        let response = match game_state.difficulty() {
+            Difficulty::Hard => CreateInteractionResponseMessage::new().content(format!(
                 "Difficulty is set to `{}`.",
                 game_state.difficulty()
-            ))
+            )),
+            _ => CreateInteractionResponseMessage::new().content(format!(
+                "Difficulty is set to `{}`. This card is from `{}`",
+                game_state.difficulty(),
+                game_state.card().set_name()
+            )),
         }
         .add_file(illustration)
         .add_embed(game_state.to_embed());

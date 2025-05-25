@@ -48,6 +48,7 @@ pub struct FuzzyFound {
     back_type_line: Option<String>,
     back_oracle_text: Option<String>,
     artist: String,
+    set_name: String,
 }
 
 impl FuzzyFound {
@@ -197,6 +198,10 @@ impl FuzzyFound {
 
         format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats)
     }
+
+    pub fn set_name(&self) -> &str {
+        &self.set_name
+    }
 }
 
 impl ToChars for FuzzyFound {
@@ -240,6 +245,7 @@ impl<'r> FromRow<'r, PgRow> for FuzzyFound {
             back_type_line: row.get::<Option<String>, &str>("back_type_line"),
             back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
             artist: row.get::<String, &str>("artist"),
+            set_name: row.get::<String, &str>("set_name"),
         })
     }
 }
