@@ -1,19 +1,12 @@
-use crate::dbs::psql::queries::{
-    FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
-    RANDOM_CARD_FROM_DISTINCT,
-};
-use crate::dbs::psql::Psql;
-use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::emoji::add_emoji;
 use crate::utils::fuzzy::ToChars;
-use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
-use serenity::all::{CreateEmbed, CreateEmbedFooter, ResolvedValue};
+use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use sqlx::postgres::PgRow;
-use sqlx::{Error, FromRow, Row};
+use sqlx::{Error, Row};
 use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
