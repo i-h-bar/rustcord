@@ -1,11 +1,11 @@
-use once_cell::sync::OnceCell;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use std::env;
+use tokio::sync::OnceCell;
 
 pub mod queries;
 
-static DB_INSTANCE: OnceCell<Psql> = OnceCell::new();
+static PSQL: OnceCell<Psql> = OnceCell::const_new();
 
 #[derive(Debug)]
 pub struct Psql {
@@ -15,7 +15,7 @@ pub struct Psql {
 impl Psql {
     pub async fn init() {
         let instance = Self::new().await;
-        DB_INSTANCE
+        PSQL
             .set(instance)
             .expect("Could not initialise DB once cell");
     }
@@ -32,6 +32,6 @@ impl Psql {
     }
 
     pub fn get() -> Option<&'static Self> {
-        DB_INSTANCE.get()
+        PSQL.get()
     }
 }

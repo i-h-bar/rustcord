@@ -1,6 +1,6 @@
 use crate::dbs::psql::Psql;
 use crate::mtg::card::FuzzyFound;
-use crate::mtg::images::ImageFetcher;
+use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
 use crate::utils;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, REGEX_COLLECTION};
@@ -76,7 +76,7 @@ pub async fn find_card(query: QueryParams) -> Option<CardAndImage> {
         start.elapsed().as_millis()
     );
 
-    let images = ImageFetcher::get()?.fetch(&found_card).await;
+    let images = IMAGE_FETCHER.fetch(&found_card).await;
 
     Some((found_card, images))
 }

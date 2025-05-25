@@ -92,7 +92,6 @@ async fn main() {
     env_logger::init();
     Psql::init().await;
     Redis::init().await;
-    ImageFetcher::init();
 
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES

@@ -1,6 +1,6 @@
 use crate::game::state;
-use crate::mtg::images::ImageFetcher;
-use crate::utils::mutex::{remove_lock, wait_for_lock};
+use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
+use crate::game::mutex;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
@@ -10,9 +10,9 @@ use serenity::all::{
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let channel_id = interaction.channel_id.to_string();
-    wait_for_lock(channel_id.clone()).await;
+    mutex::wait_for_lock(channel_id.clone()).await;
     run_guess(ctx, interaction).await;
-    remove_lock(channel_id).await;
+    mutex::remove_lock(channel_id).await;
 }
 
 async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
@@ -24,18 +24,13 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
         }
     };
 
-    let Some(image_fetcher) = ImageFetcher::get() else {
-        log::warn!("couldn't get image fetcher");
-        return;
-    };
-
     let Some(mut game_state) = state::fetch(ctx, interaction).await else {
         return;
     };
     game_state.add_guess();
 
     if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
-        let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+        let (Some(image), _) = IMAGE_FETCHER.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
             return;
         };
@@ -71,7 +66,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
     } else if game_state.number_of_guesses() >= game_state.max_guesses() {
         state::delete(interaction).await;
 
-        let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+        let (Some(image), _) = IMAGE_FETCHER.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
             return;
         };
@@ -101,7 +96,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
             log::warn!("couldn't create interaction: {}", why);
         }
     } else {
-        let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
+        let (Some(illustration), _) = IMAGE_FETCHER.fetch_illustration(game_state.card()).await
         else {
             log::warn!("couldn't fetch illustration");
             return;

@@ -1,7 +1,7 @@
 use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
-use crate::mtg::images::ImageFetcher;
+use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
 use crate::utils::parse;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::{mtg, utils};
@@ -53,11 +53,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     };
 
     if let Some(card) = random_card {
-        let Some(image_fetcher) = ImageFetcher::get() else {
-            log::warn!("failed to get image fetcher");
-            return;
-        };
-        let (Some(illustration), _) = image_fetcher.fetch_illustration(&card).await else {
+        let (Some(illustration), _) = IMAGE_FETCHER.fetch_illustration(&card).await else {
             log::warn!("failed to get image");
             return;
         };
