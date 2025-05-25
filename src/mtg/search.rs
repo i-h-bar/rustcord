@@ -2,11 +2,14 @@ use log;
 use serenity::builder::CreateAttachment;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
-
+use serenity::all::ResolvedValue;
+use regex::Captures;
 use crate::dbs::psql::Psql;
-use crate::mtg::db::{FuzzyFound, QueryParams};
+use crate::mtg::db::FuzzyFound;
 use crate::mtg::images::ImageFetcher;
+use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
+use crate::utils::parse::{ParseError, ResolveOption};
 
 pub type CardAndImage = (
     FuzzyFound,
@@ -87,4 +90,92 @@ pub async fn fuzzy_match_set_name(normalised_set_name: &str) -> Option<String> {
 
 pub async fn set_from_abbreviation(abbreviation: &str) -> Option<String> {
     Psql::get()?.set_name_from_abbreviation(abbreviation).await
+}
+
+pub struct QueryParams {
+    name: String,
+    set_code: Option<String>,
+    set_name: Option<String>,
+    artist: Option<String>,
+}
+
+impl QueryParams {
+    fn from(capture: Captures<'_>) -> Option<Self> {
+        let raw_name = capture.get(1)?.as_str();
+        let name = utils::normalise(raw_name);
+        let (set_code, set_name) = match capture.get(4) {
+            Some(set) => {
+                let set = set.as_str();
+                if set.chars().count() < 5 {
+                    (Some(utils::normalise(set)), None)
+                } else {
+                    (None, Some(utils::normalise(set)))
+                }
+            }
+            None => (None, None),
+        };
+
+        let artist = capture
+            .get(7)
+            .map(|artist| utils::normalise(artist.as_str()));
+
+        Some(Self {
+            name,
+            artist,
+            set_code,
+            set_name,
+        })
+    }
+}
+
+impl ResolveOption for QueryParams {
+    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
+    where
+        Self: Sized,
+    {
+        let mut card_name = None;
+        let mut set_name = None;
+        let mut set_code = None;
+        let mut artist = None;
+
+        for (name, value) in options {
+            match name {
+                "name" => {
+                    card_name = match value {
+                        ResolvedValue::String(card) => Some(card.to_string()),
+                        _ => return Err(ParseError::new("Name was not a string")),
+                    }
+                }
+                "set" => {
+                    let set = match value {
+                        ResolvedValue::String(set) => set.to_string(),
+                        _ => return Err(ParseError::new("Name was not a string")),
+                    };
+                    if set.chars().count() < 5 {
+                        set_code = Some(set);
+                    } else {
+                        set_name = Some(set);
+                    }
+                }
+                "artist" => {
+                    artist = match value {
+                        ResolvedValue::String(artist) => Some(artist.to_string()),
+                        _ => return Err(ParseError::new("Artist was not a string")),
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let Some(name) = card_name else {
+            return Err(ParseError::new("No name found in query params"));
+        };
+
+        Ok(Self {
+            name,
+            set_name,
+            set_code,
+            artist,
+        })
+    }
 }

@@ -26,12 +26,12 @@ Additionally, you can put this mid-sentence as to not break your flow, as well a
 \u{001b}[1;34m/help\u{001b}[0m - Options: () - Show this message.
 \u{001b}[1;34m/play\u{001b}[0m - Options: (set, difficulty) - Start a game of guess the Magic the Gathering card.
 \u{001b}[1;34m/guess\u{001b}[0m - Options: () - Make a guess for an active guess the card game.
-
+\u{001b}[1;34m/give_up\u{001b}[0m - Options: () - Give up on the current game and return the answer.
 
 \u{001b}[1;10;4;31mHaving issues or have suggestions?\u{001b}[0m
 Please raise a ticket here https://github.com/i-h-bar/rustcord/issues
 
-of if you don't want to use github please raise a ticket in this server
+or if you don't want to use github please raise a ticket in this server
 https://discord.gg/m9FjpPRAxt
 ```
     ";

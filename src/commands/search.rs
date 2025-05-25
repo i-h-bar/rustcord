@@ -1,5 +1,5 @@
 use crate::mtg;
-use crate::mtg::db::QueryParams;
+use crate::mtg::search::QueryParams;
 use crate::utils::parse;
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,

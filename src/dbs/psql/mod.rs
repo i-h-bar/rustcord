@@ -3,6 +3,8 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use std::env;
 
+pub mod queries;
+
 static DB_INSTANCE: OnceCell<Psql> = OnceCell::new();
 
 #[derive(Debug)]
