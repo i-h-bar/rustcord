@@ -5,8 +5,11 @@ use serenity::all::{
 };
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let response =
-        CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(HELP));
+    let response = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .content(HELP)
+            .ephemeral(true),
+    );
     if let Err(why) = interaction.create_response(&ctx.http, response).await {
         log::error!("couldn't create interaction response: {:?}", why);
     };

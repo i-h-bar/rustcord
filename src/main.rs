@@ -60,18 +60,17 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        
         if let Interaction::Command(command) = interaction {
             if command.user.bot {
                 return;
             }
-            
+
             log::info!(
                 "Received command: {:?} from {}",
                 command.data.name,
                 command.channel_id
             );
-            
+
             match command.data.name.as_str() {
                 "help" => commands::help::run(&ctx, &command).await,
                 "search" => commands::search::run(&ctx, &command).await,

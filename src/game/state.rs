@@ -102,7 +102,7 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
         } else {
             String::from("this channel")
         };
-        
+
         let message = MessageBuilder::new()
             .mention(&interaction.user)
             .push(" no game found in ")
