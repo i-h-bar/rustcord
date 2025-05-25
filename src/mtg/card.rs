@@ -1,8 +1,8 @@
-use crate::dbs::psql::Psql;
 use crate::dbs::psql::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
     RANDOM_CARD_FROM_DISTINCT,
 };
+use crate::dbs::psql::Psql;
 use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::emoji::add_emoji;
@@ -81,7 +81,7 @@ impl FuzzyFound {
             set_name: row.get::<String, &str>("set_name"),
         })
     }
-    
+
     pub fn image_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
         (Some(&self.front_image_id), self.back_image_id.as_ref())
     }
@@ -245,4 +245,3 @@ impl PartialEq<FuzzyFound> for &str {
         self == &other.front_normalised_name
     }
 }
-

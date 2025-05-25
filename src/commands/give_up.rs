@@ -1,6 +1,9 @@
-use serenity::all::{CommandInteraction, Context, CreateCommand, CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder};
 use crate::game::state;
 use crate::mtg::images::ImageFetcher;
+use serenity::all::{
+    CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
+    CreateInteractionResponseMessage, MessageBuilder,
+};
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let Some(game_state) = state::fetch(ctx, interaction).await else {

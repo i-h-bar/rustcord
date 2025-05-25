@@ -1,5 +1,6 @@
 use crate::game::state;
 use crate::mtg::images::ImageFetcher;
+use crate::utils::mutex::{remove_lock, wait_for_lock};
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
@@ -8,6 +9,13 @@ use serenity::all::{
 };
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+    let channel_id = interaction.channel_id.to_string();
+    wait_for_lock(channel_id.clone()).await;
+    run_guess(ctx, interaction).await;
+    remove_lock(channel_id).await;
+}
+
+async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
     let Options { guess } = match parse::options(interaction.data.options()) {
         Ok(value) => value,
         Err(err) => {

@@ -1,15 +1,15 @@
-use log;
-use serenity::builder::CreateAttachment;
-use serenity::futures::future::join_all;
-use tokio::time::Instant;
-use serenity::all::ResolvedValue;
-use regex::Captures;
 use crate::dbs::psql::Psql;
 use crate::mtg::card::FuzzyFound;
 use crate::mtg::images::ImageFetcher;
 use crate::utils;
-use crate::utils::{fuzzy, REGEX_COLLECTION};
 use crate::utils::parse::{ParseError, ResolveOption};
+use crate::utils::{fuzzy, REGEX_COLLECTION};
+use log;
+use regex::Captures;
+use serenity::all::ResolvedValue;
+use serenity::builder::CreateAttachment;
+use serenity::futures::future::join_all;
+use tokio::time::Instant;
 
 pub type CardAndImage = (
     FuzzyFound,

@@ -108,7 +108,9 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
             .push(" no game found in ")
             .push(name)
             .build();
-        let response = CreateInteractionResponseMessage::new().content(message);
+        let response = CreateInteractionResponseMessage::new()
+            .content(message)
+            .ephemeral(true);
 
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
@@ -118,9 +120,7 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
     };
 
     match ron::from_str::<GameState>(&game_state_string) {
-        Ok(game_state) => {
-            Some(game_state)
-        }
+        Ok(game_state) => Some(game_state),
         Err(why) => {
             log::warn!("Couldn't parse game state: {}", why);
             None

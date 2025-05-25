@@ -1,5 +1,3 @@
-extern crate core;
-
 use std::env;
 
 use dotenv::dotenv;
@@ -55,7 +53,7 @@ impl EventHandler for Handler {
             Err(error) => log::warn!("Could not create command {:?}", error),
             Ok(_) => log::info!("Created search command"),
         };
-        
+
         match Command::create_global_command(&ctx, commands::give_up::register()).await {
             Err(error) => log::warn!("Could not create command {:?}", error),
             Ok(_) => log::info!("Created give_up command"),

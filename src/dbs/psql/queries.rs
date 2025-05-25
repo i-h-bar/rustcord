@@ -1,8 +1,8 @@
-use sqlx::{Error, FromRow, Row};
-use sqlx::postgres::PgRow;
-use uuid::Uuid;
 use crate::dbs::psql::Psql;
 use crate::mtg::card::FuzzyFound;
+use sqlx::postgres::PgRow;
+use sqlx::{Error, FromRow, Row};
+use uuid::Uuid;
 
 pub const FUZZY_SEARCH_DISTINCT_CARDS: &str = r#"
 select * from distinct_cards
