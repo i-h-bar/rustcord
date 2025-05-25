@@ -21,9 +21,10 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         return;
     };
 
-    let Some(game_state) = state::fetch(ctx, interaction).await else {
+    let Some(mut game_state) = state::fetch(ctx, interaction).await else {
         return;
     };
+    game_state.add_guess();
 
     if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
         let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {

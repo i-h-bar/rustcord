@@ -118,8 +118,7 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
     };
 
     match ron::from_str::<GameState>(&game_state_string) {
-        Ok(mut game_state) => {
-            game_state.add_guess();
+        Ok(game_state) => {
             Some(game_state)
         }
         Err(why) => {
