@@ -50,6 +50,38 @@ pub struct FuzzyFound {
 }
 
 impl FuzzyFound {
+    pub fn from(row: &PgRow) -> Result<Self, Error> {
+        Ok(Self {
+            front_name: row.get::<String, &str>("front_name"),
+            front_normalised_name: row.get::<String, &str>("front_normalised_name"),
+            front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
+            front_image_id: row.get::<Uuid, &str>("front_image_id"),
+            front_illustration_id: row.get::<Option<Uuid>, &str>("front_illustration_id"),
+            front_mana_cost: row.get::<String, &str>("front_mana_cost"),
+            front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
+            front_power: row.get::<Option<String>, &str>("front_power"),
+            front_toughness: row.get::<Option<String>, &str>("front_toughness"),
+            front_loyalty: row.get::<Option<String>, &str>("front_loyalty"),
+            front_defence: row.get::<Option<String>, &str>("front_defence"),
+            front_type_line: row.get::<String, &str>("front_type_line"),
+            front_oracle_text: row.get::<String, &str>("front_oracle_text"),
+            back_name: row.get::<Option<String>, &str>("back_name"),
+            back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
+            back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
+            back_illustration_id: row.get::<Option<Uuid>, &str>("back_illustration_id"),
+            back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
+            back_colour_identity: row.get::<Option<Vec<String>>, &str>("back_colour_identity"),
+            back_power: row.get::<Option<String>, &str>("back_power"),
+            back_toughness: row.get::<Option<String>, &str>("back_toughness"),
+            back_loyalty: row.get::<Option<String>, &str>("back_loyalty"),
+            back_defence: row.get::<Option<String>, &str>("back_defence"),
+            back_type_line: row.get::<Option<String>, &str>("back_type_line"),
+            back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
+            artist: row.get::<String, &str>("artist"),
+            set_name: row.get::<String, &str>("set_name"),
+        })
+    }
+    
     pub fn image_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
         (Some(&self.front_image_id), self.back_image_id.as_ref())
     }
@@ -214,174 +246,3 @@ impl PartialEq<FuzzyFound> for &str {
     }
 }
 
-impl<'r> FromRow<'r, PgRow> for FuzzyFound {
-    fn from_row(row: &'r PgRow) -> Result<Self, Error> {
-        Ok(FuzzyFound {
-            front_name: row.get::<String, &str>("front_name"),
-            front_normalised_name: row.get::<String, &str>("front_normalised_name"),
-            front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
-            front_image_id: row.get::<Uuid, &str>("front_image_id"),
-            front_illustration_id: row.get::<Option<Uuid>, &str>("front_illustration_id"),
-            front_mana_cost: row.get::<String, &str>("front_mana_cost"),
-            front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
-            front_power: row.get::<Option<String>, &str>("front_power"),
-            front_toughness: row.get::<Option<String>, &str>("front_toughness"),
-            front_loyalty: row.get::<Option<String>, &str>("front_loyalty"),
-            front_defence: row.get::<Option<String>, &str>("front_defence"),
-            front_type_line: row.get::<String, &str>("front_type_line"),
-            front_oracle_text: row.get::<String, &str>("front_oracle_text"),
-            back_name: row.get::<Option<String>, &str>("back_name"),
-            back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
-            back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
-            back_illustration_id: row.get::<Option<Uuid>, &str>("back_illustration_id"),
-            back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
-            back_colour_identity: row.get::<Option<Vec<String>>, &str>("back_colour_identity"),
-            back_power: row.get::<Option<String>, &str>("back_power"),
-            back_toughness: row.get::<Option<String>, &str>("back_toughness"),
-            back_loyalty: row.get::<Option<String>, &str>("back_loyalty"),
-            back_defence: row.get::<Option<String>, &str>("back_defence"),
-            back_type_line: row.get::<Option<String>, &str>("back_type_line"),
-            back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
-            artist: row.get::<String, &str>("artist"),
-            set_name: row.get::<String, &str>("set_name"),
-        })
-    }
-}
-
-impl Psql {
-    pub async fn fuzzy_search_distinct(&self, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
-        match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
-            .bind(normalised_name)
-            .fetch_all(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed fuzzy search distinct cards fetch - {why}");
-                None
-            }
-            Ok(rows) => rows
-                .into_iter()
-                .map(|row| FuzzyFound::from_row(&row).ok())
-                .collect(),
-        }
-    }
-
-    pub async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
-        match sqlx::query(NORMALISED_SET_NAME)
-            .bind(abbreviation)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed set name from abbr fetch - {why}");
-                None
-            }
-            Ok(row) => Some(row.get::<String, &str>("normalised_name")),
-        }
-    }
-
-    pub async fn fuzzy_search_set(
-        &self,
-        set_name: &str,
-        normalised_name: &str,
-    ) -> Option<Vec<FuzzyFound>> {
-        match sqlx::query(&format!(
-            r#"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
-            set_name.replace(" ", "_")
-        ))
-        .bind(normalised_name)
-        .fetch_all(&self.pool)
-        .await
-        {
-            Err(why) => {
-                log::warn!("Failed search set fetch - {why}");
-                None
-            }
-            Ok(rows) => rows
-                .into_iter()
-                .map(|row| FuzzyFound::from_row(&row).ok())
-                .collect(),
-        }
-    }
-
-    pub async fn fuzzy_search_set_name(&self, normalised_name: &str) -> Option<Vec<String>> {
-        match sqlx::query(FUZZY_SEARCH_SET_NAME)
-            .bind(normalised_name)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed set name fetch - {why}");
-                None
-            }
-            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
-        }
-    }
-
-    pub async fn fuzzy_search_for_artist(&self, normalised_name: &str) -> Option<Vec<String>> {
-        match sqlx::query(FUZZY_SEARCH_ARTIST)
-            .bind(normalised_name)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed artist fetch - {why}");
-                None
-            }
-            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
-        }
-    }
-
-    pub async fn fuzzy_search_artist(
-        &self,
-        artist: &str,
-        normalised_name: &str,
-    ) -> Option<Vec<FuzzyFound>> {
-        match sqlx::query(&format!(
-            r#"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
-            artist.replace(" ", "_")
-        ))
-        .bind(normalised_name)
-        .fetch_all(&self.pool)
-        .await
-        {
-            Err(why) => {
-                log::warn!("Failed search set fetch - {why}");
-                None
-            }
-            Ok(rows) => rows
-                .into_iter()
-                .map(|row| FuzzyFound::from_row(&row).ok())
-                .collect(),
-        }
-    }
-
-    pub async fn random_card(&self) -> Option<FuzzyFound> {
-        match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed random card fetch - {why}");
-                None
-            }
-            Ok(row) => FuzzyFound::from_row(&row).ok(),
-        }
-    }
-
-    pub async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
-        match sqlx::query(&format!(
-            r#"select * from set_{} where front_illustration_id is not null order by random() limit 1;"#,
-            set_name.replace(" ", "_")
-        ))
-        .fetch_one(&self.pool)
-        .await
-        {
-            Err(why) => {
-                log::warn!("Failed search set fetch - {why}");
-                None
-            }
-            Ok(row) => FuzzyFound::from_row(&row).ok(),
-        }
-    }
-}

@@ -5,7 +5,7 @@ use tokio::time::Instant;
 use serenity::all::ResolvedValue;
 use regex::Captures;
 use crate::dbs::psql::Psql;
-use crate::mtg::db::FuzzyFound;
+use crate::mtg::card::FuzzyFound;
 use crate::mtg::images::ImageFetcher;
 use crate::utils;
 use crate::utils::{fuzzy, REGEX_COLLECTION};

@@ -1,9 +1,9 @@
-use crate::mtg::db::FuzzyFound;
+use crate::mtg::card::FuzzyFound;
 use crate::mtg::search::CardAndImage;
 use crate::utils;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 
-pub mod db;
+pub mod card;
 pub(crate) mod images;
 pub mod search;
 

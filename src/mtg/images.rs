@@ -1,4 +1,4 @@
-use crate::mtg::db::FuzzyFound;
+use crate::mtg::card::FuzzyFound;
 use once_cell::sync::OnceCell;
 use serenity::all::CreateAttachment;
 use std::env;

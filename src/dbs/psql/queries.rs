@@ -1,3 +1,9 @@
+use sqlx::{Error, FromRow, Row};
+use sqlx::postgres::PgRow;
+use uuid::Uuid;
+use crate::dbs::psql::Psql;
+use crate::mtg::card::FuzzyFound;
+
 pub const FUZZY_SEARCH_DISTINCT_CARDS: &str = r#"
 select * from distinct_cards
 where word_similarity(front_normalised_name, $1) > 0.50;
@@ -63,3 +69,147 @@ pub const RANDOM_CARD_FROM_DISTINCT: &str = r#"
             order by random() 
             limit 1;
 "#;
+
+impl Psql {
+    pub async fn fuzzy_search_distinct(&self, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
+        match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
+            .bind(normalised_name)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed fuzzy search distinct cards fetch - {why}");
+                None
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| FuzzyFound::from_row(&row).ok())
+                .collect(),
+        }
+    }
+
+    pub async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
+        match sqlx::query(NORMALISED_SET_NAME)
+            .bind(abbreviation)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed set name from abbr fetch - {why}");
+                None
+            }
+            Ok(row) => Some(row.get::<String, &str>("normalised_name")),
+        }
+    }
+
+    pub async fn fuzzy_search_set(
+        &self,
+        set_name: &str,
+        normalised_name: &str,
+    ) -> Option<Vec<FuzzyFound>> {
+        match sqlx::query(&format!(
+            r#"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            set_name.replace(" ", "_")
+        ))
+        .bind(normalised_name)
+        .fetch_all(&self.pool)
+        .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| FuzzyFound::from_row(&row).ok())
+                .collect(),
+        }
+    }
+
+    pub async fn fuzzy_search_set_name(&self, normalised_name: &str) -> Option<Vec<String>> {
+        match sqlx::query(FUZZY_SEARCH_SET_NAME)
+            .bind(normalised_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed set name fetch - {why}");
+                None
+            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
+        }
+    }
+
+    pub async fn fuzzy_search_for_artist(&self, normalised_name: &str) -> Option<Vec<String>> {
+        match sqlx::query(FUZZY_SEARCH_ARTIST)
+            .bind(normalised_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed artist fetch - {why}");
+                None
+            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
+        }
+    }
+
+    pub async fn fuzzy_search_artist(
+        &self,
+        artist: &str,
+        normalised_name: &str,
+    ) -> Option<Vec<FuzzyFound>> {
+        match sqlx::query(&format!(
+            r#"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;"#,
+            artist.replace(" ", "_")
+        ))
+        .bind(normalised_name)
+        .fetch_all(&self.pool)
+        .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| FuzzyFound::from_row(&row).ok())
+                .collect(),
+        }
+    }
+
+    pub async fn random_card(&self) -> Option<FuzzyFound> {
+        match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed random card fetch - {why}");
+                None
+            }
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
+        }
+    }
+
+    pub async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
+        match sqlx::query(&format!(
+            r#"select * from set_{} where front_illustration_id is not null order by random() limit 1;"#,
+            set_name.replace(" ", "_")
+        ))
+        .fetch_one(&self.pool)
+        .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(row) => FuzzyFound::from_row(&row).ok(),
+        }
+    }
+}
+
+impl<'r> FromRow<'r, PgRow> for FuzzyFound {
+    fn from_row(row: &'r PgRow) -> Result<Self, Error> {
+        FuzzyFound::from(row)
+    }
+}
