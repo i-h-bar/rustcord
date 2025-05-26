@@ -7,12 +7,13 @@ use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
+use crate::utils::mutex_by_name::LOCKS;
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let channel_id = interaction.channel_id.to_string();
-    mutex::wait_for_lock(channel_id.clone()).await;
+    let lock = LOCKS.get(&channel_id).await;
+    let _guard = lock.lock().await;
     run_guess(ctx, interaction).await;
-    mutex::remove_lock(channel_id).await;
 }
 
 async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
