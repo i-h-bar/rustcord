@@ -21,7 +21,7 @@ pub async fn parse_message(msg: &str) -> Vec<Option<CardAndImage>> {
         REGEX_COLLECTION
             .cards
             .captures_iter(msg)
-            .filter_map(|capture| Some(find_card(QueryParams::from(capture)?))),
+            .filter_map(|capture| Some(find_card(QueryParams::from(&capture)?))),
     )
     .await
 }
@@ -93,14 +93,14 @@ pub async fn set_from_abbreviation(abbreviation: &str) -> Option<String> {
 }
 
 pub struct QueryParams {
+    artist: Option<String>,
     name: String,
     set_code: Option<String>,
     set_name: Option<String>,
-    artist: Option<String>,
 }
 
 impl QueryParams {
-    fn from(capture: Captures<'_>) -> Option<Self> {
+    fn from(capture: &Captures<'_>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str();
         let name = utils::normalise(raw_name);
         let (set_code, set_name) = match capture.get(4) {
@@ -120,8 +120,8 @@ impl QueryParams {
             .map(|artist| utils::normalise(artist.as_str()));
 
         Some(Self {
-            name,
             artist,
+            name,
             set_code,
             set_name,
         })
@@ -172,10 +172,10 @@ impl ResolveOption for QueryParams {
         };
 
         Ok(Self {
-            name,
-            set_name,
-            set_code,
             artist,
+            name,
+            set_code,
+            set_name,
         })
     }
 }

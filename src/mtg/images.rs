@@ -41,21 +41,21 @@ async fn fetch_image(
     (front_id, back_id): (Option<&Uuid>, Option<&Uuid>),
 ) -> (Option<CreateAttachment>, Option<CreateAttachment>) {
     let front = if let Some(front_id) = front_id {
-        let image = tokio::fs::read(format!("{}{}.png", image_dir, front_id))
+        let image = tokio::fs::read(format!("{image_dir}{front_id}.png"))
             .await
             .ok();
 
-        image.map(|image| CreateAttachment::bytes(image, format!("{}.png", front_id)))
+        image.map(|image| CreateAttachment::bytes(image, format!("{front_id}.png")))
     } else {
         None
     };
 
     let back = if let Some(back_id) = back_id {
-        let image = tokio::fs::read(format!("{}{}.png", image_dir, &back_id))
+        let image = tokio::fs::read(format!("{image_dir}{back_id}.png"))
             .await
             .ok();
 
-        image.map(|image| CreateAttachment::bytes(image, format!("{}.png", back_id)))
+        image.map(|image| CreateAttachment::bytes(image, format!("{back_id}.png")))
     } else {
         None
     };
