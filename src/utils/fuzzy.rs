@@ -51,12 +51,8 @@ pub fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 
     let mut hash_b: Vec<u8> = vec![0; len_b];
 
     for i in 0..len_a {
-        let Some(i_isize) = i32::try_from(i).ok() else {
-            return 0.0;
-        };
-        let Some(max_isize) = i32::try_from(max_dist).ok() else {
-            return 0.0;
-        };
+        let i_isize = i32::try_from(i).ok().unwrap_or_default();
+        let max_isize = i32::try_from(max_dist).ok().unwrap_or_default();
         #[allow(clippy::cast_sign_loss)]
         for j in 0.max(i_isize - max_isize) as usize..len_b.min(i + max_dist + 1) {
             if a[i] == b[j] && hash_b[j] == 0 {
