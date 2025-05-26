@@ -1,6 +1,6 @@
 use crate::dbs::psql::Psql;
 use crate::mtg::card::FuzzyFound;
-use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
+use crate::mtg::images::IMAGE_FETCHER;
 use crate::utils;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, REGEX_COLLECTION};

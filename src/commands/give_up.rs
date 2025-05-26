@@ -1,5 +1,5 @@
 use crate::game::state;
-use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
+use crate::mtg::images::IMAGE_FETCHER;
 use serenity::all::{
     CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,

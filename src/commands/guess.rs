@@ -1,6 +1,6 @@
-use crate::game::state;
-use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
 use crate::game::mutex;
+use crate::game::state;
+use crate::mtg::images::IMAGE_FETCHER;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{

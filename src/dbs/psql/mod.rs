@@ -15,8 +15,7 @@ pub struct Psql {
 impl Psql {
     pub async fn init() {
         let instance = Self::new().await;
-        PSQL
-            .set(instance)
+        PSQL.set(instance)
             .expect("Could not initialise DB once cell");
     }
 

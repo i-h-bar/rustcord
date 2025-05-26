@@ -1,8 +1,8 @@
 use redis::{AsyncCommands, Client, FromRedisValue, SetExpiry, SetOptions, ToRedisArgs};
 use std::env;
-use tokio::sync::OnceCell;
+use std::sync::LazyLock;
 
-static REDIS_INSTANCE: OnceCell<Redis> = OnceCell::const_new();
+pub static REDIS: LazyLock<Redis> = LazyLock::new(Redis::new);
 
 #[derive(Debug)]
 pub struct Redis {
@@ -10,21 +10,10 @@ pub struct Redis {
 }
 
 impl Redis {
-    pub async fn init() {
-        let redis = Self::new().await;
-        REDIS_INSTANCE
-            .set(redis)
-            .expect("Failed to init redis instance");
-    }
-
-    async fn new() -> Self {
+    fn new() -> Self {
         let url = env::var("REDIS_URL").expect("REDIS_URL must be set");
         let client = Client::open(url).expect("failed to open redis client");
         Self { client }
-    }
-
-    pub fn instance() -> Option<&'static Self> {
-        REDIS_INSTANCE.get()
     }
 
     pub async fn get<K: ToRedisArgs + Send + Sync, V: FromRedisValue + Send + Sync>(

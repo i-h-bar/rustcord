@@ -1,11 +1,10 @@
 use crate::mtg::card::FuzzyFound;
-use once_cell::sync::OnceCell;
 use serenity::all::CreateAttachment;
 use std::env;
 use std::sync::LazyLock;
 use uuid::Uuid;
 
-pub static IMAGE_FETCHER: LazyLock<ImageFetcher> = LazyLock::new(|| ImageFetcher::new());
+pub static IMAGE_FETCHER: LazyLock<ImageFetcher> = LazyLock::new(ImageFetcher::new);
 
 #[derive(Debug)]
 pub struct ImageFetcher {
@@ -14,7 +13,6 @@ pub struct ImageFetcher {
 }
 
 impl ImageFetcher {
-
     pub fn new() -> Self {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
         Self {

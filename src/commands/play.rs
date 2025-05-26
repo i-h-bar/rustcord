@@ -1,7 +1,7 @@
 use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
-use crate::mtg::images::{ImageFetcher, IMAGE_FETCHER};
+use crate::mtg::images::IMAGE_FETCHER;
 use crate::utils::parse;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::{mtg, utils};
