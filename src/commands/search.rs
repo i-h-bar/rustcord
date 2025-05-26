@@ -31,7 +31,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
                 message
             }
             .add_embed(back);
-        };
+        }
 
         if let Err(why) = interaction
             .create_response(ctx, CreateInteractionResponse::Message(message))

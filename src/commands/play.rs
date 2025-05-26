@@ -77,11 +77,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::error!("couldn't create interaction response: {:?}", why);
-        };
+        }
 
         state::add(&game_state, interaction).await;
     } else {
-        log::warn!("Failed to get random card")
+        log::warn!("Failed to get random card");
     }
 }
 
@@ -135,8 +135,7 @@ impl ResolveOption for Options {
                             "Hard" => Difficulty::Hard,
                             default => {
                                 return Err(ParseError::new(&format!(
-                                    "Could not parse {} into difficulty",
-                                    default
+                                    "Could not parse {default} into difficulty"
                                 )))
                             }
                         },

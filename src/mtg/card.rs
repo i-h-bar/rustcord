@@ -43,6 +43,7 @@ pub struct FuzzyFound {
 }
 
 impl FuzzyFound {
+    #[allow(clippy::missing_errors_doc)]
     pub fn from(row: &PgRow) -> Result<Self, Error> {
         Ok(Self {
             front_name: row.get::<String, &str>("front_name"),

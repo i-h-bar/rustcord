@@ -45,8 +45,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
         let message = MessageBuilder::new()
             .mention(&interaction.user)
             .push(format!(
-                " has won after {} {}!",
-                number_of_guesses, guess_plural
+                " has won after {number_of_guesses} {guess_plural}!",
             ))
             .build();
 
@@ -60,7 +59,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
-        };
+        }
 
         state::delete(interaction).await;
     } else if game_state.number_of_guesses() >= game_state.max_guesses() {
@@ -79,8 +78,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
 
         let message = MessageBuilder::new()
             .push(format!(
-                "You have all failed after {} {}!",
-                number_of_guesses, guess_plural
+                "You have all failed after {number_of_guesses} {guess_plural}!",
             ))
             .build();
 
@@ -110,8 +108,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
 
         let response = CreateInteractionResponseMessage::new()
             .content(format!(
-                "'{}' was not the correct card. You have {} {} remaining",
-                guess, remaining_guesses, guess_plural
+                "'{guess}' was not the correct card. You have {remaining_guesses} {guess_plural} remaining",
             ))
             .add_file(illustration)
             .embed(game_state.to_embed());
@@ -119,7 +116,7 @@ async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
-        };
+        }
         state::add(&game_state, interaction).await;
     }
 }
@@ -148,7 +145,7 @@ impl ResolveOption for Options {
         };
 
         let guess = match guess {
-            ResolvedValue::String(guess) => guess.to_string(),
+            ResolvedValue::String(guess) => (*guess).to_string(),
             _ => return Err(ParseError::new("ResolvedValue was not a string")),
         };
 

@@ -22,7 +22,7 @@ impl Display for Difficulty {
             Difficulty::Hard => "Hard",
         };
 
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
@@ -111,7 +111,7 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
-        };
+        }
         return None;
     };
 

@@ -27,8 +27,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let message = MessageBuilder::new()
         .mention(&interaction.user)
         .push(format!(
-            " has given up after {} {}!",
-            number_of_guesses, guess_plural
+            " has given up after {number_of_guesses} {guess_plural}!",
         ))
         .build();
 
