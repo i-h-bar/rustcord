@@ -36,10 +36,10 @@ pub struct RegexCollection {
 pub async fn send_message(message: CreateMessage, msg: &Message, ctx: &Context) {
     match msg.channel_id.send_message(&ctx.http, message).await {
         Err(why) => {
-            log::warn!("Error sending message to {why:?}")
+            log::warn!("Error sending message to {why:?}");
         }
         Ok(response) => {
-            log::info!("Sent message to {:?}", response.channel_id)
+            log::info!("Sent message to {:?}", response.channel_id);
         }
     }
 }
@@ -47,10 +47,10 @@ pub async fn send_message(message: CreateMessage, msg: &Message, ctx: &Context) 
 pub async fn send(content: &str, msg: &Message, ctx: &Context) {
     match msg.channel_id.say(&ctx.http, content).await {
         Err(why) => {
-            log::warn!("Error sending message - {why:?}")
+            log::warn!("Error sending message - {why:?}");
         }
         Ok(_) => {
-            log::info!("Sent message")
+            log::info!("Sent message");
         }
     }
 }
@@ -58,7 +58,7 @@ pub async fn send(content: &str, msg: &Message, ctx: &Context) {
 pub fn normalise(name: &str) -> String {
     REGEX_COLLECTION
         .punctuation_removal
-        .replace(&name.replace("-", " ").nfkc().collect::<String>(), "")
+        .replace(&name.replace('-', " ").nfkc().collect::<String>(), "")
         .to_lowercase()
 }
 

@@ -28,7 +28,7 @@ pub async fn parse_message(msg: &str) -> Vec<Option<CardAndImage>> {
 
 async fn search_distinct_cards(normalised_name: &str) -> Option<FuzzyFound> {
     let potentials = Psql::get()?.fuzzy_search_distinct(normalised_name).await?;
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 async fn search_set_abbreviation(abbreviation: &str, normalised_name: &str) -> Option<FuzzyFound> {
@@ -36,7 +36,7 @@ async fn search_set_abbreviation(abbreviation: &str, normalised_name: &str) -> O
     let potentials = Psql::get()?
         .fuzzy_search_set(&set_name, normalised_name)
         .await?;
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 async fn search_set_name(normalised_set_name: &str, normalised_name: &str) -> Option<FuzzyFound> {
@@ -44,17 +44,17 @@ async fn search_set_name(normalised_set_name: &str, normalised_name: &str) -> Op
     let potentials = Psql::get()?
         .fuzzy_search_set(&set_name, normalised_name)
         .await?;
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 async fn search_artist(artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
     let potentials = Psql::get()?.fuzzy_search_for_artist(artist).await?;
-    let best_artist = fuzzy::winkliest_match(artist, potentials)?;
+    let best_artist = fuzzy::winkliest_match(&artist, potentials)?;
     let potentials = Psql::get()?
         .fuzzy_search_artist(&best_artist, normalised_name)
         .await?;
 
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 pub async fn find_card(query: QueryParams) -> Option<CardAndImage> {
@@ -85,7 +85,7 @@ pub async fn fuzzy_match_set_name(normalised_set_name: &str) -> Option<String> {
     let potentials = Psql::get()?
         .fuzzy_search_set_name(normalised_set_name)
         .await?;
-    fuzzy::winkliest_match(normalised_set_name, potentials)
+    fuzzy::winkliest_match(&normalised_set_name, potentials)
 }
 
 pub async fn set_from_abbreviation(abbreviation: &str) -> Option<String> {

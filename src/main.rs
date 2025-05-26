@@ -23,7 +23,7 @@ impl EventHandler for Handler {
         if msg.author.id == ctx.cache.current_user().id || msg.author.bot {
             return;
         } else if msg.content == "!help" {
-            utils::send(HELP, &msg, &ctx).await
+            utils::send(HELP, &msg, &ctx).await;
         } else {
             for card in mtg::search::parse_message(&msg.content).await {
                 mtg::card_response(card, &msg, &ctx).await;
@@ -32,32 +32,38 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, _: Ready) {
-        match Command::create_global_command(&ctx, commands::play::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(_) => log::info!("Created play command"),
-        };
-
-        match Command::create_global_command(&ctx, commands::guess::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(_) => log::info!("Created guess command"),
-        };
-
-        match Command::create_global_command(&ctx, commands::help::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(_) => log::info!("Created help command"),
-        };
-
-        match Command::create_global_command(&ctx, commands::search::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(_) => log::info!("Created search command"),
-        };
-
-        match Command::create_global_command(&ctx, commands::give_up::register()).await {
-            Err(error) => log::warn!("Could not create command {:?}", error),
-            Ok(_) => log::info!("Created give_up command"),
+        if let Err(err) = Command::create_global_command(&ctx, commands::play::register()).await {
+            log::warn!("Could not create command {:?}", err);
+        } else {
+            log::info!("Created play command");
         }
 
-        log::info!("Bot ready!")
+        if let Err(err) = Command::create_global_command(&ctx, commands::guess::register()).await {
+            log::warn!("Could not create command {:?}", err);
+        } else {
+            log::info!("Created guess command");
+        }
+
+        if let Err(err) = Command::create_global_command(&ctx, commands::help::register()).await {
+            log::warn!("Could not create command {:?}", err);
+        } else {
+            log::info!("Created help command");
+        }
+
+        if let Err(err) = Command::create_global_command(&ctx, commands::search::register()).await {
+            log::warn!("Could not create command {:?}", err);
+        } else {
+            log::info!("Created search command");
+        }
+
+        if let Err(err) = Command::create_global_command(&ctx, commands::give_up::register()).await
+        {
+            log::warn!("Could not create command {:?}", err);
+        } else {
+            log::info!("Created give_up command");
+        }
+
+        log::info!("Bot ready!");
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -79,7 +85,7 @@ impl EventHandler for Handler {
                 "guess" => commands::guess::run(&ctx, &command).await,
                 "give_up" => commands::give_up::run(&ctx, &command).await,
                 _ => (),
-            };
+            }
         }
     }
 }
@@ -101,6 +107,6 @@ async fn main() {
         .expect("Error creating client");
 
     if let Err(why) = client.start().await {
-        log::error!("Error starting client - {why:?}")
+        log::error!("Error starting client - {why:?}");
     }
 }

@@ -92,13 +92,13 @@ pub fn winkliest_match<
     B: ToChars,
     I: AsRef<[B]> + IntoIterator<Item = B>,
 >(
-    target: A,
+    target: &A,
     heap: I,
 ) -> Option<B> {
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let distance = jaro_winkler(&target, &needle);
+            let distance = jaro_winkler(target, &needle);
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
