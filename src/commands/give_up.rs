@@ -1,6 +1,9 @@
-use serenity::all::{CommandInteraction, Context, CreateCommand, CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder};
 use crate::game::state;
-use crate::mtg::images::ImageFetcher;
+use crate::mtg::images::IMAGE_FETCHER;
+use serenity::all::{
+    CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
+    CreateInteractionResponseMessage, MessageBuilder,
+};
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let Some(game_state) = state::fetch(ctx, interaction).await else {
@@ -9,12 +12,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
     state::delete(interaction).await;
 
-    let Some(image_fetcher) = ImageFetcher::get() else {
-        log::warn!("couldn't get image fetcher");
-        return;
-    };
-
-    let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+    let (Some(image), _) = IMAGE_FETCHER.fetch(game_state.card()).await else {
         log::warn!("couldn't fetch image");
         return;
     };
@@ -29,8 +27,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let message = MessageBuilder::new()
         .mention(&interaction.user)
         .push(format!(
-            " has given up after {} {}!",
-            number_of_guesses, guess_plural
+            " has given up after {number_of_guesses} {guess_plural}!",
         ))
         .build();
 

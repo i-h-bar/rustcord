@@ -35,6 +35,7 @@ impl ToChars for Box<str> {
     }
 }
 
+#[allow(clippy::cast_precision_loss)]
 pub fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 {
     if a == b {
         return 1.0;
@@ -50,7 +51,14 @@ pub fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 
     let mut hash_b: Vec<u8> = vec![0; len_b];
 
     for i in 0..len_a {
-        for j in 0.max(i as isize - max_dist as isize) as usize..len_b.min(i + max_dist + 1) {
+        let Some(i_isize) = i32::try_from(i).ok() else {
+            return 0.0;
+        };
+        let Some(max_isize) = i32::try_from(max_dist).ok() else {
+            return 0.0;
+        };
+        #[allow(clippy::cast_sign_loss)]
+        for j in 0.max(i_isize - max_isize) as usize..len_b.min(i + max_dist + 1) {
             if a[i] == b[j] && hash_b[j] == 0 {
                 hash_a[i] = 1;
                 hash_b[j] = 1;
@@ -92,13 +100,13 @@ pub fn winkliest_match<
     B: ToChars,
     I: AsRef<[B]> + IntoIterator<Item = B>,
 >(
-    target: A,
+    target: &A,
     heap: I,
 ) -> Option<B> {
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let distance = jaro_winkler(&target, &needle);
+            let distance = jaro_winkler(target, &needle);
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;

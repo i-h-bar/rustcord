@@ -1,15 +1,15 @@
+use crate::dbs::psql::Psql;
+use crate::mtg::card::FuzzyFound;
+use crate::mtg::images::IMAGE_FETCHER;
+use crate::utils;
+use crate::utils::parse::{ParseError, ResolveOption};
+use crate::utils::{fuzzy, REGEX_COLLECTION};
 use log;
+use regex::Captures;
+use serenity::all::ResolvedValue;
 use serenity::builder::CreateAttachment;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
-use serenity::all::ResolvedValue;
-use regex::Captures;
-use crate::dbs::psql::Psql;
-use crate::mtg::card::FuzzyFound;
-use crate::mtg::images::ImageFetcher;
-use crate::utils;
-use crate::utils::{fuzzy, REGEX_COLLECTION};
-use crate::utils::parse::{ParseError, ResolveOption};
 
 pub type CardAndImage = (
     FuzzyFound,
@@ -21,14 +21,14 @@ pub async fn parse_message(msg: &str) -> Vec<Option<CardAndImage>> {
         REGEX_COLLECTION
             .cards
             .captures_iter(msg)
-            .filter_map(|capture| Some(find_card(QueryParams::from(capture)?))),
+            .filter_map(|capture| Some(find_card(QueryParams::from(&capture)?))),
     )
     .await
 }
 
 async fn search_distinct_cards(normalised_name: &str) -> Option<FuzzyFound> {
     let potentials = Psql::get()?.fuzzy_search_distinct(normalised_name).await?;
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 async fn search_set_abbreviation(abbreviation: &str, normalised_name: &str) -> Option<FuzzyFound> {
@@ -36,7 +36,7 @@ async fn search_set_abbreviation(abbreviation: &str, normalised_name: &str) -> O
     let potentials = Psql::get()?
         .fuzzy_search_set(&set_name, normalised_name)
         .await?;
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 async fn search_set_name(normalised_set_name: &str, normalised_name: &str) -> Option<FuzzyFound> {
@@ -44,17 +44,17 @@ async fn search_set_name(normalised_set_name: &str, normalised_name: &str) -> Op
     let potentials = Psql::get()?
         .fuzzy_search_set(&set_name, normalised_name)
         .await?;
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 async fn search_artist(artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
     let potentials = Psql::get()?.fuzzy_search_for_artist(artist).await?;
-    let best_artist = fuzzy::winkliest_match(artist, potentials)?;
+    let best_artist = fuzzy::winkliest_match(&artist, potentials)?;
     let potentials = Psql::get()?
         .fuzzy_search_artist(&best_artist, normalised_name)
         .await?;
 
-    fuzzy::winkliest_match(normalised_name, potentials)
+    fuzzy::winkliest_match(&normalised_name, potentials)
 }
 
 pub async fn find_card(query: QueryParams) -> Option<CardAndImage> {
@@ -76,7 +76,7 @@ pub async fn find_card(query: QueryParams) -> Option<CardAndImage> {
         start.elapsed().as_millis()
     );
 
-    let images = ImageFetcher::get()?.fetch(&found_card).await;
+    let images = IMAGE_FETCHER.fetch(&found_card).await;
 
     Some((found_card, images))
 }
@@ -85,7 +85,7 @@ pub async fn fuzzy_match_set_name(normalised_set_name: &str) -> Option<String> {
     let potentials = Psql::get()?
         .fuzzy_search_set_name(normalised_set_name)
         .await?;
-    fuzzy::winkliest_match(normalised_set_name, potentials)
+    fuzzy::winkliest_match(&normalised_set_name, potentials)
 }
 
 pub async fn set_from_abbreviation(abbreviation: &str) -> Option<String> {
@@ -93,14 +93,14 @@ pub async fn set_from_abbreviation(abbreviation: &str) -> Option<String> {
 }
 
 pub struct QueryParams {
+    artist: Option<String>,
     name: String,
     set_code: Option<String>,
     set_name: Option<String>,
-    artist: Option<String>,
 }
 
 impl QueryParams {
-    fn from(capture: Captures<'_>) -> Option<Self> {
+    fn from(capture: &Captures<'_>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str();
         let name = utils::normalise(raw_name);
         let (set_code, set_name) = match capture.get(4) {
@@ -120,8 +120,8 @@ impl QueryParams {
             .map(|artist| utils::normalise(artist.as_str()));
 
         Some(Self {
-            name,
             artist,
+            name,
             set_code,
             set_name,
         })
@@ -172,10 +172,10 @@ impl ResolveOption for QueryParams {
         };
 
         Ok(Self {
-            name,
-            set_name,
-            set_code,
             artist,
+            name,
+            set_code,
+            set_name,
         })
     }
 }

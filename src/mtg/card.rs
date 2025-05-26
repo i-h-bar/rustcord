@@ -1,19 +1,12 @@
-use crate::dbs::psql::Psql;
-use crate::dbs::psql::queries::{
-    FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
-    RANDOM_CARD_FROM_DISTINCT,
-};
-use crate::utils;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::emoji::add_emoji;
 use crate::utils::fuzzy::ToChars;
-use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
-use serenity::all::{CreateEmbed, CreateEmbedFooter, ResolvedValue};
+use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use sqlx::postgres::PgRow;
-use sqlx::{Error, FromRow, Row};
+use sqlx::{Error, Row};
 use std::str::Chars;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -50,6 +43,7 @@ pub struct FuzzyFound {
 }
 
 impl FuzzyFound {
+    #[allow(clippy::missing_errors_doc)]
     pub fn from(row: &PgRow) -> Result<Self, Error> {
         Ok(Self {
             front_name: row.get::<String, &str>("front_name"),
@@ -81,11 +75,13 @@ impl FuzzyFound {
             set_name: row.get::<String, &str>("set_name"),
         })
     }
-    
+
+    #[must_use]
     pub fn image_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
         (Some(&self.front_image_id), self.back_image_id.as_ref())
     }
 
+    #[must_use]
     pub fn illustration_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
         (
             self.front_illustration_id.as_ref(),
@@ -98,13 +94,13 @@ impl FuzzyFound {
 
         let stats = if let Some(power) = self.front_power {
             let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
-            format!("\n\n{}/{}", power, toughness)
+            format!("\n\n{power}/{toughness}")
         } else if let Some(loyalty) = self.front_loyalty {
-            format!("\n\n{}", loyalty)
+            format!("\n\n{loyalty}")
         } else if let Some(defence) = self.front_defence {
-            format!("\n\n{}", defence)
+            format!("\n\n{defence}")
         } else {
-            "".to_string()
+            String::new()
         };
 
         let front_oracle_text = REGEX_COLLECTION
@@ -123,19 +119,19 @@ impl FuzzyFound {
             .url(self.front_scryfall_url)
             .title(title)
             .description(rules_text)
-            .colour(get_colour_identity(self.front_colour_identity))
+            .colour(get_colour_identity(&self.front_colour_identity))
             .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
 
         let back = if let Some(name) = self.back_name {
             let stats = if let Some(power) = self.back_power {
                 let toughness = self.back_toughness.unwrap_or_else(|| "0".to_string());
-                format!("\n\n{}/{}", power, toughness)
+                format!("\n\n{power}/{toughness}")
             } else if let Some(loyalty) = self.back_loyalty {
-                format!("\n\n{}", loyalty)
+                format!("\n\n{loyalty}")
             } else if let Some(defence) = self.back_defence {
-                format!("\n\n{}", defence)
+                format!("\n\n{defence}")
             } else {
-                "".to_string()
+                String::new()
             };
             let back_oracle_text = self.back_oracle_text.unwrap_or_default();
             let back_oracle_text = REGEX_COLLECTION
@@ -153,7 +149,7 @@ impl FuzzyFound {
                 let mana_cost = REGEX_COLLECTION
                     .symbols
                     .replace_all(&mana_cost, |cap: &Captures| add_emoji(cap));
-                format!("{}        {}", name, mana_cost)
+                format!("{name}        {mana_cost}")
             } else {
                 name
             };
@@ -166,7 +162,7 @@ impl FuzzyFound {
                     .title(title)
                     .description(back_rules_text)
                     .colour(get_colour_identity(
-                        self.back_colour_identity.unwrap_or_default(),
+                        &self.back_colour_identity.unwrap_or_default(),
                     ))
                     .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist))),
             )
@@ -193,10 +189,10 @@ impl FuzzyFound {
             let mana_cost = REGEX_COLLECTION
                 .symbols
                 .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
-            let title = format!("????        {}", mana_cost);
+            let title = format!("????        {mana_cost}");
             embed = embed
                 .title(title)
-                .colour(get_colour_identity(self.front_colour_identity.clone()));
+                .colour(get_colour_identity(&self.front_colour_identity));
         }
 
         if guesses > multiplier * 2 {
@@ -212,13 +208,13 @@ impl FuzzyFound {
                 .front_toughness
                 .clone()
                 .unwrap_or_else(|| "0".to_string());
-            format!("\n\n{}/{}", power, toughness)
+            format!("\n\n{power}/{toughness}")
         } else if let Some(loyalty) = self.front_loyalty.clone() {
-            format!("\n\n{}", loyalty)
+            format!("\n\n{loyalty}")
         } else if let Some(defence) = self.front_defence.clone() {
-            format!("\n\n{}", defence)
+            format!("\n\n{defence}")
         } else {
-            "".to_string()
+            String::new()
         };
 
         let front_oracle_text = REGEX_COLLECTION
@@ -229,6 +225,7 @@ impl FuzzyFound {
         format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats)
     }
 
+    #[must_use]
     pub fn set_name(&self) -> &str {
         &self.set_name
     }
@@ -245,4 +242,3 @@ impl PartialEq<FuzzyFound> for &str {
         self == &other.front_normalised_name
     }
 }
-

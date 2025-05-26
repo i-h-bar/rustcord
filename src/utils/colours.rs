@@ -1,6 +1,6 @@
 use serenity::model::Colour;
 
-pub fn get_colour_identity(colour_id: Vec<String>) -> Colour {
+pub fn get_colour_identity(colour_id: &[String]) -> Colour {
     let colour_id = colour_id.join("");
     let (r, g, b) = get_colour_num(&colour_id);
 

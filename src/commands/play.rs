@@ -1,7 +1,7 @@
 use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
-use crate::mtg::images::ImageFetcher;
+use crate::mtg::images::IMAGE_FETCHER;
 use crate::utils::parse;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::{mtg, utils};
@@ -53,11 +53,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     };
 
     if let Some(card) = random_card {
-        let Some(image_fetcher) = ImageFetcher::get() else {
-            log::warn!("failed to get image fetcher");
-            return;
-        };
-        let (Some(illustration), _) = image_fetcher.fetch_illustration(&card).await else {
+        let (Some(illustration), _) = IMAGE_FETCHER.fetch_illustration(&card).await else {
             log::warn!("failed to get image");
             return;
         };
@@ -81,11 +77,11 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::error!("couldn't create interaction response: {:?}", why);
-        };
+        }
 
         state::add(&game_state, interaction).await;
     } else {
-        log::warn!("Failed to get random card")
+        log::warn!("Failed to get random card");
     }
 }
 
@@ -139,8 +135,7 @@ impl ResolveOption for Options {
                             "Hard" => Difficulty::Hard,
                             default => {
                                 return Err(ParseError::new(&format!(
-                                    "Could not parse {} into difficulty",
-                                    default
+                                    "Could not parse {default} into difficulty"
                                 )))
                             }
                         },

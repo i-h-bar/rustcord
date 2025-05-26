@@ -1,5 +1,6 @@
+use crate::game::mutex;
 use crate::game::state;
-use crate::mtg::images::ImageFetcher;
+use crate::mtg::images::IMAGE_FETCHER;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
@@ -8,6 +9,13 @@ use serenity::all::{
 };
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+    let channel_id = interaction.channel_id.to_string();
+    mutex::wait_for_lock(channel_id.clone()).await;
+    run_guess(ctx, interaction).await;
+    mutex::remove_lock(channel_id).await;
+}
+
+async fn run_guess(ctx: &Context, interaction: &CommandInteraction) {
     let Options { guess } = match parse::options(interaction.data.options()) {
         Ok(value) => value,
         Err(err) => {
@@ -16,18 +24,13 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         }
     };
 
-    let Some(image_fetcher) = ImageFetcher::get() else {
-        log::warn!("couldn't get image fetcher");
-        return;
-    };
-
     let Some(mut game_state) = state::fetch(ctx, interaction).await else {
         return;
     };
     game_state.add_guess();
 
     if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75 {
-        let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+        let (Some(image), _) = IMAGE_FETCHER.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
             return;
         };
@@ -42,8 +45,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         let message = MessageBuilder::new()
             .mention(&interaction.user)
             .push(format!(
-                " has won after {} {}!",
-                number_of_guesses, guess_plural
+                " has won after {number_of_guesses} {guess_plural}!",
             ))
             .build();
 
@@ -57,13 +59,13 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
-        };
+        }
 
         state::delete(interaction).await;
     } else if game_state.number_of_guesses() >= game_state.max_guesses() {
         state::delete(interaction).await;
 
-        let (Some(image), _) = image_fetcher.fetch(game_state.card()).await else {
+        let (Some(image), _) = IMAGE_FETCHER.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");
             return;
         };
@@ -76,8 +78,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
         let message = MessageBuilder::new()
             .push(format!(
-                "You have all failed after {} {}!",
-                number_of_guesses, guess_plural
+                "You have all failed after {number_of_guesses} {guess_plural}!",
             ))
             .build();
 
@@ -93,7 +94,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             log::warn!("couldn't create interaction: {}", why);
         }
     } else {
-        let (Some(illustration), _) = image_fetcher.fetch_illustration(game_state.card()).await
+        let (Some(illustration), _) = IMAGE_FETCHER.fetch_illustration(game_state.card()).await
         else {
             log::warn!("couldn't fetch illustration");
             return;
@@ -107,8 +108,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
         let response = CreateInteractionResponseMessage::new()
             .content(format!(
-                "'{}' was not the correct card. You have {} {} remaining",
-                guess, remaining_guesses, guess_plural
+                "'{guess}' was not the correct card. You have {remaining_guesses} {guess_plural} remaining",
             ))
             .add_file(illustration)
             .embed(game_state.to_embed());
@@ -116,7 +116,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
-        };
+        }
         state::add(&game_state, interaction).await;
     }
 }
@@ -145,7 +145,7 @@ impl ResolveOption for Options {
         };
 
         let guess = match guess {
-            ResolvedValue::String(guess) => guess.to_string(),
+            ResolvedValue::String(guess) => (*guess).to_string(),
             _ => return Err(ParseError::new("ResolvedValue was not a string")),
         };
 

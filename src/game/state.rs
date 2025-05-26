@@ -1,4 +1,4 @@
-use crate::dbs::redis::Redis;
+use crate::dbs::redis::REDIS;
 use crate::mtg::card::FuzzyFound;
 use serde::{Deserialize, Serialize};
 use serenity::all::{
@@ -22,7 +22,7 @@ impl Display for Difficulty {
             Difficulty::Hard => "Hard",
         };
 
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
@@ -86,12 +86,8 @@ impl GameState {
 }
 
 pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<GameState> {
-    let Some(redis) = Redis::instance() else {
-        log::warn!("Could not get redis connection");
-        return None;
-    };
     let Some(game_state_string): Option<String> =
-        redis.get(interaction.channel_id.to_string()).await
+        REDIS.get(interaction.channel_id.to_string()).await
     else {
         let name = if let Some(channel) = &interaction.channel {
             if let Some(name) = &channel.name {
@@ -108,19 +104,19 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
             .push(" no game found in ")
             .push(name)
             .build();
-        let response = CreateInteractionResponseMessage::new().content(message);
+        let response = CreateInteractionResponseMessage::new()
+            .content(message)
+            .ephemeral(true);
 
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = interaction.create_response(&ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
-        };
+        }
         return None;
     };
 
     match ron::from_str::<GameState>(&game_state_string) {
-        Ok(game_state) => {
-            Some(game_state)
-        }
+        Ok(game_state) => Some(game_state),
         Err(why) => {
             log::warn!("Couldn't parse game state: {}", why);
             None
@@ -129,11 +125,7 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
 }
 
 pub async fn delete(interaction: &CommandInteraction) {
-    let Some(redis) = Redis::instance() else {
-        log::warn!("Could not get redis connection");
-        return;
-    };
-    if let Err(why) = redis.delete(interaction.channel_id.to_string()).await {
+    if let Err(why) = REDIS.delete(interaction.channel_id.to_string()).await {
         log::warn!(
             "Error deleting key: '{}' from redis the response: {:?}",
             interaction.channel_id.to_string(),
@@ -143,11 +135,7 @@ pub async fn delete(interaction: &CommandInteraction) {
 }
 
 pub async fn add(game_state: &GameState, interaction: &CommandInteraction) {
-    let Some(redis) = Redis::instance() else {
-        log::warn!("Could not get redis connection");
-        return;
-    };
-    if let Err(why) = redis
+    if let Err(why) = REDIS
         .set(
             interaction.channel_id.to_string(),
             ron::to_string(&game_state).unwrap(),

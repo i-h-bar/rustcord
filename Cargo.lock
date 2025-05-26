@@ -1546,7 +1546,6 @@ dependencies = [
  "dotenv",
  "env_logger",
  "log",
- "once_cell",
  "redis",
  "regex",
  "ron",
