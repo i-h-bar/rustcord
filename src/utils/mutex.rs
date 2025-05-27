@@ -6,6 +6,8 @@ use tokio::sync::{Mutex, MutexGuard};
 
 pub static LOCKS: LazyLock<LockByName> = LazyLock::new(LockByName::new);
 
+type Inner = HashMap<String, (usize, Arc<Mutex<()>>)>;
+
 pub struct LockByName {
     inner: Arc<Mutex<Inner>>,
 }
@@ -18,16 +20,12 @@ pub struct NamedGuard<'a> {
     _guard: MutexGuard<'a, ()>,
 }
 
-struct Inner {
-    map: HashMap<String, (usize, Arc<Mutex<()>>)>,
-}
 
 impl LockByName {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Inner {
-                map: HashMap::new(),
-            })),
+            inner: Arc::new(Mutex::new(HashMap::new(),
+            )),
         }
     }
 
@@ -35,7 +33,6 @@ impl LockByName {
         let m = {
             let mut lock = self.inner.lock().await;
             let entry = lock
-                .map
                 .entry(name.to_string())
                 .or_insert_with(|| (0, Arc::new(Mutex::new(()))));
             entry.0 += 1;
@@ -62,10 +59,10 @@ impl NamedLock {
 impl AsyncDrop for NamedLock {
     async fn async_drop(&mut self) {
         let mut lock = self.inner.lock().await;
-        if let Some(entry) = lock.map.get_mut(&self.name) {
+        if let Some(entry) = lock.get_mut(&self.name) {
             entry.0 -= 1;
             if entry.0 == 0 {
-                lock.map.remove(&self.name);
+                lock.remove(&self.name);
             }
         }
     }
