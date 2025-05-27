@@ -62,10 +62,11 @@ impl NamedLock {
 impl AsyncDrop for NamedLock {
     async fn async_drop(&mut self) {
         let mut lock = self.inner.lock().await;
-        let entry = lock.map.get_mut(&self.name).unwrap();
-        entry.0 -= 1;
-        if entry.0 == 0 {
-            lock.map.remove(&self.name);
+        if let Some(entry) = lock.map.get_mut(&self.name) {
+            entry.0 -= 1;
+            if entry.0 == 0 {
+                lock.map.remove(&self.name);
+            }
         }
     }
 }
