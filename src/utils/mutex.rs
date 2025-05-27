@@ -1,11 +1,10 @@
-use std::sync::{Arc, LazyLock};
-use std::collections::HashMap;
 use async_dropper::AsyncDrop;
 use serenity::async_trait;
-use tokio::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
+use tokio::sync::{Mutex, MutexGuard};
 
-
-pub static LOCKS: LazyLock<LockByName> =  LazyLock::new(LockByName::new);
+pub static LOCKS: LazyLock<LockByName> = LazyLock::new(LockByName::new);
 
 pub struct LockByName {
     inner: Arc<Mutex<Inner>>,
@@ -16,7 +15,7 @@ pub struct NamedLock {
     lock: Arc<Mutex<()>>,
 }
 pub struct NamedGuard<'a> {
-    _guard: tokio::sync::MutexGuard<'a, ()>,
+    _guard: MutexGuard<'a, ()>,
 }
 
 struct Inner {
@@ -28,22 +27,24 @@ impl LockByName {
         Self {
             inner: Arc::new(Mutex::new(Inner {
                 map: HashMap::new(),
-            }))
+            })),
         }
     }
 
     pub async fn get(&self, name: &str) -> NamedLock {
         let m = {
             let mut lock = self.inner.lock().await;
-            let entry = lock.map.entry(name.to_string())
+            let entry = lock
+                .map
+                .entry(name.to_string())
                 .or_insert_with(|| (0, Arc::new(Mutex::new(()))));
             entry.0 += 1;
-            entry.1.clone()
+            Arc::clone(&entry.1)
         };
 
         NamedLock {
             name: name.to_string(),
-            inner: self.inner.clone(),
+            inner: Arc::clone(&self.inner),
             lock: m,
         }
     }
@@ -52,7 +53,7 @@ impl LockByName {
 impl NamedLock {
     pub async fn lock(&self) -> NamedGuard<'_> {
         NamedGuard {
-            _guard: self.lock.lock().await
+            _guard: self.lock.lock().await,
         }
     }
 }

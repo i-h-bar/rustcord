@@ -2,8 +2,8 @@ pub mod colours;
 pub mod emoji;
 pub(crate) mod fuzzy;
 pub mod help;
+pub mod mutex;
 pub mod parse;
-pub mod mutex_by_name;
 
 use regex::{Captures, Regex};
 use serenity::all::{Context, CreateMessage, Message};

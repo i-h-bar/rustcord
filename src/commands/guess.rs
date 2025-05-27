@@ -1,17 +1,16 @@
-use crate::game::mutex;
 use crate::game::state;
 use crate::mtg::images::IMAGE_FETCHER;
+use crate::utils::mutex;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{fuzzy, normalise, parse};
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
-use crate::utils::mutex_by_name::LOCKS;
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let channel_id = interaction.channel_id.to_string();
-    let lock = LOCKS.get(&channel_id).await;
+    let lock = mutex::LOCKS.get(&channel_id).await;
     let _guard = lock.lock().await;
     run_guess(ctx, interaction).await;
 }
