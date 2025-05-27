@@ -135,11 +135,16 @@ pub async fn delete(interaction: &CommandInteraction) {
 }
 
 pub async fn add(game_state: &GameState, interaction: &CommandInteraction) {
+    let ron_string = match ron::to_string(&game_state) {
+        Ok(ron_string) => ron_string,
+        Err(err) => {
+            log::warn!("Error converting game state to string: {}", err);
+            return;
+        }
+    };
+
     if let Err(why) = REDIS
-        .set(
-            interaction.channel_id.to_string(),
-            ron::to_string(&game_state).unwrap(),
-        )
+        .set(interaction.channel_id.to_string(), ron_string)
         .await
     {
         log::warn!("Error while trying to set value in redis: {}", why);
