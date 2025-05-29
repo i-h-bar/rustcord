@@ -16,16 +16,15 @@ pub struct NamedLock {
     inner: Arc<Mutex<Inner>>,
     lock: Arc<Mutex<()>>,
 }
+
 pub struct NamedGuard<'a> {
     _guard: MutexGuard<'a, ()>,
 }
 
-
 impl LockByName {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(HashMap::new(),
-            )),
+            inner: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -65,5 +64,43 @@ impl AsyncDrop for NamedLock {
                 lock.remove(&self.name);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_lock_by_name() {
+        let lock = LOCKS.get("name").await;
+        assert_eq!(lock.name, "name");
+        let _guard = lock.lock().await;
+        let another_lock = LOCKS.get("name2").await;
+        assert_eq!(another_lock.name, "name2");
+        let _guard_2 = another_lock.lock().await;
+    }
+
+    #[tokio::test]
+    async fn test_lock() {
+        let (Ok(a), Ok(b)) = tokio::join!(
+            tokio::spawn(async move {
+                let lock = LOCKS.get("name").await;
+                let _guard = lock.lock().await;
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                1
+            }),
+            tokio::spawn(async move {
+                let lock = LOCKS.get("name").await;
+                let _guard = lock.lock().await;
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                2
+            }),
+        ) else {
+            panic!("test went wrong")
+        };
+
+        assert_eq!(a, 1);
+        assert_eq!(b, 2);
     }
 }

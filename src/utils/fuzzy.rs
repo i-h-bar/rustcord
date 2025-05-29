@@ -121,4 +121,20 @@ mod tests {
 
         assert_eq!(jaro_winkler(&a, &b), 0.73333335)
     }
+
+    #[test]
+    fn test_winkliest_match() {
+        let a = "CRATE";
+        let b = ["TRACE", "sdasda", "sadasdasd"];
+
+        assert_eq!(winkliest_match(&a, b), Some("TRACE"))
+    }
+
+    #[test]
+    fn test_winkliest_match_none() {
+        let a = "CRATE";
+        let b: [&str; 0] = [];
+
+        assert_eq!(winkliest_match(&a, b), None)
+    }
 }
