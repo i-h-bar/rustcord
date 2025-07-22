@@ -14,6 +14,7 @@ mod dbs;
 mod game;
 pub mod mtg;
 mod utils;
+pub mod image_store;
 
 struct Handler;
 
