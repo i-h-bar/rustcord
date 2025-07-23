@@ -17,6 +17,7 @@ pub mod image_store;
 pub mod mtg;
 pub mod query;
 mod utils;
+pub mod temp_store;
 
 #[tokio::main]
 async fn main() {
