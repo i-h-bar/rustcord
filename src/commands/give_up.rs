@@ -5,10 +5,12 @@ use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,
 };
+use crate::card_store::CardStore;
 
-impl<IS> App<IS>
+impl<IS, CS> App<IS, CS>
 where
     IS: ImageStore + Send + Sync,
+    CS: CardStore + Send + Sync,
 {
     pub async fn give_up_command(&self, ctx: &Context, interaction: &CommandInteraction) {
         let Some(game_state) = state::fetch(ctx, interaction).await else {

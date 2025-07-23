@@ -22,6 +22,6 @@ pub trait ImageStore {
 }
 
 #[must_use]
-pub fn init_image_store() -> impl ImageStore {
+pub async fn init_image_store() -> impl ImageStore {
     FileSystem::new()
 }

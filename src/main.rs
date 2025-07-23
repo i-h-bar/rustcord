@@ -6,7 +6,7 @@ use serenity::prelude::*;
 
 use crate::app::App;
 use crate::image_store::init_image_store;
-use dbs::psql::Psql;
+use crate::card_store::init_card_store;
 
 pub mod app;
 mod commands;
@@ -16,15 +16,16 @@ pub mod image_store;
 pub mod mtg;
 pub mod query;
 mod utils;
+mod card_store;
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
     env_logger::init();
-    Psql::init().await;
-    let image_store = init_image_store();
+    let card_store = init_card_store().await;
+    let image_store = init_image_store().await;
 
-    let app = App::new(image_store);
+    let app = App::new(image_store, card_store);
 
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES

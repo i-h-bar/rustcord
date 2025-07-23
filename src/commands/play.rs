@@ -1,5 +1,4 @@
 use crate::app::App;
-use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::ImageStore;
@@ -11,10 +10,12 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
+use crate::card_store::CardStore;
 
-impl<IS> App<IS>
+impl<IS, CS> App<IS, CS>
 where
     IS: ImageStore + Send + Sync,
+    CS: CardStore + Send + Sync,
 {
     pub async fn play_command(&self, ctx: &Context, interaction: &CommandInteraction) {
         let Options { set, difficulty } = match parse::options(interaction.data.options()) {
@@ -23,10 +24,6 @@ where
                 log::warn!("{}", err);
                 return;
             }
-        };
-        let Some(db) = Psql::get() else {
-            log::warn!("failed to get Psql database");
-            return;
         };
 
         let random_card = if let Some(set_name) = set {
@@ -53,9 +50,9 @@ where
                 }
                 return;
             };
-            db.random_card_from_set(&matched_set).await
+            self.card_store.random_card_from_set(&matched_set).await
         } else {
-            db.random_card().await
+            self.card_store.random_card().await
         };
 
         if let Some(card) = random_card {

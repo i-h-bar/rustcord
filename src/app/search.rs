@@ -1,17 +1,18 @@
 use crate::app::App;
-use crate::dbs::psql::Psql;
 use crate::image_store::{ImageStore, Images};
 use crate::mtg::card::FuzzyFound;
 use crate::query::QueryParams;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
+use crate::card_store::CardStore;
 
 pub type CardAndImage = (FuzzyFound, Images);
 
-impl<IS> App<IS>
+impl<IS, CS> App<IS, CS>
 where
     IS: ImageStore + Send + Sync,
+    CS: CardStore + Send + Sync,
 {
     pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardAndImage>> {
         join_all(
@@ -24,7 +25,7 @@ where
     }
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
-        let potentials = Psql::get()?.fuzzy_search_distinct(normalised_name).await?;
+        let potentials = self.card_store.search(normalised_name).await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
@@ -34,8 +35,8 @@ where
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
         let set_name = self.set_from_abbreviation(abbreviation).await?;
-        let potentials = Psql::get()?
-            .fuzzy_search_set(&set_name, normalised_name)
+        let potentials = self.card_store
+            .search_set(&set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
@@ -46,17 +47,17 @@ where
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
         let set_name = self.fuzzy_match_set_name(normalised_set_name).await?;
-        let potentials = Psql::get()?
-            .fuzzy_search_set(&set_name, normalised_name)
+        let potentials = self.card_store
+            .search_set(&set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
-        let potentials = Psql::get()?.fuzzy_search_for_artist(artist).await?;
+        let potentials = self.card_store.search_for_artist(artist).await?;
         let best_artist = fuzzy::winkliest_match(&artist, potentials)?;
-        let potentials = Psql::get()?
-            .fuzzy_search_artist(&best_artist, normalised_name)
+        let potentials = self.card_store
+            .search_artist(&best_artist, normalised_name)
             .await?;
 
         fuzzy::winkliest_match(&normalised_name, potentials)
@@ -87,13 +88,13 @@ where
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
-        let potentials = Psql::get()?
-            .fuzzy_search_set_name(normalised_set_name)
+        let potentials = self.card_store
+            .search_for_set_name(normalised_set_name)
             .await?;
         fuzzy::winkliest_match(&normalised_set_name, potentials)
     }
 
     pub async fn set_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
-        Psql::get()?.set_name_from_abbreviation(abbreviation).await
+        self.card_store.set_name_from_abbreviation(abbreviation).await
     }
 }

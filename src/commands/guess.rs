@@ -9,10 +9,12 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     MessageBuilder, ResolvedValue,
 };
+use crate::card_store::CardStore;
 
-impl<IS> App<IS>
+impl<IS, CS> App<IS, CS>
 where
     IS: ImageStore + Send + Sync,
+    CS: CardStore + Send + Sync,
 {
     pub async fn guess_command(&self, ctx: &Context, interaction: &CommandInteraction) {
         let channel_id = interaction.channel_id.to_string();
