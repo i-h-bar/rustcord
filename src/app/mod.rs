@@ -1,12 +1,12 @@
 pub mod search;
 
+use crate::cache::Cache;
 use crate::card_store::CardStore;
 use crate::image_store::ImageStore;
 use crate::utils::help::HELP;
 use crate::{commands, mtg, utils};
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
-use crate::cache::Cache;
 
 pub struct App<IS, CS, C> {
     pub(crate) image_store: IS,

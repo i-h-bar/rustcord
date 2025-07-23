@@ -1,4 +1,5 @@
 use crate::app::App;
+use crate::cache::Cache;
 use crate::card_store::CardStore;
 use crate::game::state;
 use crate::image_store::ImageStore;
@@ -6,7 +7,6 @@ use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,
 };
-use crate::cache::Cache;
 
 impl<IS, CS, C> App<IS, CS, C>
 where

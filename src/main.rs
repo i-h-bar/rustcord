@@ -10,6 +10,7 @@ use crate::card_store::init_card_store;
 use crate::image_store::init_image_store;
 
 pub mod app;
+pub mod cache;
 mod card_store;
 mod commands;
 mod game;
@@ -17,7 +18,6 @@ pub mod image_store;
 pub mod mtg;
 pub mod query;
 mod utils;
-pub mod cache;
 
 #[tokio::main]
 async fn main() {

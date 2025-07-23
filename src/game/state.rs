@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::mtg::card::FuzzyFound;
 use serde::{Deserialize, Serialize};
 use serenity::all::{
@@ -5,7 +6,6 @@ use serenity::all::{
     CreateInteractionResponseMessage, MessageBuilder,
 };
 use std::fmt::{Display, Formatter};
-use crate::cache::Cache;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Difficulty {
@@ -85,7 +85,11 @@ impl GameState {
     }
 }
 
-pub async fn fetch<C: Cache + Send + Sync>(ctx: &Context, interaction: &CommandInteraction, cache: &C) -> Option<GameState> {
+pub async fn fetch<C: Cache + Send + Sync>(
+    ctx: &Context,
+    interaction: &CommandInteraction,
+    cache: &C,
+) -> Option<GameState> {
     let Some(game_state_string): Option<String> =
         cache.get(interaction.channel_id.to_string()).await
     else {
@@ -134,7 +138,11 @@ pub async fn delete<C: Cache + Send + Sync>(interaction: &CommandInteraction, ca
     };
 }
 
-pub async fn add<C: Cache + Send + Sync>(game_state: &GameState, interaction: &CommandInteraction, cache: &C) {
+pub async fn add<C: Cache + Send + Sync>(
+    game_state: &GameState,
+    interaction: &CommandInteraction,
+    cache: &C,
+) {
     let ron_string = match ron::to_string(&game_state) {
         Ok(ron_string) => ron_string,
         Err(err) => {

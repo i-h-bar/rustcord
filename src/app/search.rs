@@ -1,4 +1,5 @@
 use crate::app::App;
+use crate::cache::Cache;
 use crate::card_store::CardStore;
 use crate::image_store::{ImageStore, Images};
 use crate::mtg::card::FuzzyFound;
@@ -6,7 +7,6 @@ use crate::query::QueryParams;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
-use crate::cache::Cache;
 
 pub type CardAndImage = (FuzzyFound, Images);
 

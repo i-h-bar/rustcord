@@ -1,4 +1,5 @@
 use crate::app::App;
+use crate::cache::Cache;
 use crate::card_store::CardStore;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
@@ -11,7 +12,6 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
-use crate::cache::Cache;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
