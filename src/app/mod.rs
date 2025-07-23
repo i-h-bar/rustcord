@@ -1,24 +1,27 @@
 pub mod search;
 
+use crate::card_store::CardStore;
 use crate::image_store::ImageStore;
 use crate::utils::help::HELP;
 use crate::{commands, mtg, utils};
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
-use crate::card_store::CardStore;
 
 pub struct App<IS, CS> {
     pub(crate) image_store: IS,
-    pub(crate) card_store: CS
+    pub(crate) card_store: CS,
 }
 
 impl<IS, CS> App<IS, CS>
 where
     IS: ImageStore + Send + Sync,
-    CS: CardStore + Send + Sync
+    CS: CardStore + Send + Sync,
 {
     pub(crate) fn new(image_store: IS, card_store: CS) -> Self {
-        App { image_store, card_store }
+        App {
+            image_store,
+            card_store,
+        }
     }
 }
 

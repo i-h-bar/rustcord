@@ -1,11 +1,11 @@
 use crate::app::App;
+use crate::card_store::CardStore;
 use crate::image_store::{ImageStore, Images};
 use crate::mtg::card::FuzzyFound;
 use crate::query::QueryParams;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
-use crate::card_store::CardStore;
 
 pub type CardAndImage = (FuzzyFound, Images);
 
@@ -35,7 +35,8 @@ where
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
         let set_name = self.set_from_abbreviation(abbreviation).await?;
-        let potentials = self.card_store
+        let potentials = self
+            .card_store
             .search_set(&set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
@@ -47,7 +48,8 @@ where
         normalised_name: &str,
     ) -> Option<FuzzyFound> {
         let set_name = self.fuzzy_match_set_name(normalised_set_name).await?;
-        let potentials = self.card_store
+        let potentials = self
+            .card_store
             .search_set(&set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
@@ -56,7 +58,8 @@ where
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
         let potentials = self.card_store.search_for_artist(artist).await?;
         let best_artist = fuzzy::winkliest_match(&artist, potentials)?;
-        let potentials = self.card_store
+        let potentials = self
+            .card_store
             .search_artist(&best_artist, normalised_name)
             .await?;
 
@@ -88,13 +91,16 @@ where
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
-        let potentials = self.card_store
+        let potentials = self
+            .card_store
             .search_for_set_name(normalised_set_name)
             .await?;
         fuzzy::winkliest_match(&normalised_set_name, potentials)
     }
 
     pub async fn set_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
-        self.card_store.set_name_from_abbreviation(abbreviation).await
+        self.card_store
+            .set_name_from_abbreviation(abbreviation)
+            .await
     }
 }

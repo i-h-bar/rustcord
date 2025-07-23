@@ -1,4 +1,5 @@
 use crate::app::App;
+use crate::card_store::CardStore;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::ImageStore;
@@ -10,7 +11,6 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
-use crate::card_store::CardStore;
 
 impl<IS, CS> App<IS, CS>
 where

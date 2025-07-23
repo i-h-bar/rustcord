@@ -1,9 +1,8 @@
-
 pub mod postgres;
 
-use async_trait::async_trait;
 use crate::card_store::postgres::Postgres;
 use crate::mtg::card::FuzzyFound;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait CardStore {

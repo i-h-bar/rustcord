@@ -5,10 +5,11 @@ use serenity::all::GatewayIntents;
 use serenity::prelude::*;
 
 use crate::app::App;
-use crate::image_store::init_image_store;
 use crate::card_store::init_card_store;
+use crate::image_store::init_image_store;
 
 pub mod app;
+mod card_store;
 mod commands;
 mod dbs;
 mod game;
@@ -16,7 +17,6 @@ pub mod image_store;
 pub mod mtg;
 pub mod query;
 mod utils;
-mod card_store;
 
 #[tokio::main]
 async fn main() {
