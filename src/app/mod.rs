@@ -6,30 +6,35 @@ use crate::utils::help::HELP;
 use crate::{commands, mtg, utils};
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
+use crate::cache::Cache;
 
-pub struct App<IS, CS> {
+pub struct App<IS, CS, C> {
     pub(crate) image_store: IS,
     pub(crate) card_store: CS,
+    pub(crate) cache: C,
 }
 
-impl<IS, CS> App<IS, CS>
+impl<IS, CS, C> App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
-    pub(crate) fn new(image_store: IS, card_store: CS) -> Self {
-        App {
+    pub(crate) fn new(image_store: IS, card_store: CS, cache: C) -> Self {
+        Self {
             image_store,
             card_store,
+            cache,
         }
     }
 }
 
 #[async_trait]
-impl<IS, CS> EventHandler for App<IS, CS>
+impl<IS, CS, C> EventHandler for App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.id == ctx.cache.current_user().id || msg.author.bot {

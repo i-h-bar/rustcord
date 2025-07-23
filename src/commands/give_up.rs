@@ -6,18 +6,20 @@ use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,
 };
+use crate::cache::Cache;
 
-impl<IS, CS> App<IS, CS>
+impl<IS, CS, C> App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
     pub async fn give_up_command(&self, ctx: &Context, interaction: &CommandInteraction) {
-        let Some(game_state) = state::fetch(ctx, interaction).await else {
+        let Some(game_state) = state::fetch(ctx, interaction, &self.cache).await else {
             return;
         };
 
-        state::delete(interaction).await;
+        state::delete(interaction, &self.cache).await;
 
         let Ok(images) = self.image_store.fetch(game_state.card()).await else {
             log::warn!("couldn't fetch image");

@@ -10,11 +10,13 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     MessageBuilder, ResolvedValue,
 };
+use crate::cache::Cache;
 
-impl<IS, CS> App<IS, CS>
+impl<IS, CS, C> App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
     pub async fn guess_command(&self, ctx: &Context, interaction: &CommandInteraction) {
         let channel_id = interaction.channel_id.to_string();
@@ -32,7 +34,7 @@ where
             }
         };
 
-        let Some(mut game_state) = state::fetch(ctx, interaction).await else {
+        let Some(mut game_state) = state::fetch(ctx, interaction, &self.cache).await else {
             return;
         };
         game_state.add_guess();
@@ -74,9 +76,9 @@ where
                 log::warn!("couldn't create interaction: {}", why);
             }
 
-            state::delete(interaction).await;
+            state::delete(interaction, &self.cache).await;
         } else if game_state.number_of_guesses() >= game_state.max_guesses() {
-            state::delete(interaction).await;
+            state::delete(interaction, &self.cache).await;
 
             let Ok(images) = self.image_store.fetch(game_state.card()).await else {
                 log::warn!("couldn't fetch image");
@@ -141,7 +143,7 @@ where
             if let Err(why) = interaction.create_response(&ctx.http, response).await {
                 log::warn!("couldn't create interaction: {}", why);
             }
-            state::add(&game_state, interaction).await;
+            state::add(&game_state, interaction, &self.cache).await;
         }
     }
 }

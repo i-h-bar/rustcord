@@ -5,19 +5,19 @@ use serenity::all::GatewayIntents;
 use serenity::prelude::*;
 
 use crate::app::App;
+use crate::cache::init_cache;
 use crate::card_store::init_card_store;
 use crate::image_store::init_image_store;
 
 pub mod app;
 mod card_store;
 mod commands;
-mod dbs;
 mod game;
 pub mod image_store;
 pub mod mtg;
 pub mod query;
 mod utils;
-pub mod temp_store;
+pub mod cache;
 
 #[tokio::main]
 async fn main() {
@@ -25,8 +25,9 @@ async fn main() {
     env_logger::init();
     let card_store = init_card_store().await;
     let image_store = init_image_store().await;
+    let cache = init_cache().await;
 
-    let app = App::new(image_store, card_store);
+    let app = App::new(image_store, card_store, cache);
 
     let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
     let intents = GatewayIntents::GUILD_MESSAGES

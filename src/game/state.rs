@@ -1,4 +1,3 @@
-use crate::dbs::redis::REDIS;
 use crate::mtg::card::FuzzyFound;
 use serde::{Deserialize, Serialize};
 use serenity::all::{
@@ -6,6 +5,7 @@ use serenity::all::{
     CreateInteractionResponseMessage, MessageBuilder,
 };
 use std::fmt::{Display, Formatter};
+use crate::cache::Cache;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Difficulty {
@@ -85,9 +85,9 @@ impl GameState {
     }
 }
 
-pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<GameState> {
+pub async fn fetch<C: Cache + Send + Sync>(ctx: &Context, interaction: &CommandInteraction, cache: &C) -> Option<GameState> {
     let Some(game_state_string): Option<String> =
-        REDIS.get(interaction.channel_id.to_string()).await
+        cache.get(interaction.channel_id.to_string()).await
     else {
         let name = if let Some(channel) = &interaction.channel {
             if let Some(name) = &channel.name {
@@ -124,8 +124,8 @@ pub async fn fetch(ctx: &Context, interaction: &CommandInteraction) -> Option<Ga
     }
 }
 
-pub async fn delete(interaction: &CommandInteraction) {
-    if let Err(why) = REDIS.delete(interaction.channel_id.to_string()).await {
+pub async fn delete<C: Cache + Send + Sync>(interaction: &CommandInteraction, cache: &C) {
+    if let Err(why) = cache.delete(interaction.channel_id.to_string()).await {
         log::warn!(
             "Error deleting key: '{}' from redis the response: {:?}",
             interaction.channel_id.to_string(),
@@ -134,7 +134,7 @@ pub async fn delete(interaction: &CommandInteraction) {
     };
 }
 
-pub async fn add(game_state: &GameState, interaction: &CommandInteraction) {
+pub async fn add<C: Cache + Send + Sync>(game_state: &GameState, interaction: &CommandInteraction, cache: &C) {
     let ron_string = match ron::to_string(&game_state) {
         Ok(ron_string) => ron_string,
         Err(err) => {
@@ -143,7 +143,7 @@ pub async fn add(game_state: &GameState, interaction: &CommandInteraction) {
         }
     };
 
-    if let Err(why) = REDIS
+    if let Err(why) = cache
         .set(interaction.channel_id.to_string(), ron_string)
         .await
     {

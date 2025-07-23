@@ -6,13 +6,15 @@ use crate::query::QueryParams;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
+use crate::cache::Cache;
 
 pub type CardAndImage = (FuzzyFound, Images);
 
-impl<IS, CS> App<IS, CS>
+impl<IS, CS, C> App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
     pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardAndImage>> {
         join_all(

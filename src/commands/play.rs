@@ -11,11 +11,13 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
+use crate::cache::Cache;
 
-impl<IS, CS> App<IS, CS>
+impl<IS, CS, C> App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
     pub async fn play_command(&self, ctx: &Context, interaction: &CommandInteraction) {
         let Options { set, difficulty } = match parse::options(interaction.data.options()) {
@@ -89,7 +91,7 @@ where
                 log::error!("couldn't create interaction response: {:?}", why);
             }
 
-            state::add(&game_state, interaction).await;
+            state::add(&game_state, interaction, &self.cache).await;
         } else {
             log::warn!("Failed to get random card");
         }

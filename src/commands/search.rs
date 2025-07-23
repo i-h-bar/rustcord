@@ -7,11 +7,13 @@ use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateAttachment, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
+use crate::cache::Cache;
 
-impl<IS, CS> App<IS, CS>
+impl<IS, CS, C> App<IS, CS, C>
 where
     IS: ImageStore + Send + Sync,
     CS: CardStore + Send + Sync,
+    C: Cache + Send + Sync,
 {
     pub async fn search_command(&self, ctx: &Context, interaction: &CommandInteraction) {
         let query_params = match parse::options::<QueryParams>(interaction.data.options()) {
