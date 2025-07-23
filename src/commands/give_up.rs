@@ -1,47 +1,58 @@
+use crate::app::App;
 use crate::game::state;
-use crate::mtg::images::IMAGE_FETCHER;
+use crate::image_store::ImageStore;
 use serenity::all::{
-    CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
+    CommandInteraction, Context, CreateAttachment, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,
 };
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let Some(game_state) = state::fetch(ctx, interaction).await else {
-        return;
-    };
+impl<IS> App<IS>
+where
+    IS: ImageStore + Send + Sync,
+{
+    pub async fn give_up_command(&self, ctx: &Context, interaction: &CommandInteraction) {
+        let Some(game_state) = state::fetch(ctx, interaction).await else {
+            return;
+        };
 
-    state::delete(interaction).await;
+        state::delete(interaction).await;
 
-    let (Some(image), _) = IMAGE_FETCHER.fetch(game_state.card()).await else {
-        log::warn!("couldn't fetch image");
-        return;
-    };
+        let Ok(images) = self.image_store.fetch(game_state.card()).await else {
+            log::warn!("couldn't fetch image");
+            return;
+        };
 
-    let number_of_guesses = game_state.number_of_guesses();
-    let guess_plural = if number_of_guesses > 1 {
-        "guesses"
-    } else {
-        "guess"
-    };
+        let image = CreateAttachment::bytes(
+            images.front,
+            format!("{}.png", game_state.card().front_image_id()),
+        );
 
-    let message = MessageBuilder::new()
-        .mention(&interaction.user)
-        .push(format!(
-            " has given up after {number_of_guesses} {guess_plural}!",
-        ))
-        .build();
+        let number_of_guesses = game_state.number_of_guesses();
+        let guess_plural = if number_of_guesses > 1 {
+            "guesses"
+        } else {
+            "guess"
+        };
 
-    let embed = game_state.convert_to_embed();
+        let message = MessageBuilder::new()
+            .mention(&interaction.user)
+            .push(format!(
+                " has given up after {number_of_guesses} {guess_plural}!",
+            ))
+            .build();
 
-    let response = CreateInteractionResponseMessage::new()
-        .add_file(image)
-        .add_embed(embed)
-        .content(message);
+        let embed = game_state.convert_to_embed();
 
-    let response = CreateInteractionResponse::Message(response);
-    if let Err(why) = interaction.create_response(&ctx.http, response).await {
-        log::warn!("couldn't create interaction: {}", why);
-    };
+        let response = CreateInteractionResponseMessage::new()
+            .add_file(image)
+            .add_embed(embed)
+            .content(message);
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        };
+    }
 }
 
 pub fn register() -> CreateCommand {

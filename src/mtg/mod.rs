@@ -1,46 +1,40 @@
+use crate::app::search::CardAndImage;
+use crate::image_store::Images;
 use crate::mtg::card::FuzzyFound;
-use crate::mtg::search::CardAndImage;
 use crate::utils;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 
 pub mod card;
-pub(crate) mod images;
-pub mod search;
 
 pub async fn card_response(card: Option<CardAndImage>, msg: &Message, ctx: &Context) {
     match card {
         None => utils::send("Failed to find card :(", msg, ctx).await,
-        Some((card, (front_image, back_image))) => {
-            send_embed(card, front_image, back_image, msg, ctx).await;
+        Some((card, images)) => {
+            send_embed(card, images, msg, ctx).await;
         }
     }
 }
 
-async fn send_embed(
-    card: FuzzyFound,
-    front_image: Option<CreateAttachment>,
-    back_image: Option<CreateAttachment>,
-    msg: &Message,
-    ctx: &Context,
-) {
-    let (front, back) = card.to_embed();
-    let message = if let Some(front_image) = front_image {
-        CreateMessage::new().add_file(front_image)
+async fn send_embed(card: FuzzyFound, images: Images, msg: &Message, ctx: &Context) {
+    let front_image =
+        CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
+    let back_image = if let Some(back_image) = images.back {
+        card.back_image_id().map(|back_image_id| {
+            CreateAttachment::bytes(back_image, format!("{back_image_id}.png"))
+        })
     } else {
-        CreateMessage::new()
-    }
-    .add_embed(front);
+        None
+    };
+
+    let (front, back) = card.to_embed();
+    let message = CreateMessage::new().add_file(front_image).add_embed(front);
 
     utils::send_message(message, msg, ctx).await;
 
     if let Some(back) = back {
-        let message = if let Some(back_image) = back_image {
-            CreateMessage::new().add_file(back_image)
-        } else {
-            CreateMessage::new()
+        if let Some(back_image) = back_image {
+            let message = CreateMessage::new().add_file(back_image).add_embed(back);
+            utils::send_message(message, msg, ctx).await;
         }
-        .add_embed(back);
-
-        utils::send_message(message, msg, ctx).await;
     }
 }

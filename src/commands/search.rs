@@ -1,53 +1,68 @@
-use crate::mtg;
-use crate::mtg::search::QueryParams;
+use crate::app::App;
+use crate::image_store::ImageStore;
+use crate::query::QueryParams;
 use crate::utils::parse;
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandInteraction, CommandOptionType, Context, CreateAttachment, CreateCommand,
+    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let query_params = match parse::options::<QueryParams>(interaction.data.options()) {
-        Ok(params) => params,
-        Err(err) => {
-            log::warn!("{}", err);
-            return;
-        }
-    };
 
-    let card = mtg::search::find_card(query_params).await;
-    if let Some((card, (front_image, back_image))) = card {
-        let (front, back) = card.to_embed();
-        let mut message = if let Some(front_image) = front_image {
-            CreateInteractionResponseMessage::new().add_file(front_image)
-        } else {
-            CreateInteractionResponseMessage::new()
-        }
-        .add_embed(front);
-
-        if let Some(back) = back {
-            message = if let Some(back_image) = back_image {
-                message.add_file(back_image)
-            } else {
-                message
+impl<IS> App<IS>
+where
+    IS: ImageStore + Send + Sync,
+{
+    pub async fn search_command(&self, ctx: &Context, interaction: &CommandInteraction) {
+        let query_params = match parse::options::<QueryParams>(interaction.data.options()) {
+            Ok(params) => params,
+            Err(err) => {
+                log::warn!("{}", err);
+                return;
             }
-            .add_embed(back);
-        }
+        };
 
-        if let Err(why) = interaction
-            .create_response(ctx, CreateInteractionResponse::Message(message))
-            .await
-        {
-            log::error!("couldn't create interaction response: {:?}", why);
-        }
-    } else {
-        let response = CreateInteractionResponseMessage::new()
-            .content("Could not find card :(")
-            .ephemeral(true);
-        if let Err(why) = interaction
-            .create_response(ctx, CreateInteractionResponse::Message(response))
-            .await
-        {
-            log::error!("couldn't create interaction response: {:?}", why);
+        let card = self.find_card(query_params).await;
+        if let Some((card, images)) = card {
+            let front_image =
+                CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
+            let back_image = if let Some(back_image_id) = card.back_image_id() {
+                images.back.map(|back_image| {
+                    CreateAttachment::bytes(back_image, format!("{back_image_id}.png"))
+                })
+            } else {
+                None
+            };
+
+            let (front, back) = card.to_embed();
+
+            let mut message = CreateInteractionResponseMessage::new()
+                .add_file(front_image)
+                .add_embed(front);
+
+            if let Some(back) = back {
+                message = if let Some(back_image) = back_image {
+                    message.add_file(back_image)
+                } else {
+                    message
+                }
+                .add_embed(back);
+            }
+
+            if let Err(why) = interaction
+                .create_response(ctx, CreateInteractionResponse::Message(message))
+                .await
+            {
+                log::error!("couldn't create interaction response: {:?}", why);
+            }
+        } else {
+            let response = CreateInteractionResponseMessage::new()
+                .content("Could not find card :(")
+                .ephemeral(true);
+            if let Err(why) = interaction
+                .create_response(ctx, CreateInteractionResponse::Message(response))
+                .await
+            {
+                log::error!("couldn't create interaction response: {:?}", why);
+            }
         }
     }
 }

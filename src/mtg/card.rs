@@ -77,8 +77,23 @@ impl FuzzyFound {
     }
 
     #[must_use]
-    pub fn image_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
-        (Some(&self.front_image_id), self.back_image_id.as_ref())
+    pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
+        (&self.front_image_id, self.back_image_id.as_ref())
+    }
+
+    #[must_use]
+    pub fn front_image_id(&self) -> &Uuid {
+        &self.front_image_id
+    }
+
+    #[must_use]
+    pub fn back_image_id(&self) -> Option<&Uuid> {
+        self.back_image_id.as_ref()
+    }
+
+    #[must_use]
+    pub fn front_illustration_id(&self) -> Option<&Uuid> {
+        self.front_illustration_id.as_ref()
     }
 
     #[must_use]

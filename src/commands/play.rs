@@ -1,87 +1,101 @@
+use crate::app::App;
 use crate::dbs::psql::Psql;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
-use crate::mtg::images::IMAGE_FETCHER;
+use crate::image_store::ImageStore;
+use crate::utils;
 use crate::utils::parse;
 use crate::utils::parse::{ParseError, ResolveOption};
-use crate::{mtg, utils};
 use serenity::all::{
-    CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
+    CommandInteraction, CommandOptionType, CreateAttachment, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let Options { set, difficulty } = match parse::options(interaction.data.options()) {
-        Ok(options) => options,
-        Err(err) => {
-            log::warn!("{}", err);
+impl<IS> App<IS>
+where
+    IS: ImageStore + Send + Sync,
+{
+    pub async fn play_command(&self, ctx: &Context, interaction: &CommandInteraction) {
+        let Options { set, difficulty } = match parse::options(interaction.data.options()) {
+            Ok(options) => options,
+            Err(err) => {
+                log::warn!("{}", err);
+                return;
+            }
+        };
+        let Some(db) = Psql::get() else {
+            log::warn!("failed to get Psql database");
             return;
-        }
-    };
-    let Some(db) = Psql::get() else {
-        log::warn!("failed to get Psql database");
-        return;
-    };
-
-    let random_card = if let Some(set_name) = set {
-        let matched_set = if set_name.chars().count() < 5 {
-            mtg::search::set_from_abbreviation(&set_name).await
-        } else {
-            mtg::search::fuzzy_match_set_name(&utils::normalise(&set_name)).await
         };
 
-        let Some(matched_set) = matched_set else {
-            let message = MessageBuilder::new()
-                .mention(&interaction.user)
-                .push(" could not find set named ")
-                .push(set_name)
-                .build();
+        let random_card = if let Some(set_name) = set {
+            let matched_set = if set_name.chars().count() < 5 {
+                self.set_from_abbreviation(&set_name).await
+            } else {
+                self.fuzzy_match_set_name(&utils::normalise(&set_name))
+                    .await
+            };
 
-            let response = CreateInteractionResponseMessage::new().content(message);
-            if let Err(why) = interaction
-                .create_response(ctx, CreateInteractionResponse::Message(response))
-                .await
-            {
+            let Some(matched_set) = matched_set else {
+                let message = MessageBuilder::new()
+                    .mention(&interaction.user)
+                    .push(" could not find set named ")
+                    .push(set_name)
+                    .build();
+
+                let response = CreateInteractionResponseMessage::new().content(message);
+                if let Err(why) = interaction
+                    .create_response(ctx, CreateInteractionResponse::Message(response))
+                    .await
+                {
+                    log::error!("couldn't create interaction response: {:?}", why);
+                }
+                return;
+            };
+            db.random_card_from_set(&matched_set).await
+        } else {
+            db.random_card().await
+        };
+
+        if let Some(card) = random_card {
+            let game_state = GameState::from(card, difficulty);
+            let Ok(images) = self.image_store.fetch_illustration(game_state.card()).await else {
+                log::warn!("failed to get image");
+                return;
+            };
+
+            let Some(illustration_id) = game_state.card().front_illustration_id() else {
+                log::warn!("failed to get image id");
+                return;
+            };
+
+            let illustration =
+                CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
+
+            let response = match game_state.difficulty() {
+                Difficulty::Hard => CreateInteractionResponseMessage::new().content(format!(
+                    "Difficulty is set to `{}`.",
+                    game_state.difficulty()
+                )),
+                _ => CreateInteractionResponseMessage::new().content(format!(
+                    "Difficulty is set to `{}`. This card is from `{}`",
+                    game_state.difficulty(),
+                    game_state.card().set_name()
+                )),
+            }
+            .add_file(illustration)
+            .add_embed(game_state.to_embed());
+
+            let response = CreateInteractionResponse::Message(response);
+            if let Err(why) = interaction.create_response(&ctx.http, response).await {
                 log::error!("couldn't create interaction response: {:?}", why);
             }
-            return;
-        };
-        db.random_card_from_set(&matched_set).await
-    } else {
-        db.random_card().await
-    };
 
-    if let Some(card) = random_card {
-        let (Some(illustration), _) = IMAGE_FETCHER.fetch_illustration(&card).await else {
-            log::warn!("failed to get image");
-            return;
-        };
-
-        let game_state = GameState::from(card, difficulty);
-
-        let response = match game_state.difficulty() {
-            Difficulty::Hard => CreateInteractionResponseMessage::new().content(format!(
-                "Difficulty is set to `{}`.",
-                game_state.difficulty()
-            )),
-            _ => CreateInteractionResponseMessage::new().content(format!(
-                "Difficulty is set to `{}`. This card is from `{}`",
-                game_state.difficulty(),
-                game_state.card().set_name()
-            )),
+            state::add(&game_state, interaction).await;
+        } else {
+            log::warn!("Failed to get random card");
         }
-        .add_file(illustration)
-        .add_embed(game_state.to_embed());
-
-        let response = CreateInteractionResponse::Message(response);
-        if let Err(why) = interaction.create_response(&ctx.http, response).await {
-            log::error!("couldn't create interaction response: {:?}", why);
-        }
-
-        state::add(&game_state, interaction).await;
-    } else {
-        log::warn!("Failed to get random card");
     }
 }
 
