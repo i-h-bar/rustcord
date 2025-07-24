@@ -12,6 +12,7 @@ use crate::image_store::init_image_store;
 pub mod app;
 pub mod cache;
 mod card_store;
+mod clients;
 mod commands;
 mod game;
 pub mod image_store;
