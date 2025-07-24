@@ -217,7 +217,7 @@ impl FuzzyFound {
         embed
     }
 
-    fn rules_text(&self) -> String {
+    pub(crate) fn rules_text(&self) -> String {
         let stats = if let Some(power) = self.front_power.clone() {
             let toughness = self
                 .front_toughness

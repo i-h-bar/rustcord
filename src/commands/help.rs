@@ -3,14 +3,10 @@ use serenity::all::{
     CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
+use crate::clients::MessageInteraction;
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let response = CreateInteractionResponse::Message(
-        CreateInteractionResponseMessage::new()
-            .content(HELP)
-            .ephemeral(true),
-    );
-    if let Err(why) = interaction.create_response(&ctx.http, response).await {
+pub async fn run<I: MessageInteraction>(interaction: &I) {
+    if let Err(why) = interaction.reply(HELP.into()).await {
         log::error!("couldn't create interaction response: {:?}", why);
     };
 }

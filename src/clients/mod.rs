@@ -1,3 +1,4 @@
+use crate::game::state::GameState;
 use crate::image_store::Images;
 use crate::mtg::card::FuzzyFound;
 use async_trait::async_trait;
@@ -15,6 +16,13 @@ pub trait MessageInteraction {
         &self,
         card: FuzzyFound,
         images: Images,
+    ) -> Result<(), MessageInterationError>;
+
+    async fn send_game_state(
+        &self,
+        state: &GameState,
+        images: Images,
+        guess: &str,
     ) -> Result<(), MessageInterationError>;
     async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
 }

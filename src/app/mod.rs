@@ -3,7 +3,6 @@ pub mod search;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
 use crate::image_store::ImageStore;
-use serenity::all::EventHandler;
 
 pub struct App<IS, CS, C> {
     pub(crate) image_store: IS,

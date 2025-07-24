@@ -50,6 +50,10 @@ impl GameState {
         }
     }
 
+    pub fn guesses(&self) -> usize {
+        self.guess_number
+    }
+
     pub fn max_guesses(&self) -> usize {
         match self.difficulty {
             Difficulty::Hard => 4,
