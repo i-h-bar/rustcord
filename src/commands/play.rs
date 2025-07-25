@@ -6,11 +6,7 @@ use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::ImageStore;
 use crate::utils;
-use crate::utils::parse::ResolveOption;
-use serenity::all::{
-    CommandOptionType, CreateAttachment, CreateCommand, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
-};
+use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
 impl<IS, CS, C> App<IS, CS, C>
 where

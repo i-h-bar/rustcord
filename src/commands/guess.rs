@@ -5,12 +5,8 @@ use crate::clients::GameInteraction;
 use crate::game::state;
 use crate::image_store::ImageStore;
 use crate::utils::mutex;
-use crate::utils::parse::ResolveOption;
 use crate::utils::{fuzzy, normalise};
-use serenity::all::{
-    CommandOptionType, Context, CreateAttachment, CreateCommand, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
-};
+use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
 impl<IS, CS, C> App<IS, CS, C>
 where

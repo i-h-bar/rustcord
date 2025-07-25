@@ -4,10 +4,7 @@ use crate::card_store::CardStore;
 use crate::clients::GameInteraction;
 use crate::game::state;
 use crate::image_store::ImageStore;
-use serenity::all::{
-    CommandInteraction, Context, CreateAttachment, CreateCommand, CreateInteractionResponse,
-    CreateInteractionResponseMessage, MessageBuilder,
-};
+use serenity::all::CreateCommand;
 
 impl<IS, CS, C> App<IS, CS, C>
 where

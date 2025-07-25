@@ -4,11 +4,7 @@ use crate::card_store::CardStore;
 use crate::clients::MessageInteraction;
 use crate::image_store::ImageStore;
 use crate::query::QueryParams;
-use crate::utils::parse;
-use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateAttachment, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-};
+use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
 impl<IS, CS, C> App<IS, CS, C>
 where

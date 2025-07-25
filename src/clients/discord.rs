@@ -4,7 +4,6 @@ use crate::card_store::CardStore;
 use crate::clients::{GameInteraction, MessageInteraction, MessageInterationError};
 use crate::commands::guess::GuessOptions;
 use crate::commands::play::PlayOptions;
-use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::{ImageStore, Images};
 use crate::mtg::card::FuzzyFound;
@@ -14,7 +13,7 @@ use crate::utils::emoji::add_emoji;
 use crate::utils::help::HELP;
 use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{italicise_reminder_text, parse, REGEX_COLLECTION};
-use crate::{commands, mtg, utils};
+use crate::{commands, mtg};
 use async_trait::async_trait;
 use regex::Captures;
 use serenity::all::{
@@ -22,7 +21,6 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, EventHandler,
     Interaction, Message, MessageBuilder, Ready, ResolvedValue,
 };
-use tokio::time::Instant;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -470,9 +468,7 @@ impl GameInteraction for DiscordCommandInteraction {
             )));
         };
 
-        let illustration = CreateAttachment::bytes(
-            images.front, format!("{illustration_id}.png",)
-        );
+        let illustration = CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
         let difficulty = state.difficulty();
         let set_name = state.card().set_name();
         let message = match difficulty {
@@ -515,7 +511,6 @@ impl GameInteraction for DiscordCommandInteraction {
         Ok(())
     }
 }
-
 
 fn create_game_embed(card: FuzzyFound, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
