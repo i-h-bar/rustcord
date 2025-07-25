@@ -6,7 +6,6 @@ use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
 use crate::utils::mutex;
 use crate::utils::{fuzzy, normalise};
-use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -71,19 +70,6 @@ where
             }
         }
     }
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("guess")
-        .description("Guess the card")
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "card",
-                "The name of the card you want to guess",
-            )
-            .required(true),
-        )
 }
 
 pub struct GuessOptions {

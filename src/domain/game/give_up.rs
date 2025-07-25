@@ -4,7 +4,6 @@ use crate::domain::game::state;
 use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
-use serenity::all::CreateCommand;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -28,8 +27,4 @@ where
             log::warn!("couldn't send game failed: {}", why);
         }
     }
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("give_up").description("Give up on the current game")
 }

@@ -4,12 +4,13 @@ mod utils;
 
 use crate::api::clients::discord::commands::game::DiscordCommandInteraction;
 use crate::api::clients::discord::commands::interaction::DiscordCommand;
+use crate::api::clients::discord::commands::register::{give_up, guess, help, play, search};
 use crate::api::clients::discord::messages::interaction::DiscordMessageInteration;
 use crate::api::clients::MessageInteraction;
 use crate::domain::app::App;
+use crate::domain::game::play::PlayOptions;
 use crate::domain::query::QueryParams;
-use crate::domain::tem_commands::play::PlayOptions;
-use crate::domain::{card, tem_commands};
+use crate::domain::{card, game};
 use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
@@ -42,39 +43,31 @@ where
     }
 
     async fn ready(&self, ctx: Context, _: Ready) {
-        if let Err(err) = Command::create_global_command(&ctx, tem_commands::play::register()).await
-        {
+        if let Err(err) = Command::create_global_command(&ctx, play::register()).await {
             log::warn!("Could not create command {:?}", err);
         } else {
             log::info!("Created play command");
         }
 
-        if let Err(err) =
-            Command::create_global_command(&ctx, tem_commands::guess::register()).await
-        {
+        if let Err(err) = Command::create_global_command(&ctx, guess::register()).await {
             log::warn!("Could not create command {:?}", err);
         } else {
             log::info!("Created guess command");
         }
 
-        if let Err(err) = Command::create_global_command(&ctx, tem_commands::help::register()).await
-        {
+        if let Err(err) = Command::create_global_command(&ctx, help::register()).await {
             log::warn!("Could not create command {:?}", err);
         } else {
             log::info!("Created help command");
         }
 
-        if let Err(err) =
-            Command::create_global_command(&ctx, tem_commands::search::register()).await
-        {
+        if let Err(err) = Command::create_global_command(&ctx, search::register()).await {
             log::warn!("Could not create command {:?}", err);
         } else {
             log::info!("Created search command");
         }
 
-        if let Err(err) =
-            Command::create_global_command(&ctx, tem_commands::give_up::register()).await
-        {
+        if let Err(err) = Command::create_global_command(&ctx, give_up::register()).await {
             log::warn!("Could not create command {:?}", err);
         } else {
             log::info!("Created give_up command");
@@ -98,7 +91,7 @@ where
             match command.data.name.as_str() {
                 "help" => {
                     let interaction = DiscordCommand::new(ctx, command);
-                    tem_commands::help::run(&interaction).await;
+                    game::help::run(&interaction).await;
                 }
                 "search" => {
                     let query_params = match parse::options::<QueryParams>(command.data.options()) {
@@ -109,7 +102,7 @@ where
                         }
                     };
                     let interaction = DiscordCommand::new(ctx, command);
-                    self.search_command(&interaction, query_params).await;
+                    self.search(&interaction, query_params).await;
                 }
                 "play" => {
                     let options = match parse::options::<PlayOptions>(command.data.options()) {

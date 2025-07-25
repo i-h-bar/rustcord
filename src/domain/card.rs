@@ -5,8 +5,6 @@ use crate::utils::fuzzy::ToChars;
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgRow;
-use sqlx::Row;
 use std::str::Chars;
 use uuid::Uuid;
 
@@ -42,39 +40,6 @@ pub struct Card {
 }
 
 impl Card {
-    #[allow(clippy::missing_errors_doc)]
-    pub fn from(row: &PgRow) -> Self {
-        Self {
-            front_name: row.get::<String, &str>("front_name"),
-            front_normalised_name: row.get::<String, &str>("front_normalised_name"),
-            front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
-            front_image_id: row.get::<Uuid, &str>("front_image_id"),
-            front_illustration_id: row.get::<Option<Uuid>, &str>("front_illustration_id"),
-            front_mana_cost: row.get::<String, &str>("front_mana_cost"),
-            front_colour_identity: row.get::<Vec<String>, &str>("front_colour_identity"),
-            front_power: row.get::<Option<String>, &str>("front_power"),
-            front_toughness: row.get::<Option<String>, &str>("front_toughness"),
-            front_loyalty: row.get::<Option<String>, &str>("front_loyalty"),
-            front_defence: row.get::<Option<String>, &str>("front_defence"),
-            front_type_line: row.get::<String, &str>("front_type_line"),
-            front_oracle_text: row.get::<String, &str>("front_oracle_text"),
-            back_name: row.get::<Option<String>, &str>("back_name"),
-            back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
-            back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
-            back_illustration_id: row.get::<Option<Uuid>, &str>("back_illustration_id"),
-            back_mana_cost: row.get::<Option<String>, &str>("back_mana_cost"),
-            back_colour_identity: row.get::<Option<Vec<String>>, &str>("back_colour_identity"),
-            back_power: row.get::<Option<String>, &str>("back_power"),
-            back_toughness: row.get::<Option<String>, &str>("back_toughness"),
-            back_loyalty: row.get::<Option<String>, &str>("back_loyalty"),
-            back_defence: row.get::<Option<String>, &str>("back_defence"),
-            back_type_line: row.get::<Option<String>, &str>("back_type_line"),
-            back_oracle_text: row.get::<Option<String>, &str>("back_oracle_text"),
-            artist: row.get::<String, &str>("artist"),
-            set_name: row.get::<String, &str>("set_name"),
-        }
-    }
-
     #[must_use]
     pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
         (&self.front_image_id, self.back_image_id.as_ref())

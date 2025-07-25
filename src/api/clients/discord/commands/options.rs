@@ -1,7 +1,7 @@
+use crate::domain::game::guess::GuessOptions;
+use crate::domain::game::play::PlayOptions;
 use crate::domain::game::state::Difficulty;
 use crate::domain::query::QueryParams;
-use crate::domain::tem_commands::guess::GuessOptions;
-use crate::domain::tem_commands::play::PlayOptions;
 use crate::utils::parse::{ParseError, ResolveOption};
 use serenity::all::ResolvedValue;
 

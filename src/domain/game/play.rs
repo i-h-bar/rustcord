@@ -6,7 +6,6 @@ use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
 use crate::utils;
-use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption};
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -54,30 +53,6 @@ where
             log::warn!("Failed to get random card");
         }
     }
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("play")
-        .description("Start a guess the card game")
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "set",
-                "What set to choose the card from",
-            )
-            .required(false),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "difficulty",
-                "what difficulty do you want to play at?",
-            )
-            .add_string_choice("Easy", "Easy")
-            .add_string_choice("Medium", "Medium")
-            .add_string_choice("Hard", "Hard")
-            .required(false),
-        )
 }
 
 pub struct PlayOptions {

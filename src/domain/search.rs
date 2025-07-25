@@ -1,3 +1,4 @@
+use crate::api::clients::MessageInteraction;
 use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::query::QueryParams;
@@ -104,5 +105,22 @@ where
         self.card_store
             .set_name_from_abbreviation(abbreviation)
             .await
+    }
+
+    pub async fn search<I: MessageInteraction>(&self, interaction: &I, query_params: QueryParams) {
+        let card = self.find_card(query_params).await;
+        if let Some((card, images)) = card {
+            if let Err(why) = interaction.send_card(card, images).await {
+                log::warn!("Error sending card from search command: {}", why);
+            };
+        } else if let Err(why) = interaction
+            .reply(String::from("Could not find card :("))
+            .await
+        {
+            log::warn!(
+                "Error the failed to find card message from search command: {}",
+                why
+            );
+        }
     }
 }
