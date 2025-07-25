@@ -1,19 +1,16 @@
 use crate::app::App;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
-use crate::clients::{GameInteraction, MessageInteraction};
+use crate::clients::GameInteraction;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::ImageStore;
 use crate::utils;
-use crate::utils::parse;
-use crate::utils::parse::{ParseError, ResolveOption};
+use crate::utils::parse::ResolveOption;
 use serenity::all::{
-    CommandInteraction, CommandOptionType, CreateAttachment, CreateCommand, CreateCommandOption,
+    CommandOptionType, CreateAttachment, CreateCommand, CreateCommandOption,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
-use serenity::prelude::*;
-use std::fmt::format;
 
 impl<IS, CS, C> App<IS, CS, C>
 where

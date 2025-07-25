@@ -22,6 +22,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, EventHandler,
     Interaction, Message, MessageBuilder, Ready, ResolvedValue,
 };
+use tokio::time::Instant;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -351,7 +352,7 @@ impl GameInteraction for DiscordCommandInteraction {
             ))
             .build();
 
-        let embed = state.convert_to_embed();
+        let (embed, _) = create_embed(state.card);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)
@@ -359,7 +360,12 @@ impl GameInteraction for DiscordCommandInteraction {
             .content(message);
 
         let response = CreateInteractionResponse::Message(response);
-        if let Err(_) = self.command.create_response(&self.ctx.http, response).await {
+        if self
+            .command
+            .create_response(&self.ctx.http, response)
+            .await
+            .is_err()
+        {
             return Err(MessageInterationError(String::from(
                 "couldn't create interaction",
             )));
@@ -392,7 +398,7 @@ impl GameInteraction for DiscordCommandInteraction {
             ))
             .build();
 
-        let embed = state.convert_to_embed();
+        let (embed, _) = create_embed(state.card);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)
@@ -400,7 +406,12 @@ impl GameInteraction for DiscordCommandInteraction {
             .content(message);
 
         let response = CreateInteractionResponse::Message(response);
-        if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
+        if self
+            .command
+            .create_response(&self.ctx.http, response)
+            .await
+            .is_err()
+        {
             return Err(MessageInterationError(String::from(
                 "Failed to send message",
             )));
@@ -415,34 +426,6 @@ impl GameInteraction for DiscordCommandInteraction {
         images: Images,
         guess: String,
     ) -> Result<(), MessageInterationError> {
-        let mut embed = CreateEmbed::default()
-            .attachment(format!(
-                "{}.png",
-                state.card().front_illustration_id.unwrap_or_default()
-            ))
-            .title("????")
-            .description("????")
-            .footer(CreateEmbedFooter::new(format!(
-                "🖌️ - {}",
-                state.card().artist
-            )));
-
-        if state.guesses() > state.multiplier() {
-            let mana_cost = REGEX_COLLECTION
-                .symbols
-                .replace_all(&state.card().front_mana_cost, |cap: &Captures| {
-                    add_emoji(cap)
-                });
-            let title = format!("????        {mana_cost}");
-            embed = embed
-                .title(title)
-                .colour(get_colour_identity(&state.card().front_colour_identity));
-        }
-
-        if state.guesses() > state.multiplier() * 2 {
-            embed = embed.description(state.card().rules_text());
-        }
-
         let illustration = if let Some(illustration_id) = state.card().front_illustration_id() {
             CreateAttachment::bytes(images.front, format!("{illustration_id}.png",))
         } else {
@@ -453,6 +436,9 @@ impl GameInteraction for DiscordCommandInteraction {
         };
 
         let remaining_guesses = state.max_guesses() - state.number_of_guesses();
+        let (multiplier, guesses) = (state.multiplier(), state.guesses());
+        let embed = create_game_embed(state.card, multiplier, guesses);
+
         let guess_plural = if remaining_guesses > 1 {
             "guesses"
         } else {
@@ -484,19 +470,22 @@ impl GameInteraction for DiscordCommandInteraction {
             )));
         };
 
-        let illustration = CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
+        let illustration = CreateAttachment::bytes(
+            images.front, format!("{illustration_id}.png",)
+        );
+        let difficulty = state.difficulty();
+        let set_name = state.card().set_name();
+        let message = match difficulty {
+            Difficulty::Hard => format!("Difficulty is set to `{difficulty}`."),
+            _ => format!("Difficulty is set to `{difficulty}`. This card is from `{set_name}`"),
+        };
 
-        let response = match state.difficulty() {
-            Difficulty::Hard => CreateInteractionResponseMessage::new()
-                .content(format!("Difficulty is set to `{}`.", state.difficulty())),
-            _ => CreateInteractionResponseMessage::new().content(format!(
-                "Difficulty is set to `{}`. This card is from `{}`",
-                state.difficulty(),
-                state.card().set_name()
-            )),
-        }
-        .add_file(illustration)
-        .add_embed(state.to_embed());
+        let (multiplier, guesses) = (state.multiplier(), state.guesses());
+        let embed = create_game_embed(state.card, multiplier, guesses);
+        let response = CreateInteractionResponseMessage::new()
+            .content(message)
+            .add_file(illustration)
+            .add_embed(embed);
 
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
@@ -512,7 +501,12 @@ impl GameInteraction for DiscordCommandInteraction {
                 .content(message)
                 .ephemeral(true),
         );
-        if let Err(_) = self.command.create_response(&self.ctx.http, response).await {
+        if self
+            .command
+            .create_response(&self.ctx.http, response)
+            .await
+            .is_err()
+        {
             return Err(MessageInterationError(String::from(
                 "couldn't create interaction",
             )));
@@ -520,6 +514,34 @@ impl GameInteraction for DiscordCommandInteraction {
 
         Ok(())
     }
+}
+
+
+fn create_game_embed(card: FuzzyFound, multiplier: usize, guesses: usize) -> CreateEmbed {
+    let mut embed = CreateEmbed::default()
+        .attachment(format!(
+            "{}.png",
+            card.front_illustration_id.unwrap_or_default()
+        ))
+        .title("????")
+        .description("????")
+        .footer(CreateEmbedFooter::new(format!("🖌️ - {}", card.artist)));
+
+    if guesses > multiplier {
+        let mana_cost = REGEX_COLLECTION
+            .symbols
+            .replace_all(&card.front_mana_cost, |cap: &Captures| add_emoji(cap));
+        let title = format!("????        {mana_cost}");
+        embed = embed
+            .title(title)
+            .colour(get_colour_identity(&card.front_colour_identity));
+    }
+
+    if guesses > multiplier * 2 {
+        embed = embed.description(card.rules_text());
+    }
+
+    embed
 }
 
 fn create_embed(card: FuzzyFound) -> (CreateEmbed, Option<CreateEmbed>) {

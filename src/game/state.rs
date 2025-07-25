@@ -1,11 +1,6 @@
 use crate::cache::Cache;
-use crate::clients::MessageInteraction;
 use crate::mtg::card::FuzzyFound;
 use serde::{Deserialize, Serialize};
-use serenity::all::{
-    CommandInteraction, Context, CreateEmbed, CreateInteractionResponse,
-    CreateInteractionResponseMessage, MessageBuilder,
-};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -29,7 +24,7 @@ impl Display for Difficulty {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GameState {
-    card: FuzzyFound,
+    pub(crate) card: FuzzyFound,
     difficulty: Difficulty,
     guess_number: usize,
 }
@@ -67,16 +62,6 @@ impl GameState {
         &self.difficulty
     }
 
-    pub fn to_embed(&self) -> CreateEmbed {
-        self.card
-            .to_game_embed(self.multiplier(), self.guess_number)
-    }
-
-    pub fn convert_to_embed(self) -> CreateEmbed {
-        let (embed, _) = self.card.to_embed();
-        embed
-    }
-
     pub fn card(&self) -> &FuzzyFound {
         &self.card
     }
@@ -91,9 +76,7 @@ impl GameState {
 }
 
 pub async fn fetch<C: Cache + Send + Sync>(id: String, cache: &C) -> Option<GameState> {
-    let Some(game_state_string): Option<String> = cache.get(id).await else {
-        return None;
-    };
+    let game_state_string = cache.get(id).await?;
 
     match ron::from_str::<GameState>(&game_state_string) {
         Ok(game_state) => Some(game_state),

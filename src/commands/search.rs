@@ -26,16 +26,14 @@ where
             if let Err(why) = interaction.send_card(card, images).await {
                 log::warn!("Error sending card from search command: {}", why);
             };
-        } else {
-            if let Err(why) = interaction
-                .reply(String::from("Could not find card :("))
-                .await
-            {
-                log::warn!(
-                    "Error the failed to find card message from search command: {}",
-                    why
-                );
-            };
+        } else if let Err(why) = interaction
+            .reply(String::from("Could not find card :("))
+            .await
+        {
+            log::warn!(
+                "Error the failed to find card message from search command: {}",
+                why
+            );
         }
     }
 }

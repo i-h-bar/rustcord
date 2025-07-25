@@ -1,14 +1,11 @@
-use crate::utils::colours::get_colour_identity;
 use crate::utils::emoji::add_emoji;
 use crate::utils::fuzzy::ToChars;
 use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serde::{Deserialize, Serialize};
-use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use sqlx::postgres::PgRow;
 use sqlx::{Error, Row};
 use std::str::Chars;
-use tokio::time::Instant;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -102,119 +99,6 @@ impl FuzzyFound {
             self.front_illustration_id.as_ref(),
             self.back_illustration_id.as_ref(),
         )
-    }
-
-    pub fn to_embed(self) -> (CreateEmbed, Option<CreateEmbed>) {
-        let start = Instant::now();
-
-        let stats = if let Some(power) = self.front_power {
-            let toughness = self.front_toughness.unwrap_or_else(|| "0".to_string());
-            format!("\n\n{power}/{toughness}")
-        } else if let Some(loyalty) = self.front_loyalty {
-            format!("\n\n{loyalty}")
-        } else if let Some(defence) = self.front_defence {
-            format!("\n\n{defence}")
-        } else {
-            String::new()
-        };
-
-        let front_oracle_text = REGEX_COLLECTION
-            .symbols
-            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(cap));
-        let front_oracle_text = italicise_reminder_text(&front_oracle_text);
-
-        let rules_text = format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats);
-        let mana_cost = REGEX_COLLECTION
-            .symbols
-            .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
-        let title = format!("{}        {}", self.front_name, mana_cost);
-
-        let front = CreateEmbed::default()
-            .attachment(format!("{}.png", self.front_image_id))
-            .url(self.front_scryfall_url)
-            .title(title)
-            .description(rules_text)
-            .colour(get_colour_identity(&self.front_colour_identity))
-            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
-
-        let back = if let Some(name) = self.back_name {
-            let stats = if let Some(power) = self.back_power {
-                let toughness = self.back_toughness.unwrap_or_else(|| "0".to_string());
-                format!("\n\n{power}/{toughness}")
-            } else if let Some(loyalty) = self.back_loyalty {
-                format!("\n\n{loyalty}")
-            } else if let Some(defence) = self.back_defence {
-                format!("\n\n{defence}")
-            } else {
-                String::new()
-            };
-            let back_oracle_text = self.back_oracle_text.unwrap_or_default();
-            let back_oracle_text = REGEX_COLLECTION
-                .symbols
-                .replace_all(&back_oracle_text, |cap: &Captures| add_emoji(cap));
-            let back_oracle_text = italicise_reminder_text(&back_oracle_text);
-
-            let back_rules_text = format!(
-                "{}\n\n{}{}",
-                self.back_type_line.unwrap_or_default(),
-                back_oracle_text,
-                stats
-            );
-            let title = if let Some(mana_cost) = self.back_mana_cost {
-                let mana_cost = REGEX_COLLECTION
-                    .symbols
-                    .replace_all(&mana_cost, |cap: &Captures| add_emoji(cap));
-                format!("{name}        {mana_cost}")
-            } else {
-                name
-            };
-
-            let url = self.back_scryfall_url.unwrap_or_default();
-            Some(
-                CreateEmbed::default()
-                    .attachment(format!("{}.png", self.back_image_id.unwrap_or_default()))
-                    .url(url)
-                    .title(title)
-                    .description(back_rules_text)
-                    .colour(get_colour_identity(
-                        &self.back_colour_identity.unwrap_or_default(),
-                    ))
-                    .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist))),
-            )
-        } else {
-            None
-        };
-
-        log::info!("Format lifetime: {} us", start.elapsed().as_micros());
-
-        (front, back)
-    }
-
-    pub fn to_game_embed(&self, multiplier: usize, guesses: usize) -> CreateEmbed {
-        let mut embed = CreateEmbed::default()
-            .attachment(format!(
-                "{}.png",
-                self.front_illustration_id.unwrap_or_default()
-            ))
-            .title("????")
-            .description("????")
-            .footer(CreateEmbedFooter::new(format!("🖌️ - {}", self.artist)));
-
-        if guesses > multiplier {
-            let mana_cost = REGEX_COLLECTION
-                .symbols
-                .replace_all(&self.front_mana_cost, |cap: &Captures| add_emoji(cap));
-            let title = format!("????        {mana_cost}");
-            embed = embed
-                .title(title)
-                .colour(get_colour_identity(&self.front_colour_identity));
-        }
-
-        if guesses > multiplier * 2 {
-            embed = embed.description(self.rules_text());
-        }
-
-        embed
     }
 
     pub(crate) fn rules_text(&self) -> String {

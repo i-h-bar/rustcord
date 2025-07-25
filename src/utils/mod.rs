@@ -6,7 +6,6 @@ pub mod mutex;
 pub mod parse;
 
 use regex::{Captures, Regex};
-use serenity::all::{Context, CreateMessage, Message};
 use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;
 
@@ -32,28 +31,6 @@ pub struct RegexCollection {
     pub cards: Regex,
     pub symbols: Regex,
     pub reminder_text: Regex,
-}
-
-pub async fn send_message(message: CreateMessage, msg: &Message, ctx: &Context) {
-    match msg.channel_id.send_message(&ctx.http, message).await {
-        Err(why) => {
-            log::warn!("Error sending message to {why:?}");
-        }
-        Ok(response) => {
-            log::info!("Sent message to {:?}", response.channel_id);
-        }
-    }
-}
-
-pub async fn send(content: &str, msg: &Message, ctx: &Context) {
-    match msg.channel_id.say(&ctx.http, content).await {
-        Err(why) => {
-            log::warn!("Error sending message - {why:?}");
-        }
-        Ok(_) => {
-            log::info!("Sent message");
-        }
-    }
 }
 
 pub fn normalise(name: &str) -> String {

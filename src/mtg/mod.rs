@@ -1,9 +1,5 @@
 use crate::app::search::CardAndImage;
 use crate::clients::MessageInteraction;
-use crate::image_store::Images;
-use crate::mtg::card::FuzzyFound;
-use crate::utils;
-use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 
 pub mod card;
 

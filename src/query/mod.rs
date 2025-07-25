@@ -1,7 +1,5 @@
 use crate::utils;
-use crate::utils::parse::{ParseError, ResolveOption};
 use regex::Captures;
-use serenity::all::ResolvedValue;
 
 pub struct QueryParams {
     artist: Option<String>,

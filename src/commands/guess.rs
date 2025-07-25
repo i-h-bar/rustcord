@@ -1,17 +1,15 @@
 use crate::app::App;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
-use crate::clients::{GameInteraction, MessageInteraction};
+use crate::clients::GameInteraction;
 use crate::game::state;
 use crate::image_store::ImageStore;
-use crate::query::QueryParams;
 use crate::utils::mutex;
-use crate::utils::parse::{ParseError, ResolveOption};
-use crate::utils::{fuzzy, normalise, parse};
+use crate::utils::parse::ResolveOption;
+use crate::utils::{fuzzy, normalise};
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateAttachment, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    MessageBuilder, ResolvedValue,
+    CommandOptionType, Context, CreateAttachment, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 
 impl<IS, CS, C> App<IS, CS, C>
