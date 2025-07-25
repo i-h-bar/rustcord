@@ -44,7 +44,7 @@ where
 
             if let Err(why) = interaction.send_win_message(game_state, images).await {
                 log::warn!("couldn't send win message: {}", why);
-            };
+            }
 
             state::delete(interaction.id(), &self.cache).await;
         } else if game_state.number_of_guesses() >= game_state.max_guesses() {

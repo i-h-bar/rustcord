@@ -9,6 +9,7 @@ pub struct QueryParams {
 }
 
 impl QueryParams {
+    #[must_use]
     pub fn new(
         artist: Option<String>,
         name: String,

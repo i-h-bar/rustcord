@@ -30,7 +30,7 @@ where
                     .await
                 {
                     log::error!("couldn't create interaction response: {:?}", why);
-                };
+                }
                 return;
             };
             self.card_store.random_card_from_set(&matched_set).await

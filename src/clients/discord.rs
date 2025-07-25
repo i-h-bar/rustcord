@@ -97,7 +97,7 @@ where
             match command.data.name.as_str() {
                 "help" => {
                     let interaction = DiscordCommand { ctx, command };
-                    commands::help::run(&interaction).await
+                    commands::help::run(&interaction).await;
                 }
                 "search" => {
                     let interaction = DiscordCommand { ctx, command };
@@ -109,7 +109,7 @@ where
                                 return;
                             }
                         };
-                    self.search_command(&interaction, query_params).await
+                    self.search_command(&interaction, query_params).await;
                 }
                 "play" => {
                     let interaction = DiscordCommandInteraction { ctx, command };
@@ -121,7 +121,7 @@ where
                                 return;
                             }
                         };
-                    self.play_command(&interaction, options).await
+                    self.play_command(&interaction, options).await;
                 }
                 "guess" => {
                     let interaction = DiscordCommandInteraction { ctx, command };
@@ -132,11 +132,11 @@ where
                             return;
                         }
                     };
-                    self.guess_command(&interaction, guess_options).await
+                    self.guess_command(&interaction, guess_options).await;
                 }
                 "give_up" => {
                     let interaction = DiscordCommandInteraction { ctx, command };
-                    self.give_up_command(&interaction).await
+                    self.give_up_command(&interaction).await;
                 }
                 _ => (),
             }
@@ -154,16 +154,15 @@ impl DiscordCommand {
         &self,
         message: CreateInteractionResponseMessage,
     ) -> Result<(), MessageInterationError> {
-        match self
+        if let Err(why) = self
             .command
             .create_response(&self.ctx, CreateInteractionResponse::Message(message))
             .await
         {
-            Err(why) => Err(MessageInterationError(why.to_string())),
-            Ok(_) => {
-                log::info!("Sent message to {:?}", self.command.channel_id.to_string());
-                Ok(())
-            }
+            Err(MessageInterationError(why.to_string()))
+        } else {
+            log::info!("Sent message to {:?}", self.command.channel_id.to_string());
+            Ok(())
         }
     }
 }
@@ -433,10 +432,9 @@ impl GameInteraction for DiscordCommandInteraction {
             )));
         };
 
-        let remaining_guesses = state.max_guesses() - state.number_of_guesses();
-        let (multiplier, guesses) = (state.multiplier(), state.guesses());
-        let embed = create_game_embed(state.card, multiplier, guesses);
+        let embed = create_game_embed(&state.card, state.multiplier(), state.guesses());
 
+        let remaining_guesses = state.max_guesses() - state.number_of_guesses();
         let guess_plural = if remaining_guesses > 1 {
             "guesses"
         } else {
@@ -476,8 +474,7 @@ impl GameInteraction for DiscordCommandInteraction {
             _ => format!("Difficulty is set to `{difficulty}`. This card is from `{set_name}`"),
         };
 
-        let (multiplier, guesses) = (state.multiplier(), state.guesses());
-        let embed = create_game_embed(state.card, multiplier, guesses);
+        let embed = create_game_embed(&state.card, state.multiplier(), state.guesses());
         let response = CreateInteractionResponseMessage::new()
             .content(message)
             .add_file(illustration)
@@ -512,7 +509,7 @@ impl GameInteraction for DiscordCommandInteraction {
     }
 }
 
-fn create_game_embed(card: FuzzyFound, multiplier: usize, guesses: usize) -> CreateEmbed {
+fn create_game_embed(card: &FuzzyFound, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
         .attachment(format!(
             "{}.png",
