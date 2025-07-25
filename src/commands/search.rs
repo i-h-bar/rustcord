@@ -16,58 +16,16 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn search_command<I: MessageInteraction>(&self, interaction: &I) {
-        let query_params = match parse::options::<QueryParams>(interaction.data.options()) {
-            Ok(params) => params,
-            Err(err) => {
-                log::warn!("{}", err);
-                return;
-            }
-        };
-
+    pub async fn search_command<I: MessageInteraction>(&self, interaction: &I, query_params: QueryParams) {
         let card = self.find_card(query_params).await;
         if let Some((card, images)) = card {
-            let front_image =
-                CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
-            let back_image = if let Some(back_image_id) = card.back_image_id() {
-                images.back.map(|back_image| {
-                    CreateAttachment::bytes(back_image, format!("{back_image_id}.png"))
-                })
-            } else {
-                None
+            if let Err(why ) = interaction.send_card(card, images).await {
+                log::warn!("Error sending card from search command: {}", why);
             };
-
-            let (front, back) = card.to_embed();
-
-            let mut message = CreateInteractionResponseMessage::new()
-                .add_file(front_image)
-                .add_embed(front);
-
-            if let Some(back) = back {
-                message = if let Some(back_image) = back_image {
-                    message.add_file(back_image)
-                } else {
-                    message
-                }
-                .add_embed(back);
-            }
-
-            if let Err(why) = interaction
-                .create_response(ctx, CreateInteractionResponse::Message(message))
-                .await
-            {
-                log::error!("couldn't create interaction response: {:?}", why);
-            }
         } else {
-            let response = CreateInteractionResponseMessage::new()
-                .content("Could not find card :(")
-                .ephemeral(true);
-            if let Err(why) = interaction
-                .create_response(ctx, CreateInteractionResponse::Message(response))
-                .await
-            {
-                log::error!("couldn't create interaction response: {:?}", why);
-            }
+            if let Err(why) = interaction.reply(String::from("Could not find card :(")).await {
+                log::warn!("Error the failed to find card message from search command: {}", why);
+            };
         }
     }
 }

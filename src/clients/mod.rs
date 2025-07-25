@@ -18,11 +18,14 @@ pub trait MessageInteraction {
         images: Images,
     ) -> Result<(), MessageInterationError>;
 
-    async fn send_game_state(
+    async fn send_guess_wrong_message(
         &self,
         state: &GameState,
         images: Images,
-        guess: &str,
+        guess: Option<&str>,
     ) -> Result<(), MessageInterationError>;
+    async fn send_new_game_message(&self, state: &GameState) -> Result<(), MessageInterationError>;
+    async fn send_win_message(&self, state: &GameState, images: Images) -> Result<(), MessageInterationError>;
     async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
+    fn id(&self) -> String;
 }

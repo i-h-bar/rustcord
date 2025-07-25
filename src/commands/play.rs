@@ -1,3 +1,4 @@
+use std::fmt::format;
 use crate::app::App;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
@@ -12,6 +13,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
+use crate::clients::MessageInteraction;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -19,15 +21,8 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn play_command(&self, ctx: &Context, interaction: &CommandInteraction) {
-        let Options { set, difficulty } = match parse::options(interaction.data.options()) {
-            Ok(options) => options,
-            Err(err) => {
-                log::warn!("{}", err);
-                return;
-            }
-        };
-
+    pub async fn play_command<I: MessageInteraction, O: ResolveOption>(&self, interaction: &I, options: PlayOptions) {
+        let PlayOptions { set, difficulty } = options;
         let random_card = if let Some(set_name) = set {
             let matched_set = if set_name.chars().count() < 5 {
                 self.set_from_abbreviation(&set_name).await
@@ -37,19 +32,9 @@ where
             };
 
             let Some(matched_set) = matched_set else {
-                let message = MessageBuilder::new()
-                    .mention(&interaction.user)
-                    .push(" could not find set named ")
-                    .push(set_name)
-                    .build();
-
-                let response = CreateInteractionResponseMessage::new().content(message);
-                if let Err(why) = interaction
-                    .create_response(ctx, CreateInteractionResponse::Message(response))
-                    .await
-                {
+                if let Err(why) = interaction.reply(format!("Could not find set '{set_name}'")).await                 {
                     log::error!("couldn't create interaction response: {:?}", why);
-                }
+                };
                 return;
             };
             self.card_store.random_card_from_set(&matched_set).await
@@ -63,33 +48,10 @@ where
                 log::warn!("failed to get image");
                 return;
             };
-
-            let Some(illustration_id) = game_state.card().front_illustration_id() else {
-                log::warn!("failed to get image id");
-                return;
+            
+            if let Err(why) = interaction.send_guess_wrong_message(&game_state, images, None).await {
+                log::error!("couldn't send game state: {:?}", why);
             };
-
-            let illustration =
-                CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
-
-            let response = match game_state.difficulty() {
-                Difficulty::Hard => CreateInteractionResponseMessage::new().content(format!(
-                    "Difficulty is set to `{}`.",
-                    game_state.difficulty()
-                )),
-                _ => CreateInteractionResponseMessage::new().content(format!(
-                    "Difficulty is set to `{}`. This card is from `{}`",
-                    game_state.difficulty(),
-                    game_state.card().set_name()
-                )),
-            }
-            .add_file(illustration)
-            .add_embed(game_state.to_embed());
-
-            let response = CreateInteractionResponse::Message(response);
-            if let Err(why) = interaction.create_response(&ctx.http, response).await {
-                log::error!("couldn't create interaction response: {:?}", why);
-            }
 
             state::add(&game_state, interaction, &self.cache).await;
         } else {
@@ -122,47 +84,13 @@ pub fn register() -> CreateCommand {
         )
 }
 
-struct Options {
+pub struct PlayOptions {
     set: Option<String>,
     difficulty: Difficulty,
 }
 
-impl ResolveOption for Options {
-    fn resolve(option: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
-        let mut set: Option<String> = None;
-        let mut difficulty: Difficulty = Difficulty::Medium;
-
-        for (name, value) in option {
-            match name {
-                "set" => {
-                    set = match value {
-                        ResolvedValue::String(card) => Some(card.to_string()),
-                        _ => return Err(ParseError::new("set ResolvedValue was not a string")),
-                    };
-                }
-                "difficulty" => {
-                    difficulty = match value {
-                        ResolvedValue::String(difficulty_string) => match difficulty_string {
-                            "Easy" => Difficulty::Easy,
-                            "Medium" => Difficulty::Medium,
-                            "Hard" => Difficulty::Hard,
-                            default => {
-                                return Err(ParseError::new(&format!(
-                                    "Could not parse {default} into difficulty"
-                                )))
-                            }
-                        },
-                        _ => {
-                            return Err(ParseError::new(
-                                "difficulty ResolvedValue was not a string",
-                            ))
-                        }
-                    };
-                }
-                _ => {}
-            }
-        }
-
-        Ok(Options { set, difficulty })
+impl PlayOptions {
+    pub fn new(set: Option<String>, difficulty: Difficulty) -> Self {
+        Self { set, difficulty }
     }
 }

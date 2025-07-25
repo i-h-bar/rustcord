@@ -6,6 +6,7 @@ use serenity::all::{
     CreateInteractionResponseMessage, MessageBuilder,
 };
 use std::fmt::{Display, Formatter};
+use crate::clients::MessageInteraction;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Difficulty {
@@ -89,35 +90,14 @@ impl GameState {
     }
 }
 
-pub async fn fetch<C: Cache + Send + Sync>(
-    ctx: &Context,
-    interaction: &CommandInteraction,
+pub async fn fetch<C: Cache + Send + Sync, I: MessageInteraction>(
+    interaction: &I,
     cache: &C,
 ) -> Option<GameState> {
     let Some(game_state_string): Option<String> =
-        cache.get(interaction.channel_id.to_string()).await
+        cache.get(interaction.id()).await
     else {
-        let name = if let Some(channel) = &interaction.channel {
-            if let Some(name) = &channel.name {
-                name.to_owned()
-            } else {
-                String::from("this channel")
-            }
-        } else {
-            String::from("this channel")
-        };
-
-        let message = MessageBuilder::new()
-            .mention(&interaction.user)
-            .push(" no game found in ")
-            .push(name)
-            .build();
-        let response = CreateInteractionResponseMessage::new()
-            .content(message)
-            .ephemeral(true);
-
-        let response = CreateInteractionResponse::Message(response);
-        if let Err(why) = interaction.create_response(&ctx.http, response).await {
+        if let Err(why) = interaction.reply(String::from("No game found in this channel :(")).await {
             log::warn!("couldn't create interaction: {}", why);
         }
         return None;
@@ -132,19 +112,19 @@ pub async fn fetch<C: Cache + Send + Sync>(
     }
 }
 
-pub async fn delete<C: Cache + Send + Sync>(interaction: &CommandInteraction, cache: &C) {
-    if let Err(why) = cache.delete(interaction.channel_id.to_string()).await {
+pub async fn delete<C: Cache + Send + Sync, I: MessageInteraction>(interaction: &I, cache: &C) {
+    if let Err(why) = cache.delete(interaction.id()).await {
         log::warn!(
             "Error deleting key: '{}' from redis the response: {:?}",
-            interaction.channel_id.to_string(),
+            interaction.id(),
             why
         );
     };
 }
 
-pub async fn add<C: Cache + Send + Sync>(
+pub async fn add<C: Cache + Send + Sync, I: MessageInteraction>(
     game_state: &GameState,
-    interaction: &CommandInteraction,
+    interaction: &I,
     cache: &C,
 ) {
     let ron_string = match ron::to_string(&game_state) {
@@ -156,7 +136,7 @@ pub async fn add<C: Cache + Send + Sync>(
     };
 
     if let Err(why) = cache
-        .set(interaction.channel_id.to_string(), ron_string)
+        .set(interaction.id(), ron_string)
         .await
     {
         log::warn!("Error while trying to set value in redis: {}", why);

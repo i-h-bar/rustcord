@@ -11,6 +11,8 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     MessageBuilder, ResolvedValue,
 };
+use crate::clients::MessageInteraction;
+use crate::query::QueryParams;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -18,23 +20,17 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn guess_command(&self, ctx: &Context, interaction: &CommandInteraction) {
-        let channel_id = interaction.channel_id.to_string();
+    pub async fn guess_command<I: MessageInteraction>(&self, interaction: &I, options: GuessOptions) {
+        let channel_id = interaction.id();
         let lock = mutex::LOCKS.get(&channel_id).await;
         let _guard = lock.lock().await;
-        self.run_guess(ctx, interaction).await;
+        self.run_guess(interaction, options).await;
     }
 
-    async fn run_guess(&self, ctx: &Context, interaction: &CommandInteraction) {
-        let Options { guess } = match parse::options(interaction.data.options()) {
-            Ok(value) => value,
-            Err(err) => {
-                log::warn!("Failed to parse guess: {}", err);
-                return;
-            }
-        };
+    async fn run_guess<I: MessageInteraction>(&self, interaction: &I, options: GuessOptions) {
+        let GuessOptions { guess } = options;
 
-        let Some(mut game_state) = state::fetch(ctx, interaction, &self.cache).await else {
+        let Some(mut game_state) = state::fetch(interaction, &self.cache).await else {
             return;
         };
         game_state.add_guess();
@@ -161,21 +157,12 @@ pub fn register() -> CreateCommand {
         )
 }
 
-struct Options {
+pub struct GuessOptions {
     guess: String,
 }
 
-impl ResolveOption for Options {
-    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
-        let Some((_, guess)) = options.first() else {
-            return Err(ParseError::new("Could not get first option"));
-        };
-
-        let guess = match guess {
-            ResolvedValue::String(guess) => (*guess).to_string(),
-            _ => return Err(ParseError::new("ResolvedValue was not a string")),
-        };
-
-        Ok(Options { guess })
+impl GuessOptions {
+    pub fn new(guess: String) -> Self {
+        Self { guess }
     }
 }

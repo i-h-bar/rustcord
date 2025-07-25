@@ -11,6 +11,10 @@ pub struct QueryParams {
 }
 
 impl QueryParams {
+    pub fn new(artist: Option<String>, name: String, set_code: Option<String>, set_name: Option<String>) -> Self {
+        Self { artist, name, set_code, set_name }
+    }
+    
     #[must_use]
     pub fn from(capture: &Captures<'_>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str();
@@ -57,57 +61,5 @@ impl QueryParams {
     #[must_use]
     pub fn name(&self) -> &String {
         &self.name
-    }
-}
-
-impl ResolveOption for QueryParams {
-    fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
-    where
-        Self: Sized,
-    {
-        let mut card_name = None;
-        let mut set_name = None;
-        let mut set_code = None;
-        let mut artist = None;
-
-        for (name, value) in options {
-            match name {
-                "name" => {
-                    card_name = match value {
-                        ResolvedValue::String(card) => Some(card.to_string()),
-                        _ => return Err(ParseError::new("Name was not a string")),
-                    }
-                }
-                "set" => {
-                    let set = match value {
-                        ResolvedValue::String(set) => set.to_string(),
-                        _ => return Err(ParseError::new("Name was not a string")),
-                    };
-                    if set.chars().count() < 5 {
-                        set_code = Some(set);
-                    } else {
-                        set_name = Some(set);
-                    }
-                }
-                "artist" => {
-                    artist = match value {
-                        ResolvedValue::String(artist) => Some(artist.to_string()),
-                        _ => return Err(ParseError::new("Artist was not a string")),
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        let Some(name) = card_name else {
-            return Err(ParseError::new("No name found in query params"));
-        };
-
-        Ok(Self {
-            artist,
-            name,
-            set_code,
-            set_name,
-        })
     }
 }
