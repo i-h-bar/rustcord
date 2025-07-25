@@ -6,7 +6,7 @@ use crate::commands::guess::GuessOptions;
 use crate::commands::play::PlayOptions;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::{ImageStore, Images};
-use crate::mtg::card::FuzzyFound;
+use crate::mtg::card::Card;
 use crate::query::QueryParams;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::emoji::add_emoji;
@@ -171,7 +171,7 @@ impl DiscordCommand {
 impl MessageInteraction for DiscordCommand {
     async fn send_card(
         &self,
-        card: FuzzyFound,
+        card: Card,
         images: Images,
     ) -> Result<(), MessageInterationError> {
         let front_image =
@@ -237,7 +237,7 @@ impl DiscordMessageInteration {
 impl MessageInteraction for DiscordMessageInteration {
     async fn send_card(
         &self,
-        card: FuzzyFound,
+        card: Card,
         images: Images,
     ) -> Result<(), MessageInterationError> {
         let front_image =
@@ -288,7 +288,7 @@ impl GameInteraction for DiscordCommandInteraction {
     }
     async fn send_card(
         &self,
-        card: FuzzyFound,
+        card: Card,
         images: Images,
     ) -> Result<(), MessageInterationError> {
         let front_image =
@@ -509,7 +509,7 @@ impl GameInteraction for DiscordCommandInteraction {
     }
 }
 
-fn create_game_embed(card: &FuzzyFound, multiplier: usize, guesses: usize) -> CreateEmbed {
+fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
         .attachment(format!(
             "{}.png",
@@ -536,7 +536,7 @@ fn create_game_embed(card: &FuzzyFound, multiplier: usize, guesses: usize) -> Cr
     embed
 }
 
-fn create_embed(card: FuzzyFound) -> (CreateEmbed, Option<CreateEmbed>) {
+fn create_embed(card: Card) -> (CreateEmbed, Option<CreateEmbed>) {
     let stats = if let Some(power) = card.front_power {
         let toughness = card.front_toughness.unwrap_or_else(|| "0".to_string());
         format!("\n\n{power}/{toughness}")

@@ -9,7 +9,7 @@ use std::str::Chars;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct FuzzyFound {
+pub struct Card {
     pub front_name: String,
     pub front_normalised_name: String,
     pub front_scryfall_url: String,
@@ -39,7 +39,7 @@ pub struct FuzzyFound {
     pub set_name: String,
 }
 
-impl FuzzyFound {
+impl Card {
     #[allow(clippy::missing_errors_doc)]
     pub fn from(row: &PgRow) -> Result<Self, Error> {
         Ok(Self {
@@ -130,14 +130,14 @@ impl FuzzyFound {
     }
 }
 
-impl ToChars for FuzzyFound {
+impl ToChars for Card {
     fn to_chars(&self) -> Chars<'_> {
         self.front_normalised_name.chars()
     }
 }
 
-impl PartialEq<FuzzyFound> for &str {
-    fn eq(&self, other: &FuzzyFound) -> bool {
+impl PartialEq<Card> for &str {
+    fn eq(&self, other: &Card) -> bool {
         self == &other.front_normalised_name
     }
 }

@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::mtg::card::FuzzyFound;
+use crate::mtg::card::Card;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -24,13 +24,13 @@ impl Display for Difficulty {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GameState {
-    pub(crate) card: FuzzyFound,
+    pub(crate) card: Card,
     difficulty: Difficulty,
     guess_number: usize,
 }
 
 impl GameState {
-    pub fn from(card: FuzzyFound, difficulty: Difficulty) -> Self {
+    pub fn from(card: Card, difficulty: Difficulty) -> Self {
         Self {
             card,
             difficulty,
@@ -62,7 +62,7 @@ impl GameState {
         &self.difficulty
     }
 
-    pub fn card(&self) -> &FuzzyFound {
+    pub fn card(&self) -> &Card {
         &self.card
     }
 

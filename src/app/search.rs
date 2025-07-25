@@ -2,13 +2,13 @@ use crate::app::App;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
 use crate::image_store::{ImageStore, Images};
-use crate::mtg::card::FuzzyFound;
+use crate::mtg::card::Card;
 use crate::query::QueryParams;
 use crate::utils::{fuzzy, REGEX_COLLECTION};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 
-pub type CardAndImage = (FuzzyFound, Images);
+pub type CardAndImage = (Card, Images);
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -26,7 +26,7 @@ where
         .await
     }
 
-    async fn search_distinct_cards(&self, normalised_name: &str) -> Option<FuzzyFound> {
+    async fn search_distinct_cards(&self, normalised_name: &str) -> Option<Card> {
         let potentials = self.card_store.search(normalised_name).await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
@@ -35,7 +35,7 @@ where
         &self,
         abbreviation: &str,
         normalised_name: &str,
-    ) -> Option<FuzzyFound> {
+    ) -> Option<Card> {
         let set_name = self.set_from_abbreviation(abbreviation).await?;
         let potentials = self
             .card_store
@@ -48,7 +48,7 @@ where
         &self,
         normalised_set_name: &str,
         normalised_name: &str,
-    ) -> Option<FuzzyFound> {
+    ) -> Option<Card> {
         let set_name = self.fuzzy_match_set_name(normalised_set_name).await?;
         let potentials = self
             .card_store
@@ -57,7 +57,7 @@ where
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
-    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<FuzzyFound> {
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Card> {
         let potentials = self.card_store.search_for_artist(artist).await?;
         let best_artist = fuzzy::winkliest_match(&artist, potentials)?;
         let potentials = self

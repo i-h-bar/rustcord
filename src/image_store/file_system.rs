@@ -1,5 +1,5 @@
 use crate::image_store::{ImageRetrievalError, ImageStore, Images};
-use crate::mtg::card::FuzzyFound;
+use crate::mtg::card::Card;
 use async_trait::async_trait;
 use std::env;
 
@@ -18,7 +18,7 @@ impl ImageStore for FileSystem {
         }
     }
 
-    async fn fetch(&self, card: &FuzzyFound) -> Result<Images, ImageRetrievalError> {
+    async fn fetch(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
         let (front_id, back_id) = card.image_ids();
 
         let front = tokio::fs::read(format!("{}{front_id}.png", self.image_dir))
@@ -38,7 +38,7 @@ impl ImageStore for FileSystem {
         Ok(Images { front, back })
     }
 
-    async fn fetch_illustration(&self, card: &FuzzyFound) -> Result<Images, ImageRetrievalError> {
+    async fn fetch_illustration(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
         let Some(illustration_id) = card.front_illustration_id() else {
             return Err(ImageRetrievalError(String::from(
                 "Card had no illustration id",

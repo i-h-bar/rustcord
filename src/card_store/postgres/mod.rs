@@ -5,7 +5,7 @@ use crate::card_store::postgres::queries::{
     RANDOM_CARD_FROM_DISTINCT,
 };
 use crate::card_store::CardStore;
-use crate::mtg::card::FuzzyFound;
+use crate::mtg::card::Card;
 use async_trait::async_trait;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Row};
@@ -28,7 +28,7 @@ impl CardStore for Postgres {
         Self { pool }
     }
 
-    async fn search(&self, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
+    async fn search(&self, normalised_name: &str) -> Option<Vec<Card>> {
         match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
             .bind(normalised_name)
             .fetch_all(&self.pool)
@@ -40,12 +40,12 @@ impl CardStore for Postgres {
             }
             Ok(rows) => rows
                 .into_iter()
-                .map(|row| FuzzyFound::from(&row).ok())
+                .map(|row| Card::from(&row).ok())
                 .collect(),
         }
     }
 
-    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>> {
         match sqlx::query(&format!(
             r"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;",
             artist.replace(' ', "_")
@@ -60,12 +60,12 @@ impl CardStore for Postgres {
             }
             Ok(rows) => rows
                 .into_iter()
-                .map(|row| FuzzyFound::from(&row).ok())
+                .map(|row| Card::from(&row).ok())
                 .collect(),
         }
     }
 
-    async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<FuzzyFound>> {
+    async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<Card>> {
         match sqlx::query(&format!(
             r"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;",
             set_name.replace(' ', "_")
@@ -80,7 +80,7 @@ impl CardStore for Postgres {
             }
             Ok(rows) => rows
                 .into_iter()
-                .map(|row| FuzzyFound::from(&row).ok())
+                .map(|row| Card::from(&row).ok())
                 .collect(),
         }
     }
@@ -127,7 +127,7 @@ impl CardStore for Postgres {
         }
     }
 
-    async fn random_card(&self) -> Option<FuzzyFound> {
+    async fn random_card(&self) -> Option<Card> {
         match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
             .fetch_one(&self.pool)
             .await
@@ -136,11 +136,11 @@ impl CardStore for Postgres {
                 log::warn!("Failed random card fetch - {why}");
                 None
             }
-            Ok(row) => FuzzyFound::from(&row).ok(),
+            Ok(row) => Card::from(&row).ok(),
         }
     }
 
-    async fn random_card_from_set(&self, set_name: &str) -> Option<FuzzyFound> {
+    async fn random_card_from_set(&self, set_name: &str) -> Option<Card> {
         match sqlx::query(&format!(
             r"select * from set_{} where front_illustration_id is not null order by random() limit 1;",
             set_name.replace(' ', "_")
@@ -152,7 +152,7 @@ impl CardStore for Postgres {
                 log::warn!("Failed search set fetch - {why}");
                 None
             }
-            Ok(row) => FuzzyFound::from(&row).ok(),
+            Ok(row) => Card::from(&row).ok(),
         }
     }
 }
