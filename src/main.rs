@@ -4,20 +4,14 @@ use dotenv::dotenv;
 use serenity::all::GatewayIntents;
 use serenity::prelude::*;
 
-use crate::app::App;
-use crate::cache::init_cache;
-use crate::card_store::init_card_store;
-use crate::image_store::init_image_store;
+use crate::domain::app::App;
+use spi::cache::init_cache;
+use spi::card_store::init_card_store;
+use spi::image_store::init_image_store;
 
-pub mod app;
-pub mod cache;
-mod card_store;
-mod clients;
-mod commands;
-mod game;
-pub mod image_store;
-pub mod mtg;
-pub mod query;
+mod api;
+mod domain;
+mod spi;
 mod utils;
 
 #[tokio::main]
