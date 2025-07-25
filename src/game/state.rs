@@ -1,4 +1,5 @@
 use crate::cache::Cache;
+use crate::clients::MessageInteraction;
 use crate::mtg::card::FuzzyFound;
 use serde::{Deserialize, Serialize};
 use serenity::all::{
@@ -6,7 +7,6 @@ use serenity::all::{
     CreateInteractionResponseMessage, MessageBuilder,
 };
 use std::fmt::{Display, Formatter};
-use crate::clients::MessageInteraction;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Difficulty {
@@ -90,16 +90,8 @@ impl GameState {
     }
 }
 
-pub async fn fetch<C: Cache + Send + Sync, I: MessageInteraction>(
-    interaction: &I,
-    cache: &C,
-) -> Option<GameState> {
-    let Some(game_state_string): Option<String> =
-        cache.get(interaction.id()).await
-    else {
-        if let Err(why) = interaction.reply(String::from("No game found in this channel :(")).await {
-            log::warn!("couldn't create interaction: {}", why);
-        }
+pub async fn fetch<C: Cache + Send + Sync>(id: String, cache: &C) -> Option<GameState> {
+    let Some(game_state_string): Option<String> = cache.get(id).await else {
         return None;
     };
 
@@ -112,21 +104,13 @@ pub async fn fetch<C: Cache + Send + Sync, I: MessageInteraction>(
     }
 }
 
-pub async fn delete<C: Cache + Send + Sync, I: MessageInteraction>(interaction: &I, cache: &C) {
-    if let Err(why) = cache.delete(interaction.id()).await {
-        log::warn!(
-            "Error deleting key: '{}' from redis the response: {:?}",
-            interaction.id(),
-            why
-        );
+pub async fn delete<C: Cache + Send + Sync>(id: String, cache: &C) {
+    if let Err(why) = cache.delete(id).await {
+        log::warn!("Error deleting key from redis the response: {:?}", why);
     };
 }
 
-pub async fn add<C: Cache + Send + Sync, I: MessageInteraction>(
-    game_state: &GameState,
-    interaction: &I,
-    cache: &C,
-) {
+pub async fn add<C: Cache + Send + Sync>(game_state: &GameState, id: String, cache: &C) {
     let ron_string = match ron::to_string(&game_state) {
         Ok(ron_string) => ron_string,
         Err(err) => {
@@ -135,10 +119,7 @@ pub async fn add<C: Cache + Send + Sync, I: MessageInteraction>(
         }
     };
 
-    if let Err(why) = cache
-        .set(interaction.id(), ron_string)
-        .await
-    {
+    if let Err(why) = cache.set(id, ron_string).await {
         log::warn!("Error while trying to set value in redis: {}", why);
     };
 }

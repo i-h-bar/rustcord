@@ -1,23 +1,27 @@
 use crate::app::App;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
-use crate::clients::{MessageInteraction, MessageInterationError};
+use crate::clients::{GameInteraction, MessageInteraction, MessageInterationError};
+use crate::commands::guess::GuessOptions;
+use crate::commands::play::PlayOptions;
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::{ImageStore, Images};
 use crate::mtg::card::FuzzyFound;
+use crate::query::QueryParams;
 use crate::utils::colours::get_colour_identity;
 use crate::utils::emoji::add_emoji;
 use crate::utils::help::HELP;
+use crate::utils::parse::{ParseError, ResolveOption};
 use crate::utils::{italicise_reminder_text, parse, REGEX_COLLECTION};
 use crate::{commands, mtg, utils};
 use async_trait::async_trait;
 use regex::Captures;
-use serenity::all::{Command, CommandInteraction, Context, CreateAttachment, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, EventHandler, Interaction, Message, Ready, ResolvedValue};
-use crate::commands::guess::GuessOptions;
-use crate::commands::play::PlayOptions;
-use crate::query::QueryParams;
-use crate::utils::parse::{ParseError, ResolveOption};
+use serenity::all::{
+    Command, CommandInteraction, Context, CreateAttachment, CreateEmbed, CreateEmbedFooter,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, EventHandler,
+    Interaction, Message, MessageBuilder, Ready, ResolvedValue,
+};
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -84,40 +88,44 @@ where
             if command.user.bot {
                 return;
             }
-            
-            let interaction = DiscordCommandInteraction {
-                ctx, command
-            };
 
             log::info!(
                 "Received command: {:?} from {}",
-                interaction.command.data.name,
-                interaction.command.channel_id
+                command.data.name,
+                command.channel_id.to_string(),
             );
 
-            match interaction.command.data.name.as_str() {
-                "help" => commands::help::run(&interaction).await,
-                "search" =>  {
-                    let query_params = match parse::options::<QueryParams>(interaction.command.data.options()) {
-                        Ok(params) => params,
-                        Err(err) => {
-                            log::warn!("{}", err);
-                            return;
-                        }
-                    };
-                    self.search_command(&interaction, query_params).await 
-                },
+            match command.data.name.as_str() {
+                "help" => {
+                    let interaction = DiscordCommand { ctx, command };
+                    commands::help::run(&interaction).await
+                }
+                "search" => {
+                    let interaction = DiscordCommand { ctx, command };
+                    let query_params =
+                        match parse::options::<QueryParams>(interaction.command.data.options()) {
+                            Ok(params) => params,
+                            Err(err) => {
+                                log::warn!("{}", err);
+                                return;
+                            }
+                        };
+                    self.search_command(&interaction, query_params).await
+                }
                 "play" => {
-                    let options = match parse::options::<PlayOptions>(interaction.command.data.options()) {
-                        Ok(options) => options,
-                        Err(err) => {
-                            log::warn!("{}", err);
-                            return;
-                        }
-                    };
-                    self.play_command(&interaction, options).await 
-                },
+                    let interaction = DiscordCommandInteraction { ctx, command };
+                    let options =
+                        match parse::options::<PlayOptions>(interaction.command.data.options()) {
+                            Ok(options) => options,
+                            Err(err) => {
+                                log::warn!("{}", err);
+                                return;
+                            }
+                        };
+                    self.play_command(&interaction, options).await
+                }
                 "guess" => {
+                    let interaction = DiscordCommandInteraction { ctx, command };
                     let guess_options = match parse::options(interaction.command.data.options()) {
                         Ok(value) => value,
                         Err(err) => {
@@ -125,12 +133,83 @@ where
                             return;
                         }
                     };
-                    self.guess_command(&interaction, guess_options).await 
-                },
-                "give_up" => self.give_up_command(&interaction).await,
+                    self.guess_command(&interaction, guess_options).await
+                }
+                "give_up" => {
+                    let interaction = DiscordCommandInteraction { ctx, command };
+                    self.give_up_command(&interaction).await
+                }
                 _ => (),
             }
         }
+    }
+}
+
+struct DiscordCommand {
+    ctx: Context,
+    command: CommandInteraction,
+}
+
+impl DiscordCommand {
+    async fn send_message(
+        &self,
+        message: CreateInteractionResponseMessage,
+    ) -> Result<(), MessageInterationError> {
+        match self
+            .command
+            .create_response(&self.ctx, CreateInteractionResponse::Message(message))
+            .await
+        {
+            Err(why) => Err(MessageInterationError(why.to_string())),
+            Ok(_) => {
+                log::info!("Sent message to {:?}", self.command.channel_id.to_string());
+                Ok(())
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl MessageInteraction for DiscordCommand {
+    async fn send_card(
+        &self,
+        card: FuzzyFound,
+        images: Images,
+    ) -> Result<(), MessageInterationError> {
+        let front_image =
+            CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
+        let back_image = if let Some(back_image) = images.back {
+            card.back_image_id().map(|back_image_id| {
+                CreateAttachment::bytes(back_image, format!("{back_image_id}.png"))
+            })
+        } else {
+            None
+        };
+
+        let (front, back) = create_embed(card);
+        let message = CreateInteractionResponseMessage::new()
+            .add_file(front_image)
+            .add_embed(front);
+
+        self.send_message(message).await?;
+
+        if let Some(back) = back {
+            if let Some(back_image) = back_image {
+                let message = CreateInteractionResponseMessage::new()
+                    .add_file(back_image)
+                    .add_embed(back);
+                self.send_message(message).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn reply(&self, message: String) -> Result<(), MessageInterationError> {
+        let message = CreateInteractionResponseMessage::new().content(message);
+        self.send_message(message).await?;
+
+        Ok(())
     }
 }
 
@@ -158,10 +237,6 @@ impl DiscordMessageInteration {
 
 #[async_trait]
 impl MessageInteraction for DiscordMessageInteration {
-    fn id(&self) -> String {
-        self.msg.channel_id.to_string()
-    }
-    
     async fn send_card(
         &self,
         card: FuzzyFound,
@@ -192,15 +267,6 @@ impl MessageInteraction for DiscordMessageInteration {
         Ok(())
     }
 
-    async fn send_guess_wrong_message(
-        &self,
-        _: &GameState,
-        _: Images,
-        _: Option<&str>,
-    ) -> Result<(), MessageInterationError> {
-        Ok(())
-    }
-
     async fn reply(&self, message: String) -> Result<(), MessageInterationError> {
         self.msg
             .channel_id
@@ -218,7 +284,7 @@ struct DiscordCommandInteraction {
 }
 
 #[async_trait]
-impl MessageInteraction for DiscordCommandInteraction {
+impl GameInteraction for DiscordCommandInteraction {
     fn id(&self) -> String {
         self.command.channel_id.to_string()
     }
@@ -243,11 +309,7 @@ impl MessageInteraction for DiscordCommandInteraction {
                 .add_file(front_image)
                 .add_embed(front),
         );
-        if let Err(why) = self
-            .command
-            .create_response(&self.ctx.http, response)
-            .await
-        {
+        if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
             log::warn!("couldn't create interaction: {}", why);
         }
 
@@ -258,11 +320,7 @@ impl MessageInteraction for DiscordCommandInteraction {
                         .add_file(back_image)
                         .add_embed(back),
                 );
-                if let Err(why) = self
-                    .command
-                    .create_response(&self.ctx.http, response)
-                    .await
-                {
+                if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
                     log::warn!("couldn't create interaction: {}", why);
                 }
             }
@@ -271,100 +329,179 @@ impl MessageInteraction for DiscordCommandInteraction {
         Ok(())
     }
 
+    async fn game_failed_message(
+        &self,
+        state: GameState,
+        images: Images,
+    ) -> Result<(), MessageInterationError> {
+        let image = CreateAttachment::bytes(
+            images.front,
+            format!("{}.png", state.card().front_image_id()),
+        );
+        let number_of_guesses = state.number_of_guesses();
+        let guess_plural = if number_of_guesses > 1 {
+            "guesses"
+        } else {
+            "guess"
+        };
+
+        let message = MessageBuilder::new()
+            .push(format!(
+                "You have all failed after {number_of_guesses} {guess_plural}!",
+            ))
+            .build();
+
+        let embed = state.convert_to_embed();
+
+        let response = CreateInteractionResponseMessage::new()
+            .add_file(image)
+            .add_embed(embed)
+            .content(message);
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(_) = self.command.create_response(&self.ctx.http, response).await {
+            return Err(MessageInterationError(String::from(
+                "couldn't create interaction",
+            )));
+        }
+
+        Ok(())
+    }
+
+    async fn send_win_message(
+        &self,
+        state: GameState,
+        images: Images,
+    ) -> Result<(), MessageInterationError> {
+        let image = CreateAttachment::bytes(
+            images.front,
+            format!("{}.png", state.card().front_image_id()),
+        );
+
+        let number_of_guesses = state.number_of_guesses();
+        let guess_plural = if number_of_guesses > 1 {
+            "guesses"
+        } else {
+            "guess"
+        };
+
+        let message = MessageBuilder::new()
+            .mention(&self.command.user)
+            .push(format!(
+                " has won after {number_of_guesses} {guess_plural}!",
+            ))
+            .build();
+
+        let embed = state.convert_to_embed();
+
+        let response = CreateInteractionResponseMessage::new()
+            .add_file(image)
+            .add_embed(embed)
+            .content(message);
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
+            return Err(MessageInterationError(String::from(
+                "Failed to send message",
+            )));
+        }
+
+        Ok(())
+    }
+
     async fn send_guess_wrong_message(
         &self,
-        state: &GameState,
+        state: GameState,
         images: Images,
-        guess: Option<&str>,
+        guess: String,
     ) -> Result<(), MessageInterationError> {
-        if let Some(guess) = guess {
-            let mut embed = CreateEmbed::default()
-                .attachment(format!(
-                    "{}.png",
-                    state.card().front_illustration_id.unwrap_or_default()
-                ))
-                .title("????")
-                .description("????")
-                .footer(CreateEmbedFooter::new(format!(
-                    "🖌️ - {}",
-                    state.card().artist
-                )));
+        let mut embed = CreateEmbed::default()
+            .attachment(format!(
+                "{}.png",
+                state.card().front_illustration_id.unwrap_or_default()
+            ))
+            .title("????")
+            .description("????")
+            .footer(CreateEmbedFooter::new(format!(
+                "🖌️ - {}",
+                state.card().artist
+            )));
 
-            if state.guesses() > state.multiplier() {
-                let mana_cost = REGEX_COLLECTION
-                    .symbols
-                    .replace_all(&state.card().front_mana_cost, |cap: &Captures| {
-                        add_emoji(cap)
-                    });
-                let title = format!("????        {mana_cost}");
-                embed = embed
-                    .title(title)
-                    .colour(get_colour_identity(&state.card().front_colour_identity));
-            }
-
-            if state.guesses() > state.multiplier() * 2 {
-                embed = embed.description(state.card().rules_text());
-            }
-
-            let illustration = if let Some(illustration_id) = state.card().front_illustration_id() {
-                CreateAttachment::bytes(images.front, format!("{illustration_id}.png",))
-            } else {
-                log::warn!("Card had no illustration id");
-                return Err(MessageInterationError(String::from(
-                    "Card had no illustration id",
-                )));
-            };
-
-            let remaining_guesses = state.max_guesses() - state.number_of_guesses();
-            let guess_plural = if remaining_guesses > 1 {
-                "guesses"
-            } else {
-                "guess"
-            };
-
-            let response = CreateInteractionResponseMessage::new()
-                .content(format!(
-                    "'{guess}' was not the correct card. You have {remaining_guesses} {guess_plural} remaining",
-                ))
-                .add_file(illustration)
-                .embed(embed);
-
-            let response = CreateInteractionResponse::Message(response);
-            if let Err(why) = self
-                .command
-                .create_response(&self.ctx.http, response)
-                .await
-            {
-                log::warn!("couldn't create interaction: {}", why);
-            }
-        } else {
-            let Some(illustration_id) = state.card().front_illustration_id() else {
-                return Err(MessageInterationError(String::from("Failed to get image id")));
-            };
-
-            let illustration =
-                CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
-
-            let response = match state.difficulty() {
-                Difficulty::Hard => CreateInteractionResponseMessage::new().content(format!(
-                    "Difficulty is set to `{}`.",
-                    state.difficulty()
-                )),
-                _ => CreateInteractionResponseMessage::new().content(format!(
-                    "Difficulty is set to `{}`. This card is from `{}`",
-                    state.difficulty(),
-                    state.card().set_name()
-                )),
-            }
-                .add_file(illustration)
-                .add_embed(state.to_embed());
-
-            let response = CreateInteractionResponse::Message(response);
-            if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
-                log::error!("couldn't create interaction response: {:?}", why);
-            }
+        if state.guesses() > state.multiplier() {
+            let mana_cost = REGEX_COLLECTION
+                .symbols
+                .replace_all(&state.card().front_mana_cost, |cap: &Captures| {
+                    add_emoji(cap)
+                });
+            let title = format!("????        {mana_cost}");
+            embed = embed
+                .title(title)
+                .colour(get_colour_identity(&state.card().front_colour_identity));
         }
-        
+
+        if state.guesses() > state.multiplier() * 2 {
+            embed = embed.description(state.card().rules_text());
+        }
+
+        let illustration = if let Some(illustration_id) = state.card().front_illustration_id() {
+            CreateAttachment::bytes(images.front, format!("{illustration_id}.png",))
+        } else {
+            log::warn!("Card had no illustration id");
+            return Err(MessageInterationError(String::from(
+                "Card had no illustration id",
+            )));
+        };
+
+        let remaining_guesses = state.max_guesses() - state.number_of_guesses();
+        let guess_plural = if remaining_guesses > 1 {
+            "guesses"
+        } else {
+            "guess"
+        };
+
+        let response = CreateInteractionResponseMessage::new()
+            .content(format!(
+                "'{guess}' was not the correct card. You have {remaining_guesses} {guess_plural} remaining",
+            ))
+            .add_file(illustration)
+            .embed(embed);
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
+            log::warn!("couldn't create interaction: {}", why);
+        }
+
+        Ok(())
+    }
+    async fn send_new_game_message(
+        &self,
+        state: GameState,
+        images: Images,
+    ) -> Result<(), MessageInterationError> {
+        let Some(illustration_id) = state.card().front_illustration_id() else {
+            return Err(MessageInterationError(String::from(
+                "Failed to get image id",
+            )));
+        };
+
+        let illustration = CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
+
+        let response = match state.difficulty() {
+            Difficulty::Hard => CreateInteractionResponseMessage::new()
+                .content(format!("Difficulty is set to `{}`.", state.difficulty())),
+            _ => CreateInteractionResponseMessage::new().content(format!(
+                "Difficulty is set to `{}`. This card is from `{}`",
+                state.difficulty(),
+                state.card().set_name()
+            )),
+        }
+        .add_file(illustration)
+        .add_embed(state.to_embed());
+
+        let response = CreateInteractionResponse::Message(response);
+        if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
+            log::error!("couldn't create interaction response: {:?}", why);
+        }
 
         Ok(())
     }
@@ -375,12 +512,10 @@ impl MessageInteraction for DiscordCommandInteraction {
                 .content(message)
                 .ephemeral(true),
         );
-        if let Err(_) = self
-            .command
-            .create_response(&self.ctx.http, response)
-            .await
-        {
-            return Err(MessageInterationError(String::from("couldn't create interaction")));
+        if let Err(_) = self.command.create_response(&self.ctx.http, response).await {
+            return Err(MessageInterationError(String::from(
+                "couldn't create interaction",
+            )));
         }
 
         Ok(())
@@ -469,7 +604,6 @@ fn create_embed(card: FuzzyFound) -> (CreateEmbed, Option<CreateEmbed>) {
     (front, back)
 }
 
-
 impl ResolveOption for PlayOptions {
     fn resolve(option: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {
         let mut set: Option<String> = None;
@@ -509,7 +643,6 @@ impl ResolveOption for PlayOptions {
         Ok(PlayOptions::new(set, difficulty))
     }
 }
-
 
 impl ResolveOption for QueryParams {
     fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError>
@@ -557,7 +690,6 @@ impl ResolveOption for QueryParams {
         Ok(Self::new(artist, name, set_code, set_name))
     }
 }
-
 
 impl ResolveOption for GuessOptions {
     fn resolve(options: Vec<(&str, ResolvedValue)>) -> Result<Self, ParseError> {

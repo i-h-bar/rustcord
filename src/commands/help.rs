@@ -1,9 +1,9 @@
+use crate::clients::{GameInteraction, MessageInteraction};
 use crate::utils::help::HELP;
 use serenity::all::{
     CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
-use crate::clients::MessageInteraction;
 
 pub async fn run<I: MessageInteraction>(interaction: &I) {
     if let Err(why) = interaction.reply(HELP.into()).await {

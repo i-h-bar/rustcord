@@ -1,7 +1,7 @@
-use std::fmt::format;
 use crate::app::App;
 use crate::cache::Cache;
 use crate::card_store::CardStore;
+use crate::clients::{GameInteraction, MessageInteraction};
 use crate::game::state;
 use crate::game::state::{Difficulty, GameState};
 use crate::image_store::ImageStore;
@@ -13,7 +13,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder, ResolvedValue,
 };
 use serenity::prelude::*;
-use crate::clients::MessageInteraction;
+use std::fmt::format;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -21,7 +21,7 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn play_command<I: MessageInteraction, O: ResolveOption>(&self, interaction: &I, options: PlayOptions) {
+    pub async fn play_command<I: GameInteraction>(&self, interaction: &I, options: PlayOptions) {
         let PlayOptions { set, difficulty } = options;
         let random_card = if let Some(set_name) = set {
             let matched_set = if set_name.chars().count() < 5 {
@@ -32,7 +32,10 @@ where
             };
 
             let Some(matched_set) = matched_set else {
-                if let Err(why) = interaction.reply(format!("Could not find set '{set_name}'")).await                 {
+                if let Err(why) = interaction
+                    .reply(format!("Could not find set '{set_name}'"))
+                    .await
+                {
                     log::error!("couldn't create interaction response: {:?}", why);
                 };
                 return;
@@ -44,16 +47,16 @@ where
 
         if let Some(card) = random_card {
             let game_state = GameState::from(card, difficulty);
+            state::add(&game_state, interaction.id(), &self.cache).await;
+
             let Ok(images) = self.image_store.fetch_illustration(game_state.card()).await else {
                 log::warn!("failed to get image");
                 return;
             };
-            
-            if let Err(why) = interaction.send_guess_wrong_message(&game_state, images, None).await {
+
+            if let Err(why) = interaction.send_new_game_message(game_state, images).await {
                 log::error!("couldn't send game state: {:?}", why);
             };
-
-            state::add(&game_state, interaction, &self.cache).await;
         } else {
             log::warn!("Failed to get random card");
         }

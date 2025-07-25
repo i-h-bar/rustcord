@@ -11,10 +11,20 @@ pub struct QueryParams {
 }
 
 impl QueryParams {
-    pub fn new(artist: Option<String>, name: String, set_code: Option<String>, set_name: Option<String>) -> Self {
-        Self { artist, name, set_code, set_name }
+    pub fn new(
+        artist: Option<String>,
+        name: String,
+        set_code: Option<String>,
+        set_name: Option<String>,
+    ) -> Self {
+        Self {
+            artist,
+            name,
+            set_code,
+            set_name,
+        }
     }
-    
+
     #[must_use]
     pub fn from(capture: &Captures<'_>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str();

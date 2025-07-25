@@ -17,15 +17,37 @@ pub trait MessageInteraction {
         card: FuzzyFound,
         images: Images,
     ) -> Result<(), MessageInterationError>;
+    async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
+}
 
+#[async_trait]
+pub trait GameInteraction {
+    async fn send_card(
+        &self,
+        card: FuzzyFound,
+        images: Images,
+    ) -> Result<(), MessageInterationError>;
     async fn send_guess_wrong_message(
         &self,
-        state: &GameState,
+        state: GameState,
         images: Images,
-        guess: Option<&str>,
+        guess: String,
     ) -> Result<(), MessageInterationError>;
-    async fn send_new_game_message(&self, state: &GameState) -> Result<(), MessageInterationError>;
-    async fn send_win_message(&self, state: &GameState, images: Images) -> Result<(), MessageInterationError>;
-    async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
+    async fn send_new_game_message(
+        &self,
+        state: GameState,
+        images: Images,
+    ) -> Result<(), MessageInterationError>;
+    async fn send_win_message(
+        &self,
+        state: GameState,
+        images: Images,
+    ) -> Result<(), MessageInterationError>;
+    async fn game_failed_message(
+        &self,
+        state: GameState,
+        images: Images,
+    ) -> Result<(), MessageInterationError>;
     fn id(&self) -> String;
+    async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
 }
