@@ -1,6 +1,6 @@
 use crate::api::clients::GameInteraction;
 use crate::domain::app::App;
-use crate::domain::game::state;
+use crate::domain::functions::game::state;
 use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;

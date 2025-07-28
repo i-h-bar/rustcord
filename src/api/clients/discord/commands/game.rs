@@ -1,6 +1,6 @@
 use crate::api::clients::discord::utils::{create_embed, create_game_embed};
 use crate::api::clients::{GameInteraction, MessageInterationError};
-use crate::domain::game::state::{Difficulty, GameState};
+use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::spi::image_store::Images;
 use async_trait::async_trait;
 use serenity::all::{

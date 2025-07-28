@@ -9,9 +9,9 @@ use crate::api::clients::discord::commands::register::{give_up, guess, help, pla
 use crate::api::clients::discord::messages::interaction::DiscordMessageInteration;
 use crate::api::clients::MessageInteraction;
 use crate::domain::app::App;
-use crate::domain::game::play::PlayOptions;
+use crate::domain::functions::game::play::PlayOptions;
 use crate::domain::query::QueryParams;
-use crate::domain::{card, game};
+use crate::domain::{card, functions};
 use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
@@ -19,6 +19,8 @@ use crate::utils::help::HELP;
 use crate::utils::parse;
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
+use crate::domain;
+use crate::domain::functions::game;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -32,9 +34,7 @@ where
             return;
         } else if msg.content == "!help" {
             let interaction = DiscordMessageInteration::new(ctx, msg);
-            if let Err(why) = interaction.reply(HELP.to_string()).await {
-                log::error!("Error sending help message: {:?}", why);
-            };
+            functions::help::run(&interaction).await;
         } else {
             let interaction = DiscordMessageInteration::new(ctx, msg);
             for card in self.parse_message(interaction.content()).await {
@@ -92,7 +92,7 @@ where
             match command.data.name.as_str() {
                 "help" => {
                     let interaction = DiscordCommand::new(ctx, command);
-                    game::help::run(&interaction).await;
+                    functions::help::run(&interaction).await;
                 }
                 "search" => {
                     let query_params = match parse::options::<QueryParams>(command.data.options()) {

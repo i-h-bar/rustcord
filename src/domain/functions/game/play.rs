@@ -1,11 +1,13 @@
 use crate::api::clients::GameInteraction;
 use crate::domain::app::App;
-use crate::domain::game::state;
-use crate::domain::game::state::{Difficulty, GameState};
+use crate::domain::functions::game::state;
+use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
 use crate::utils;
+
+const SET_ABBR_CHAR_LIMIT: usize = 5;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -16,7 +18,7 @@ where
     pub async fn play_command<I: GameInteraction>(&self, interaction: &I, options: PlayOptions) {
         let PlayOptions { set, difficulty } = options;
         let random_card = if let Some(set_name) = set {
-            let matched_set = if set_name.chars().count() < 5 {
+            let matched_set = if set_name.chars().count() < SET_ABBR_CHAR_LIMIT {
                 self.set_from_abbreviation(&set_name).await
             } else {
                 self.fuzzy_match_set_name(&utils::normalise(&set_name))
