@@ -8,9 +8,7 @@ use serenity::all::GatewayIntents;
 use serenity::Client as DiscordClient;
 use crate::api::clients::Client;
 
-pub struct Discord {
-    client: DiscordClient,
-}
+pub struct Discord(DiscordClient);
 
 impl Discord {
     pub async fn new<IS, CS, C>(app: App<IS, CS, C>) -> Self
@@ -29,7 +27,7 @@ impl Discord {
             .await
             .expect("Error creating client");
 
-        Self { client }
+        Self(client)
     }
 }
 
@@ -37,7 +35,7 @@ impl Discord {
 #[async_trait]
 impl Client for Discord {
     async fn run(&mut self) {
-        if let Err(why) = self.client.start().await {
+        if let Err(why) = self.0.start().await {
             log::error!("Error starting client - {why:?}");
         }
     }
