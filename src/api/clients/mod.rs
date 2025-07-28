@@ -1,6 +1,10 @@
+use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::game::state::GameState;
-use crate::spi::image_store::Images;
+use crate::spi::cache::Cache;
+use crate::spi::card_store::CardStore;
+use crate::spi::image_store::{ImageStore, Images};
+use crate::api::clients::discord::client::Discord;
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -41,4 +45,18 @@ pub trait GameInteraction {
     ) -> Result<(), MessageInterationError>;
     fn id(&self) -> String;
     async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
+}
+
+#[async_trait]
+pub trait Client {
+    async fn run(&mut self);
+}
+
+pub async fn create_client<IS, CS, C>(app: App<IS, CS, C>) -> impl Client
+where
+    IS: ImageStore + Send + Sync + 'static,
+    CS: CardStore + Send + Sync + 'static,
+    C: Cache + Send + Sync + 'static,
+{
+    Discord::new(app).await
 }
