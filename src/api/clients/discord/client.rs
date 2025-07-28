@@ -1,12 +1,12 @@
+use crate::api::clients::Client;
 use crate::domain::app::App;
 use crate::spi::cache::Cache;
 use crate::spi::card_store::CardStore;
 use crate::spi::image_store::ImageStore;
-use std::env;
 use async_trait::async_trait;
 use serenity::all::GatewayIntents;
 use serenity::Client as DiscordClient;
-use crate::api::clients::Client;
+use std::env;
 
 pub struct Discord(DiscordClient);
 
@@ -14,7 +14,7 @@ impl Discord {
     pub async fn new<IS, CS, C>(app: App<IS, CS, C>) -> Self
     where
         IS: ImageStore + Send + Sync + 'static,
-        CS: CardStore + Send + Sync+ 'static,
+        CS: CardStore + Send + Sync + 'static,
         C: Cache + Send + Sync + 'static,
     {
         let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
@@ -30,7 +30,6 @@ impl Discord {
         Self(client)
     }
 }
-
 
 #[async_trait]
 impl Client for Discord {

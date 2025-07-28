@@ -1,7 +1,7 @@
+pub mod client;
 mod commands;
 mod messages;
 mod utils;
-pub mod client;
 
 use crate::api::clients::discord::commands::game::DiscordCommandInteraction;
 use crate::api::clients::discord::commands::interaction::DiscordCommand;
