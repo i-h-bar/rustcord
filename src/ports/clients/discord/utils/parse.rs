@@ -1,7 +1,8 @@
 use serenity::all::{ResolvedOption, ResolvedValue};
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug)]
+#[error("Error parsing command options")]
 pub struct ParseError {
     message: String,
 }
@@ -11,12 +12,6 @@ impl ParseError {
         Self {
             message: message.to_string(),
         }
-    }
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ParseError: {}", self.message)
     }
 }
 
