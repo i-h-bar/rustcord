@@ -1,7 +1,7 @@
 pub mod postgres;
 
+use crate::adapters::card_store::postgres::Postgres;
 use crate::domain::card::Card;
-use crate::spi::card_store::postgres::Postgres;
 use async_trait::async_trait;
 
 #[async_trait]

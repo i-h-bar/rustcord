@@ -1,11 +1,11 @@
-use crate::api::clients::MessageInteraction;
+use crate::adapters::cache::Cache;
+use crate::adapters::card_store::CardStore;
+use crate::adapters::image_store::{ImageStore, Images};
 use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::query::QueryParams;
-use crate::spi::cache::Cache;
-use crate::spi::card_store::CardStore;
-use crate::spi::image_store::{ImageStore, Images};
-use crate::utils::{fuzzy, REGEX_COLLECTION};
+use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
+use crate::ports::clients::MessageInteraction;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 

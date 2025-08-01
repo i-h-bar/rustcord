@@ -3,7 +3,6 @@ pub mod emoji;
 pub(crate) mod fuzzy;
 pub mod help;
 pub mod mutex;
-pub mod parse;
 
 use regex::{Captures, Regex};
 use std::sync::LazyLock;

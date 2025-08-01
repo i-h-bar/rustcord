@@ -1,17 +1,16 @@
-use crate::api::clients::Client;
+use crate::ports::clients::Client;
 
 use dotenv::dotenv;
 
-use crate::api::clients::create_client;
 use crate::domain::app::App;
-use spi::cache::init_cache;
-use spi::card_store::init_card_store;
-use spi::image_store::init_image_store;
+use crate::ports::clients::create_client;
+use adapters::cache::init_cache;
+use adapters::card_store::init_card_store;
+use adapters::image_store::init_image_store;
 
-mod api;
+mod adapters;
 mod domain;
-mod spi;
-mod utils;
+mod ports;
 
 #[tokio::main]
 async fn main() {

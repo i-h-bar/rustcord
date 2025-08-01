@@ -1,5 +1,5 @@
+use crate::adapters::cache::Cache;
 use crate::domain::card::Card;
-use crate::spi::cache::Cache;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

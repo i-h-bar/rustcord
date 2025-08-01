@@ -1,6 +1,6 @@
 mod redis;
 
-use crate::spi::cache::redis::Redis;
+use crate::adapters::cache::redis::Redis;
 use async_trait::async_trait;
 use thiserror::Error;
 

@@ -1,7 +1,7 @@
-use crate::api::clients::discord::utils::create_embed;
-use crate::api::clients::{MessageInteraction, MessageInterationError};
+use crate::adapters::image_store::Images;
 use crate::domain::card::Card;
-use crate::spi::image_store::Images;
+use crate::ports::clients::discord::utils::embed::create_embed;
+use crate::ports::clients::{MessageInteraction, MessageInterationError};
 use async_trait::async_trait;
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,

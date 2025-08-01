@@ -1,10 +1,10 @@
-use crate::api::clients::discord::client::Discord;
+use crate::adapters::cache::Cache;
+use crate::adapters::card_store::CardStore;
+use crate::adapters::image_store::{ImageStore, Images};
 use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::functions::game::state::GameState;
-use crate::spi::cache::Cache;
-use crate::spi::card_store::CardStore;
-use crate::spi::image_store::{ImageStore, Images};
+use crate::ports::clients::discord::client::Discord;
 use async_trait::async_trait;
 use thiserror::Error;
 

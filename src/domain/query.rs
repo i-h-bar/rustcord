@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::domain::utils;
 use regex::Captures;
 
 pub struct QueryParams {

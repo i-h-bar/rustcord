@@ -3,24 +3,20 @@ mod commands;
 mod messages;
 mod utils;
 
-use crate::api::clients::discord::commands::game::DiscordCommandInteraction;
-use crate::api::clients::discord::commands::interaction::DiscordCommand;
-use crate::api::clients::discord::commands::register::{give_up, guess, help, play, search};
-use crate::api::clients::discord::messages::interaction::DiscordMessageInteration;
-use crate::api::clients::MessageInteraction;
+use crate::adapters::cache::Cache;
+use crate::adapters::card_store::CardStore;
+use crate::adapters::image_store::ImageStore;
 use crate::domain::app::App;
 use crate::domain::functions::game::play::PlayOptions;
 use crate::domain::query::QueryParams;
 use crate::domain::{card, functions};
-use crate::spi::cache::Cache;
-use crate::spi::card_store::CardStore;
-use crate::spi::image_store::ImageStore;
-use crate::utils::help::HELP;
-use crate::utils::parse;
+use crate::ports::clients::discord::commands::game::DiscordCommandInteraction;
+use crate::ports::clients::discord::commands::interaction::DiscordCommand;
+use crate::ports::clients::discord::commands::register::{give_up, guess, help, play, search};
+use crate::ports::clients::discord::messages::interaction::DiscordMessageInteration;
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
-use crate::domain;
-use crate::domain::functions::game;
+use utils::parse;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>

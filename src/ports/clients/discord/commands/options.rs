@@ -2,7 +2,7 @@ use crate::domain::functions::game::guess::GuessOptions;
 use crate::domain::functions::game::play::PlayOptions;
 use crate::domain::functions::game::state::Difficulty;
 use crate::domain::query::QueryParams;
-use crate::utils::parse::{ParseError, ResolveOption};
+use crate::ports::clients::discord::utils::parse::{ParseError, ResolveOption};
 use serenity::all::ResolvedValue;
 
 impl ResolveOption for PlayOptions {

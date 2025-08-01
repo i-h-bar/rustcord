@@ -1,7 +1,7 @@
 mod file_system;
 
+use crate::adapters::image_store::file_system::FileSystem;
 use crate::domain::card::Card;
-use crate::spi::image_store::file_system::FileSystem;
 use async_trait::async_trait;
 use thiserror::Error;
 

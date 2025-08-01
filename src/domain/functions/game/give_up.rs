@@ -1,9 +1,9 @@
-use crate::api::clients::GameInteraction;
+use crate::adapters::cache::Cache;
+use crate::adapters::card_store::CardStore;
+use crate::adapters::image_store::ImageStore;
 use crate::domain::app::App;
 use crate::domain::functions::game::state;
-use crate::spi::cache::Cache;
-use crate::spi::card_store::CardStore;
-use crate::spi::image_store::ImageStore;
+use crate::ports::clients::GameInteraction;
 
 impl<IS, CS, C> App<IS, CS, C>
 where

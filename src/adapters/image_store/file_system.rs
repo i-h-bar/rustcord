@@ -1,5 +1,5 @@
+use crate::adapters::image_store::{ImageRetrievalError, ImageStore, Images};
 use crate::domain::card::Card;
-use crate::spi::image_store::{ImageRetrievalError, ImageStore, Images};
 use async_trait::async_trait;
 use std::env;
 

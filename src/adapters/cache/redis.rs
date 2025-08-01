@@ -1,4 +1,4 @@
-use crate::spi::cache::{Cache, CacheError};
+use crate::adapters::cache::{Cache, CacheError};
 use async_trait::async_trait;
 use redis::{AsyncCommands, Client, SetExpiry, SetOptions};
 use std::env;

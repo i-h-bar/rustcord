@@ -1,8 +1,8 @@
-use crate::api::clients::MessageInteraction;
 use crate::domain::search::CardAndImage;
-use crate::utils::emoji::add_emoji;
-use crate::utils::fuzzy::ToChars;
-use crate::utils::{italicise_reminder_text, REGEX_COLLECTION};
+use crate::domain::utils::emoji::add_emoji;
+use crate::domain::utils::fuzzy::ToChars;
+use crate::domain::utils::{italicise_reminder_text, REGEX_COLLECTION};
+use crate::ports::clients::MessageInteraction;
 use regex::Captures;
 use serde::{Deserialize, Serialize};
 use std::str::Chars;

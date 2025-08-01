@@ -1,2 +1,2 @@
-pub mod help;
 pub mod game;
+pub mod help;
