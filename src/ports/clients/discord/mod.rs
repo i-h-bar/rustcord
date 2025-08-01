@@ -17,6 +17,7 @@ use crate::ports::clients::discord::messages::interaction::DiscordMessageInterat
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
 use utils::parse;
+use crate::ports::clients::discord::utils::help::HELP;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -30,7 +31,7 @@ where
             return;
         } else if msg.content == "!help" {
             let interaction = DiscordMessageInteration::new(ctx, msg);
-            functions::help::run(&interaction).await;
+            functions::help::run(&interaction, HELP).await;
         } else {
             let interaction = DiscordMessageInteration::new(ctx, msg);
             for card in self.parse_message(interaction.content()).await {
@@ -88,7 +89,7 @@ where
             match command.data.name.as_str() {
                 "help" => {
                     let interaction = DiscordCommand::new(ctx, command);
-                    functions::help::run(&interaction).await;
+                    functions::help::run(&interaction, HELP).await;
                 }
                 "search" => {
                     let query_params = match parse::options::<QueryParams>(command.data.options()) {
