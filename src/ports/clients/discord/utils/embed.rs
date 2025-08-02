@@ -1,6 +1,6 @@
 use crate::domain::card::Card;
-use crate::domain::utils::colours::get_colour_identity;
-use crate::domain::utils::emoji::add_emoji;
+use crate::ports::clients::discord::utils::colours::get_colour_identity;
+use crate::ports::clients::discord::utils::emoji::add_emoji;
 use crate::domain::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
@@ -26,7 +26,11 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
     }
 
     if guesses > multiplier * 2 {
-        embed = embed.description(card.rules_text());
+        let rules_text = card.rules_text();
+        let rules_text = REGEX_COLLECTION
+            .symbols
+            .replace_all(&rules_text, |cap: &Captures| add_emoji(cap));
+        embed = embed.description(rules_text);
     }
 
     embed

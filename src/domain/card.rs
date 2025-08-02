@@ -1,5 +1,4 @@
 use crate::domain::search::CardAndImage;
-use crate::domain::utils::emoji::add_emoji;
 use crate::domain::utils::fuzzy::ToChars;
 use crate::domain::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use crate::ports::clients::MessageInteraction;
@@ -83,10 +82,7 @@ impl Card {
             String::new()
         };
 
-        let front_oracle_text = REGEX_COLLECTION
-            .symbols
-            .replace_all(&self.front_oracle_text, |cap: &Captures| add_emoji(cap));
-        let front_oracle_text = italicise_reminder_text(&front_oracle_text);
+        let front_oracle_text = italicise_reminder_text(&self.front_oracle_text);
 
         format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats)
     }
