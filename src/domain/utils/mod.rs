@@ -35,4 +35,3 @@ pub fn normalise(name: &str) -> String {
         .replace(&name.replace('-', " ").nfkc().collect::<String>(), "")
         .to_lowercase()
 }
-

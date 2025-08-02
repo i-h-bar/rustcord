@@ -1,10 +1,10 @@
 use crate::domain::card::Card;
+use crate::domain::utils::REGEX_COLLECTION;
 use crate::ports::clients::discord::utils::colours::get_colour_identity;
 use crate::ports::clients::discord::utils::emoji::add_emoji;
-use crate::domain::utils::REGEX_COLLECTION;
+use crate::ports::clients::discord::utils::italicise_reminder_text;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
-use crate::ports::clients::discord::utils::italicise_reminder_text;
 
 pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
@@ -47,9 +47,10 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
 
         let front_oracle_text = italicise_reminder_text(&front_rules_text);
 
-        embed = embed.description(
-            format!("{}\n\n{}{}", card.front_type_line, front_oracle_text, stats)
-        );
+        embed = embed.description(format!(
+            "{}\n\n{}{}",
+            card.front_type_line, front_oracle_text, stats
+        ));
     }
 
     embed

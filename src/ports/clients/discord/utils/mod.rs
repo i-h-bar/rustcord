@@ -1,11 +1,11 @@
-use regex::Captures;
 use crate::domain::utils::REGEX_COLLECTION;
+use regex::Captures;
 
-pub mod embed;
-pub mod parse;
-pub mod help;
 pub mod colours;
+pub mod embed;
 pub mod emoji;
+pub mod help;
+pub mod parse;
 
 pub fn italicise_reminder_text(text: &str) -> String {
     REGEX_COLLECTION

@@ -14,10 +14,10 @@ use crate::ports::clients::discord::commands::game::DiscordCommandInteraction;
 use crate::ports::clients::discord::commands::interaction::DiscordCommand;
 use crate::ports::clients::discord::commands::register::{give_up, guess, help, play, search};
 use crate::ports::clients::discord::messages::interaction::DiscordMessageInteration;
+use crate::ports::clients::discord::utils::help::HELP;
 use async_trait::async_trait;
 use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
 use utils::parse;
-use crate::ports::clients::discord::utils::help::HELP;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
