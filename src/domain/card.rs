@@ -1,8 +1,6 @@
 use crate::domain::search::CardAndImage;
 use crate::domain::utils::fuzzy::ToChars;
-use crate::domain::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use crate::ports::clients::MessageInteraction;
-use regex::Captures;
 use serde::{Deserialize, Serialize};
 use std::str::Chars;
 use uuid::Uuid;
@@ -65,26 +63,6 @@ impl Card {
             self.front_illustration_id.as_ref(),
             self.back_illustration_id.as_ref(),
         )
-    }
-
-    pub(crate) fn rules_text(&self) -> String {
-        let stats = if let Some(power) = self.front_power.clone() {
-            let toughness = self
-                .front_toughness
-                .clone()
-                .unwrap_or_else(|| "0".to_string());
-            format!("\n\n{power}/{toughness}")
-        } else if let Some(loyalty) = self.front_loyalty.clone() {
-            format!("\n\n{loyalty}")
-        } else if let Some(defence) = self.front_defence.clone() {
-            format!("\n\n{defence}")
-        } else {
-            String::new()
-        };
-
-        let front_oracle_text = italicise_reminder_text(&self.front_oracle_text);
-
-        format!("{}\n\n{}{}", self.front_type_line, front_oracle_text, stats)
     }
 
     #[must_use]

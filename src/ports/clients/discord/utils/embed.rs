@@ -1,9 +1,10 @@
 use crate::domain::card::Card;
 use crate::ports::clients::discord::utils::colours::get_colour_identity;
 use crate::ports::clients::discord::utils::emoji::add_emoji;
-use crate::domain::utils::{italicise_reminder_text, REGEX_COLLECTION};
+use crate::domain::utils::REGEX_COLLECTION;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
+use crate::ports::clients::discord::utils::italicise_reminder_text;
 
 pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
@@ -26,11 +27,29 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
     }
 
     if guesses > multiplier * 2 {
-        let rules_text = card.rules_text();
-        let rules_text = REGEX_COLLECTION
+        let stats = if let Some(power) = card.front_power.clone() {
+            let toughness = card
+                .front_toughness
+                .clone()
+                .unwrap_or_else(|| "0".to_string());
+            format!("\n\n{power}/{toughness}")
+        } else if let Some(loyalty) = card.front_loyalty.clone() {
+            format!("\n\n{loyalty}")
+        } else if let Some(defence) = card.front_defence.clone() {
+            format!("\n\n{defence}")
+        } else {
+            String::new()
+        };
+
+        let front_rules_text = REGEX_COLLECTION
             .symbols
-            .replace_all(&rules_text, |cap: &Captures| add_emoji(cap));
-        embed = embed.description(rules_text);
+            .replace_all(&card.front_oracle_text, |cap: &Captures| add_emoji(cap));
+
+        let front_oracle_text = italicise_reminder_text(&front_rules_text);
+
+        embed = embed.description(
+            format!("{}\n\n{}{}", card.front_type_line, front_oracle_text, stats)
+        );
     }
 
     embed

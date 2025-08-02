@@ -1,7 +1,7 @@
 pub(crate) mod fuzzy;
 pub mod mutex;
 
-use regex::{Captures, Regex};
+use regex::Regex;
 use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;
 
@@ -36,9 +36,3 @@ pub fn normalise(name: &str) -> String {
         .to_lowercase()
 }
 
-pub fn italicise_reminder_text(text: &str) -> String {
-    REGEX_COLLECTION
-        .reminder_text
-        .replace_all(text, |cap: &Captures| format!("(*{}*)", &cap[1]))
-        .to_string()
-}
