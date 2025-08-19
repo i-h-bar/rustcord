@@ -20,7 +20,7 @@ jobs:
         run: cargo build --release
 
       - name: Run deploy script
-        run: ./run.sh
+        run: bash run.sh
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           PSQL_URI: ${{ secrets.PSQL_URI }}
