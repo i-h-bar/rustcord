@@ -1,4 +1,3 @@
-pub mod colours;
 pub mod emoji;
 pub(crate) mod fuzzy;
 pub mod mutex;

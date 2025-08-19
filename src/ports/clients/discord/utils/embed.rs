@@ -1,5 +1,5 @@
 use crate::domain::card::Card;
-use crate::domain::utils::colours::get_colour_identity;
+use crate::ports::clients::discord::utils::colours::get_colour_identity;
 use crate::domain::utils::emoji::add_emoji;
 use crate::domain::utils::{italicise_reminder_text, REGEX_COLLECTION};
 use regex::Captures;
