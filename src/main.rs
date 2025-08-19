@@ -1,5 +1,6 @@
 use crate::ports::clients::Client;
 
+#[cfg(debug_assertions)]
 use dotenv::dotenv;
 
 use crate::domain::app::App;
@@ -14,7 +15,11 @@ mod ports;
 
 #[tokio::main]
 async fn main() {
-    dotenv().ok();
+    #[cfg(debug_assertions)]
+    {
+        dotenv().ok();
+    }
+
     env_logger::init();
     let card_store = init_card_store().await;
     let image_store = init_image_store().await;

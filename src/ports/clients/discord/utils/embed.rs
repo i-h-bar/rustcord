@@ -1,8 +1,8 @@
 use crate::domain::card::Card;
-use crate::ports::clients::discord::utils::REGEX_COLLECTION;
 use crate::ports::clients::discord::utils::colours::get_colour_identity;
 use crate::ports::clients::discord::utils::emoji::add_emoji;
 use crate::ports::clients::discord::utils::italicise_reminder_text;
+use crate::ports::clients::discord::utils::REGEX_COLLECTION;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 

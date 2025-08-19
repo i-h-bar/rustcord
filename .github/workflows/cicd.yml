@@ -1,0 +1,29 @@
+name: Deploy The Bot
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Compile release build
+        run: cargo build --release
+
+      - name: Run deploy script
+        run: ./run.sh
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          PSQL_URI: ${{ secrets.PSQL_URI }}
+          IMAGES_DIR: ${{ secrets.IMAGES_DIR }}
+          RUST_LOG: ${{ secrets.RUST_LOG }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
