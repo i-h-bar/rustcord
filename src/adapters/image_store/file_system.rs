@@ -22,14 +22,15 @@ impl ImageStore for FileSystem {
     async fn fetch(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
         let (front_id, back_id) = card.image_ids();
 
-        let front = match tokio::fs::read(format!("{}{front_id}.png", self.image_dir))
-            .await {
+        let front = match tokio::fs::read(format!("{}{front_id}.png", self.image_dir)).await {
             Err(why) => {
                 log::warn!("Error getting image {why:?}");
-                return Err(ImageRetrievalError(format!("No front image found for {}", card.front_name)));
+                return Err(ImageRetrievalError(format!(
+                    "No front image found for {}",
+                    card.front_name
+                )));
             }
-            Ok(image) => image
-
+            Ok(image) => image,
         };
 
         let back = if let Some(back_id) = back_id {
