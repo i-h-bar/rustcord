@@ -28,7 +28,7 @@ impl Cache for Redis {
     }
 
     async fn set(&self, key: String, value: String) -> Result<(), CacheError> {
-        match self
+        if let Err(why) = self
             .new_connection()
             .await?
             .set_options::<String, String, ()>(
@@ -38,21 +38,19 @@ impl Cache for Redis {
             )
             .await
         {
-            Ok(()) => Ok(()),
-            Err(why) => {
-                log::warn!("Error setting value in cache {why:?}");
-                Err(CacheError(String::from("Unable to set value")))
-            }
+            log::warn!("Error setting value in cache {why:?}");
+            Err(CacheError(String::from("Unable to set value")))
+        } else {
+            Ok(())
         }
     }
 
     async fn delete(&self, key: String) -> Result<(), CacheError> {
-        match self.new_connection().await?.del(key).await {
-            Ok(()) => Ok(()),
-            Err(why) => {
-                log::warn!("Error deleting value in cache {why:?}");
-                Err(CacheError(String::from("Unable to delete cache")))
-            }
+        if let Err(why) = self.new_connection().await?.del::<String, ()>(key).await {
+            log::warn!("Error deleting value in cache {why:?}");
+            Err(CacheError(String::from("Unable to delete cache")))
+        } else {
+            Ok(())
         }
     }
 }
