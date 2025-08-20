@@ -12,6 +12,7 @@ pub struct FileSystem {
 impl ImageStore for FileSystem {
     fn new() -> Self {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
+        log::info!("Using IMAGES_DIR: {}", base_dir);
         Self {
             image_dir: format!("{}/images/", &base_dir),
             illustration_dir: format!("{}/illustrations/", &base_dir),
@@ -21,11 +22,15 @@ impl ImageStore for FileSystem {
     async fn fetch(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
         let (front_id, back_id) = card.image_ids();
 
-        let front = tokio::fs::read(format!("{}{front_id}.png", self.image_dir))
-            .await
-            .map_err(|_| {
-                ImageRetrievalError(format!("No front image found for {}", card.front_name))
-            })?;
+        let front = match tokio::fs::read(format!("{}{front_id}.png", self.image_dir))
+            .await {
+            Err(why) => {
+                log::warn!("Error getting image {why:?}");
+                return Err(ImageRetrievalError(format!("No front image found for {}", card.front_name)));
+            }
+            Ok(image) => image
+
+        };
 
         let back = if let Some(back_id) = back_id {
             tokio::fs::read(format!("{}{back_id}.png", self.image_dir))
