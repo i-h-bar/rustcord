@@ -11,6 +11,7 @@ pub struct Redis {
 impl Cache for Redis {
     fn new() -> Self {
         let url = env::var("REDIS_URL").expect("REDIS_URL must be set");
+        log::info!("Using redis cache: {}", url);
         let client = Client::open(url).expect("failed to open redis client");
         Self { client }
     }
@@ -26,17 +27,27 @@ impl Cache for Redis {
     }
 
     async fn set(&self, key: String, value: String) -> Result<(), CacheError> {
-        self.client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|_| CacheError(String::from("Unable to get connection")))?
-            .set_options(
+        let mut connection = match self.client.get_multiplexed_async_connection().await {
+            Ok(connection) => connection,
+            Err(why) => {
+                log::warn!("Error making connection {why:?}");
+                return Err(CacheError(String::from("Unable to get connection")));
+            }
+        };
+
+        match connection
+            .set_options::<String, String, ()>(
                 key,
                 value,
                 SetOptions::default().with_expiration(SetExpiry::EX(86400)),
             )
-            .await
-            .map_err(|_| CacheError(String::from("Unable to set value")))
+            .await {
+            Ok(_) => Ok(()),
+            Err(why) => {
+                log::warn!("Error setting value in cache {why:?}");
+                Err(CacheError(String::from("Unable to set value")))
+            }
+        }
     }
 
     async fn delete(&self, key: String) -> Result<(), CacheError> {
