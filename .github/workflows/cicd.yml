@@ -50,7 +50,7 @@ jobs:
           --name rustcord-container \
           --restart=always \
           --add-host=host.docker.internal:host-gateway \
-          -v ${{ secrets.HOST_IMAGE_DIR }}:${{ secrets.IMAGE_DIR }} \
+          -v '${{ secrets.HOST_IMAGE_DIR }}:${{ secrets.IMAGE_DIR }}' \
           -e BOT_TOKEN='${{ secrets.BOT_TOKEN }}' \
           -e PSQL_URI='${{ secrets.PSQL_URI }}' \
           -e IMAGES_DIR='${{ secrets.IMAGES_DIR }}' \
