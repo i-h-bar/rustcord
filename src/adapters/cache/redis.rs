@@ -12,7 +12,6 @@ pub struct Redis {
 impl Cache for Redis {
     fn new() -> Self {
         let url = env::var("REDIS_URL").expect("REDIS_URL must be set");
-        log::info!("Using redis cache: {}", url);
         let client = Client::open(url).expect("failed to open redis client");
         Self { client }
     }
