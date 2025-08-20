@@ -12,7 +12,6 @@ pub struct FileSystem {
 impl ImageStore for FileSystem {
     fn new() -> Self {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
-        log::info!("Using IMAGES_DIR: {}", base_dir);
         Self {
             image_dir: format!("{}/images/", &base_dir),
             illustration_dir: format!("{}/illustrations/", &base_dir),
