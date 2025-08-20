@@ -6,24 +6,42 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v3
         with:
-          toolchain: stable
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-      - name: Compile release build
-        run: cargo build --release
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Run deploy script
-        run: bash run.sh
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          PSQL_URI: ${{ secrets.PSQL_URI }}
-          IMAGES_DIR: ${{ secrets.IMAGES_DIR }}
-          RUST_LOG: ${{ secrets.RUST_LOG }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
+      - name: Build Image
+        run: docker build --platform linux/arm64 -t ${{ secrets.DOCKER_USERNAME }}/rustcord .
+
+      - name: Push Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
+
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Pull Image From Docker
+        run: docker pull ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
+
+      - name: Delete Old Container
+        run: docker rm -f rustcord-container
+
+      - name: Run Docker Container
+        run: docker run -d --name rustcord-container --add-host=host.docker.internal:host-gateway -v ${{ secrets.HOST_IMAGE_DIR }}:${{ secrets.IMAGE_DIR }} -e BOT_TOKEN='${{ secrets.BOT_TOKEN }}' -e PQSL_URI='${{ secrets.PSQL_URI }}' -e IMAGES_DIR='${{ secrets.IMAGES_DIR }}' -e RUST_LOG='${{ secrets.RUST_LOG }}' -e REDIS_URL='${{ secrets.REDIS_URL }}' ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
