@@ -42,6 +42,18 @@ jobs:
 
       - name: Delete Old Container
         run: docker rm -f rustcord-container
+        continue-on-error: true
 
       - name: Run Docker Container
-        run: docker run -d --name rustcord-container --add-host=host.docker.internal:host-gateway -v ${{ secrets.HOST_IMAGE_DIR }}:${{ secrets.IMAGE_DIR }} -e BOT_TOKEN='${{ secrets.BOT_TOKEN }}' -e PQSL_URI='${{ secrets.PSQL_URI }}' -e IMAGES_DIR='${{ secrets.IMAGES_DIR }}' -e RUST_LOG='${{ secrets.RUST_LOG }}' -e REDIS_URL='${{ secrets.REDIS_URL }}' ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
+        run: |
+          docker run -d \
+          --name rustcord-container \
+          --restart=always \
+          --add-host=host.docker.internal:host-gateway \
+          -v ${{ secrets.HOST_IMAGE_DIR }}:${{ secrets.IMAGE_DIR }} \
+          -e BOT_TOKEN='${{ secrets.BOT_TOKEN }}' \
+          -e PQSL_URI='${{ secrets.PSQL_URI }}' \
+          -e IMAGES_DIR='${{ secrets.IMAGES_DIR }}' \
+          -e RUST_LOG='${{ secrets.RUST_LOG }}' \
+          -e REDIS_URL='${{ secrets.REDIS_URL }}' \
+          ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
