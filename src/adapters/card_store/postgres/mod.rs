@@ -2,7 +2,7 @@ mod queries;
 
 use crate::adapters::card_store::postgres::queries::{
     FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
-    RANDOM_CARD_FROM_DISTINCT,
+    RANDOM_CARD,
 };
 use crate::adapters::card_store::CardStore;
 use crate::domain::card::Card;
@@ -120,7 +120,7 @@ impl CardStore for Postgres {
     }
 
     async fn random_card(&self) -> Option<Card> {
-        match sqlx::query(RANDOM_CARD_FROM_DISTINCT)
+        match sqlx::query(RANDOM_CARD)
             .fetch_one(&self.pool)
             .await
         {
