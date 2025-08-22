@@ -17,7 +17,7 @@ where word_similarity(normalised_name, $1) > 0.50
 
 pub const NORMALISED_SET_NAME: &str = r"select normalised_name from set where abbreviation = $1";
 
-pub const RANDOM_CARD_FROM_DISTINCT: &str = r"
+pub const RANDOM_CARD: &str = r"
 select set.id                       as set_id,
        front.id                     as front_id,
        front.name                   as front_name,
@@ -55,8 +55,8 @@ select set.id                       as set_id,
        set.name                     as set_name
 from card front
          left join card back on front.backside_id = back.id
-         left join rule front_rule on front.rule_id = front_rule.id
-         left join rule back_rule on back.rule_id = back_rule.id
+         left join rule front_rule on front.oracle_id = front_rule.id
+         left join rule back_rule on back.oracle_id = back_rule.id
          join set on front.set_id = set.id
          left join artist on front.artist_id = artist.id
 where front.illustration_id is not null 
