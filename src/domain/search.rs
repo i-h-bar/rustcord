@@ -76,8 +76,9 @@ where
         };
 
         log::info!(
-            "Found match for query '{}' in {} ms",
+            "Found match for query '{}' -> '{}' in {} ms",
             query.name(),
+            found_card.front_name,
             start.elapsed().as_millis()
         );
 
