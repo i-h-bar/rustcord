@@ -1,8 +1,8 @@
 mod queries;
 
 use crate::adapters::card_store::postgres::queries::{
-    FUZZY_SEARCH_ARTIST, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME,
-    RANDOM_CARD,
+    FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS,
+    FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
 };
 use crate::adapters::card_store::CardStore;
 use crate::domain::card::Card;
@@ -44,13 +44,11 @@ impl CardStore for Postgres {
     }
 
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>> {
-        match sqlx::query(&format!(
-            r"select * from artist_{} where word_similarity(front_normalised_name, $1) > 0.50;",
-            artist.replace(' ', "_")
-        ))
-        .bind(normalised_name)
-        .fetch_all(&self.pool)
-        .await
+        match sqlx::query(FUZZY_SEARCH_CARD_AND_ARTIST)
+            .bind(normalised_name)
+            .bind(artist)
+            .fetch_all(&self.pool)
+            .await
         {
             Err(why) => {
                 log::warn!("Failed search set fetch - {why}");
@@ -61,13 +59,11 @@ impl CardStore for Postgres {
     }
 
     async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<Card>> {
-        match sqlx::query(&format!(
-            r"select * from set_{} where word_similarity(front_normalised_name, $1) > 0.50;",
-            set_name.replace(' ', "_")
-        ))
-        .bind(normalised_name)
-        .fetch_all(&self.pool)
-        .await
+        match sqlx::query(FUZZY_SEARCH_CARD_AND_SET_NAME)
+            .bind(normalised_name)
+            .bind(set_name)
+            .fetch_all(&self.pool)
+            .await
         {
             Err(why) => {
                 log::warn!("Failed search set fetch - {why}");
@@ -91,20 +87,6 @@ impl CardStore for Postgres {
         }
     }
 
-    async fn search_for_artist(&self, normalised_name: &str) -> Option<Vec<String>> {
-        match sqlx::query(FUZZY_SEARCH_ARTIST)
-            .bind(normalised_name)
-            .fetch_one(&self.pool)
-            .await
-        {
-            Err(why) => {
-                log::warn!("Failed artist fetch - {why}");
-                None
-            }
-            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
-        }
-    }
-
     async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
         match sqlx::query(NORMALISED_SET_NAME)
             .bind(abbreviation)
@@ -120,10 +102,7 @@ impl CardStore for Postgres {
     }
 
     async fn random_card(&self) -> Option<Card> {
-        match sqlx::query(RANDOM_CARD)
-            .fetch_one(&self.pool)
-            .await
-        {
+        match sqlx::query(RANDOM_CARD).fetch_one(&self.pool).await {
             Err(why) => {
                 log::warn!("Failed random card fetch - {why}");
                 None

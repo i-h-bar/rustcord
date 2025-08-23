@@ -11,7 +11,6 @@ pub trait CardStore {
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>>;
     async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<Card>>;
     async fn search_for_set_name(&self, normalised_name: &str) -> Option<Vec<String>>;
-    async fn search_for_artist(&self, normalised_name: &str) -> Option<Vec<String>>;
     async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String>;
     async fn random_card(&self) -> Option<Card>;
     async fn random_card_from_set(&self, set_name: &str) -> Option<Card>;
