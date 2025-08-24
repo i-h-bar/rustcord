@@ -7,6 +7,7 @@ use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
+use tokio::time::Instant;
 
 pub struct DiscordCommand {
     ctx: Context,
@@ -21,6 +22,7 @@ impl DiscordCommand {
         &self,
         message: CreateInteractionResponseMessage,
     ) -> Result<(), MessageInterationError> {
+        let start = Instant::now();
         if let Err(why) = self
             .command
             .create_response(&self.ctx, CreateInteractionResponse::Message(message))
@@ -28,7 +30,7 @@ impl DiscordCommand {
         {
             Err(MessageInterationError(why.to_string()))
         } else {
-            log::info!("Sent message to {:?}", self.command.channel_id.to_string());
+            log::info!("Discord RTT took {}ms to send the message to {:?}", start.elapsed().as_millis(), self.command.channel_id.to_string());
             Ok(())
         }
     }

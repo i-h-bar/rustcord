@@ -4,6 +4,7 @@ use crate::ports::clients::discord::utils::embed::create_embed;
 use crate::ports::clients::{MessageInteraction, MessageInterationError};
 use async_trait::async_trait;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
+use tokio::time::Instant;
 
 pub struct DiscordMessageInteration {
     ctx: Context,
@@ -20,6 +21,7 @@ impl DiscordMessageInteration {
     }
 
     async fn send_message(&self, message: CreateMessage) -> Result<(), MessageInterationError> {
+        let start = Instant::now();
         match self
             .msg
             .channel_id
@@ -28,7 +30,7 @@ impl DiscordMessageInteration {
         {
             Err(why) => Err(MessageInterationError(why.to_string())),
             Ok(response) => {
-                log::info!("Sent message to {:?}", response.channel_id);
+                log::info!("Discord RTT took {}ms to send the message to {:?}", start.elapsed().as_millis(), response.channel_id.to_string());
                 Ok(())
             }
         }

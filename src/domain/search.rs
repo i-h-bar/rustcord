@@ -50,22 +50,15 @@ where
         normalised_set_name: &str,
         normalised_name: &str,
     ) -> Option<Card> {
-        let set_name = self.fuzzy_match_set_name(normalised_set_name).await?;
         let potentials = self
             .card_store
-            .search_set(&set_name, normalised_name)
+            .search_set(&normalised_set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Card> {
-        let potentials = self.card_store.search_for_artist(artist).await?;
-        let best_artist = fuzzy::winkliest_match(&artist, potentials)?;
-        let potentials = self
-            .card_store
-            .search_artist(&best_artist, normalised_name)
-            .await?;
-
+        let potentials = self.card_store.search_artist(artist, &normalised_name).await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
@@ -83,8 +76,9 @@ where
         };
 
         log::info!(
-            "Found match for query '{}' in {} ms",
+            "Found match for query '{}' -> '{}' in {} ms",
             query.name(),
+            found_card.front_name,
             start.elapsed().as_millis()
         );
 
