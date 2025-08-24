@@ -30,7 +30,7 @@ impl DiscordCommand {
         {
             Err(MessageInterationError(why.to_string()))
         } else {
-            log::info!("Discord API took {}ms to send the message to {:?}", start.elapsed().as_millis(), self.command.channel_id.to_string());
+            log::info!("Discord RTT took {}ms to send the message to {:?}", start.elapsed().as_millis(), self.command.channel_id.to_string());
             Ok(())
         }
     }
