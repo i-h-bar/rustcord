@@ -4,10 +4,14 @@ use crate::adapters::cache::redis::Redis;
 use async_trait::async_trait;
 use thiserror::Error;
 
+#[cfg(test)]
+use mockall::automock;
+
 #[derive(Error, Debug)]
 #[error("Error in cache operation")]
 pub struct CacheError(String);
 
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait Cache {
     fn new() -> Self;

@@ -1,6 +1,8 @@
 use crate::domain::utils;
 use regex::Captures;
 
+
+#[cfg_attr(test, derive(Clone))]
 pub struct QueryParams {
     artist: Option<String>,
     name: String,
@@ -50,6 +52,21 @@ impl QueryParams {
             set_code,
             set_name,
         })
+    }
+
+    #[cfg(test)]
+    pub fn from_test(
+        name: String,
+        artist: Option<String>,
+        set_name: Option<String>,
+        set_code: Option<String>,
+    ) -> Self {
+        Self {
+            name,
+            artist,
+            set_name,
+            set_code,
+        }
     }
 
     #[must_use]

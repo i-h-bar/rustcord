@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::str::Chars;
 use uuid::Uuid;
 
+#[cfg_attr(test, derive(Clone, PartialEq))]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Card {
     pub front_name: String,

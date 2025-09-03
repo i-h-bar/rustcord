@@ -109,7 +109,6 @@ where front.normalised_name % $1
 order by front.oracle_id, set_sml desc;
 ";
 
-
 pub const FUZZY_SEARCH_CARD_AND_ARTIST: &str = r"
 select distinct on (front.oracle_id) front.id                   as front_id,
                                      front.name                 as front_name,

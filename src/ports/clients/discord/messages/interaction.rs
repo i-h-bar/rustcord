@@ -30,7 +30,11 @@ impl DiscordMessageInteration {
         {
             Err(why) => Err(MessageInterationError(why.to_string())),
             Ok(response) => {
-                log::info!("Discord RTT took {}ms to send the message to {:?}", start.elapsed().as_millis(), response.channel_id.to_string());
+                log::info!(
+                    "Discord RTT took {}ms to send the message to {:?}",
+                    start.elapsed().as_millis(),
+                    response.channel_id.to_string()
+                );
                 Ok(())
             }
         }
