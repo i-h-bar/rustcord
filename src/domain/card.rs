@@ -91,12 +91,12 @@ pub async fn card_response<MI: MessageInteraction>(card: Option<CardAndImage>, i
                 .reply(String::from("Failed to find card :("))
                 .await
             {
-                log::error!("Error sending card not found message :( {:?}", why);
+                log::error!("Error sending card not found message :( {why:?}");
             }
         }
         Some((card, images)) => {
             if let Err(why) = interaction.send_card(card, images).await {
-                log::error!("Error sending card message :( {:?}", why);
+                log::error!("Error sending card message :( {why:?}");
             };
         }
     }

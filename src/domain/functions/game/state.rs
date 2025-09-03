@@ -81,7 +81,7 @@ pub async fn fetch<C: Cache + Send + Sync>(id: String, cache: &C) -> Option<Game
     match ron::from_str::<GameState>(&game_state_string) {
         Ok(game_state) => Some(game_state),
         Err(why) => {
-            log::warn!("Couldn't parse game state: {}", why);
+            log::warn!("Couldn't parse game state: {why}");
             None
         }
     }
@@ -89,7 +89,7 @@ pub async fn fetch<C: Cache + Send + Sync>(id: String, cache: &C) -> Option<Game
 
 pub async fn delete<C: Cache + Send + Sync>(id: String, cache: &C) {
     if let Err(why) = cache.delete(id).await {
-        log::warn!("Error deleting key from redis the response: {:?}", why);
+        log::warn!("Error deleting key from redis the response: {why:?}");
     };
 }
 
@@ -97,12 +97,12 @@ pub async fn add<C: Cache + Send + Sync>(game_state: &GameState, id: String, cac
     let ron_string = match ron::to_string(&game_state) {
         Ok(ron_string) => ron_string,
         Err(err) => {
-            log::warn!("Error converting game state to string: {}", err);
+            log::warn!("Error converting game state to string: {err}");
             return;
         }
     };
 
     if let Err(why) = cache.set(id, ron_string).await {
-        log::warn!("Error while trying to set value in redis: {}", why);
+        log::warn!("Error while trying to set value in redis: {why}");
     };
 }

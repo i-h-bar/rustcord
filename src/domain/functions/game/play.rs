@@ -30,7 +30,7 @@ where
                     .reply(format!("Could not find set '{set_name}'"))
                     .await
                 {
-                    log::error!("couldn't create interaction response: {:?}", why);
+                    log::error!("couldn't create interaction response: {why:?}");
                 }
                 return;
             };
@@ -49,7 +49,7 @@ where
             };
 
             if let Err(why) = interaction.send_new_game_message(game_state, images).await {
-                log::error!("couldn't send game state: {:?}", why);
+                log::error!("couldn't send game state: {why:?}");
             };
         } else {
             log::warn!("Failed to get random card");

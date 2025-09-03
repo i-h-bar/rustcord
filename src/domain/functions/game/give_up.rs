@@ -24,7 +24,7 @@ where
         };
 
         if let Err(why) = interaction.game_failed_message(game_state, images).await {
-            log::warn!("couldn't send game failed: {}", why);
+            log::warn!("couldn't send game failed: {why}");
         }
     }
 }

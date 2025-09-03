@@ -28,7 +28,7 @@ where
                 .reply(String::from("No game found in this channel :("))
                 .await
             {
-                log::warn!("couldn't create interaction: {}", why);
+                log::warn!("couldn't create interaction: {why}");
             }
             return;
         };
@@ -42,7 +42,7 @@ where
             };
 
             if let Err(why) = interaction.send_win_message(game_state, images).await {
-                log::warn!("couldn't send win message: {}", why);
+                log::warn!("couldn't send win message: {why}");
             }
 
             state::delete(interaction.id(), &self.cache).await;
@@ -54,7 +54,7 @@ where
 
             state::delete(interaction.id(), &self.cache).await;
             if let Err(why) = interaction.game_failed_message(game_state, images).await {
-                log::warn!("couldn't send game failed message: {}", why);
+                log::warn!("couldn't send game failed message: {why}");
             }
         } else {
             state::add(&game_state, interaction.id(), &self.cache).await;
@@ -66,7 +66,7 @@ where
                 .send_guess_wrong_message(game_state, images, guess)
                 .await
             {
-                log::warn!("couldn't send guess wrong message: {}", why);
+                log::warn!("couldn't send guess wrong message: {why}");
             }
         }
     }
