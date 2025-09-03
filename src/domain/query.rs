@@ -1,7 +1,6 @@
 use crate::domain::utils;
 use regex::Captures;
 
-
 #[cfg_attr(test, derive(Clone))]
 pub struct QueryParams {
     artist: Option<String>,

@@ -52,7 +52,7 @@ where
     ) -> Option<Card> {
         let potentials = self
             .card_store
-            .search_set(&normalised_set_name, normalised_name)
+            .search_set(normalised_set_name, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
@@ -60,7 +60,7 @@ where
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Card> {
         let potentials = self
             .card_store
-            .search_artist(artist, &normalised_name)
+            .search_artist(artist, normalised_name)
             .await?;
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
@@ -127,7 +127,7 @@ mod tests {
     use super::*;
     use crate::adapters::cache::MockCache;
     use crate::adapters::card_store::MockCardStore;
-    use crate::adapters::image_store::{MockImageStore, Images};
+    use crate::adapters::image_store::{Images, MockImageStore};
     use crate::ports::clients::MockMessageInteraction;
     use mockall::predicate::eq;
     use uuid::uuid;

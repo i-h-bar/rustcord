@@ -83,7 +83,7 @@ where
             log::info!(
                 "Received command: {:?} from {}",
                 command.data.name,
-                command.channel_id.to_string(),
+                command.channel_id,
             );
 
             match command.data.name.as_str() {
