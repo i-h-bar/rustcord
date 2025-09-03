@@ -35,6 +35,90 @@ impl ToChars for Box<str> {
     }
 }
 
+
+fn experimental_jw<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 {
+    let mut a_chars = a.to_chars().collect::<Vec<_>>();
+    let mut b_chars = b.to_chars().collect::<Vec<_>>();
+
+    let len_a = a_chars.len();
+    let len_b = b_chars.len();
+
+    if len_a == 0 || len_b == 0 {
+        return 0.0;
+    }
+
+    if a == b {
+        return 1.0;
+    }
+
+    let max_dist = (len_a.max(len_b) / 2).saturating_sub(1);
+    let mut matches = 0.0;
+    let mut transpositions = 0.0;
+    let mut hash_a = vec![false; len_a];
+    let mut hash_b = vec![false; len_b];
+
+
+
+    for i in 0..len_a {
+        let start = i.saturating_sub(max_dist);
+        let end = (i + max_dist + 1).min(len_b);
+
+        for j in start..end {
+            if !hash_b[j] && a_chars[i] == b_chars[j] {
+                hash_a[i] = true;
+                hash_b[j] = true;
+                matches += 1.0;
+                break;
+            }
+        }
+    }
+
+    if matches == 0.0 {
+        return 0.0;
+    }
+
+    let mut a_match_chars: Vec<char> = Vec::with_capacity(matches as usize);
+    let mut b_match_chars: Vec<char> = Vec::with_capacity(matches as usize);
+
+    for i in 0..len_a {
+        if hash_a[i] {
+            a_match_chars.push(a_chars[i]);
+        }
+    }
+    for i in 0..len_b {
+        if hash_b[i] {
+            b_match_chars.push(b_chars[i]);
+        }
+    }
+
+    for i in 0..(matches as usize) {
+        if a_match_chars[i] != b_match_chars[i] {
+            transpositions += 1.0;
+        }
+    }
+
+    let jaro_similarity = (1.0 / 3.0) * (
+        matches / len_a as f32 +
+            matches / len_b as f32 +
+            (matches - transpositions / 2.0) / matches
+    );
+
+    // Winkler modification
+    let mut prefix_len = 0;
+    for (c1, c2) in a_chars.into_iter().zip(b_chars) {
+        if c1 == c2 {
+            prefix_len += 1;
+        } else {
+            break;
+        }
+    }
+
+    let prefix_len = prefix_len.min(4) as f32;
+    let scaling_factor = 0.1;
+
+    jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity))
+}
+
 #[allow(clippy::cast_precision_loss)]
 pub fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 {
     if a == b {
