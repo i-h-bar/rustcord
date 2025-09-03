@@ -18,7 +18,7 @@ pub struct Postgres {
 
 #[async_trait]
 impl CardStore for Postgres {
-    async fn new() -> Self {
+    async fn create() -> Self {
         let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
         let pool = PgPoolOptions::new()
             .max_connections(5)

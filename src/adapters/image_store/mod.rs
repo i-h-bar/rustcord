@@ -23,12 +23,12 @@ pub struct ImageRetrievalError(String);
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait ImageStore {
-    fn new() -> Self;
+    fn create() -> Self;
     async fn fetch(&self, card: &Card) -> Result<Images, ImageRetrievalError>;
     async fn fetch_illustration(&self, card: &Card) -> Result<Images, ImageRetrievalError>;
 }
 
 #[must_use]
 pub async fn init_image_store() -> impl ImageStore {
-    FileSystem::new()
+    FileSystem::create()
 }

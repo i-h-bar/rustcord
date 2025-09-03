@@ -10,7 +10,7 @@ pub struct Redis {
 
 #[async_trait]
 impl Cache for Redis {
-    fn new() -> Self {
+    fn create() -> Self {
         let url = env::var("REDIS_URL").expect("REDIS_URL must be set");
         let client = Client::open(url).expect("failed to open redis client");
         Self { client }

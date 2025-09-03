@@ -149,7 +149,7 @@ mod tests {
             .with(eq(card.clone()))
             .return_const(Ok(images.clone()));
 
-        let mut card_store = MockCardStore::new().await;
+        let mut card_store = MockCardStore::new();
         card_store
             .expect_search()
             .times(1)
