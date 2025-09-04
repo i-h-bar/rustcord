@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::io::Bytes;
 use std::str::Chars;
 
 pub trait ToChars {
@@ -37,9 +38,9 @@ impl ToChars for Box<str> {
 
 
 #[allow(clippy::cast_precision_loss)]
-pub fn jaro_winkler_bitmask(a: &str, b: &str) -> Option<f32> {
-    let a_chars: Vec<char> = a.chars().collect();
-    let b_chars: Vec<char> = b.chars().collect();
+pub fn jaro_winkler_ascii_bitmask(a: &str, b: &str) -> Option<f32> {
+    let a_chars = a.bytes().collect::<Vec<u8>>();
+    let b_chars = b.bytes().collect::<Vec<u8>>();
     let len_a = a_chars.len();
     let len_b = b_chars.len();
 
@@ -96,7 +97,7 @@ pub fn jaro_winkler_bitmask(a: &str, b: &str) -> Option<f32> {
     );
 
     let mut prefix_len = 0;
-    for (c1, c2) in a.chars().zip(b.chars()) {
+    for (c1, c2) in a_chars.into_iter().zip(b_chars) {
         if c1 == c2 {
             prefix_len += 1;
         } else {
@@ -194,7 +195,7 @@ mod tests {
         let a = "CRATE";
         let b = "TRACE";
 
-        let answer = jaro_winkler_bitmask(a, b);
+        let answer = jaro_winkler_ascii_bitmask(a, b);
         assert!(answer.is_some());
 
         assert_eq!(answer.unwrap(), 0.73333335)

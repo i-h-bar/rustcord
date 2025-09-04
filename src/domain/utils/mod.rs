@@ -1,4 +1,4 @@
-pub(crate) mod fuzzy;
+pub mod fuzzy;
 pub mod mutex;
 
 use regex::Regex;
