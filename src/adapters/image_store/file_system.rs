@@ -10,7 +10,7 @@ pub struct FileSystem {
 
 #[async_trait]
 impl ImageStore for FileSystem {
-    fn new() -> Self {
+    fn create() -> Self {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
         Self {
             image_dir: format!("{}/images/", &base_dir),

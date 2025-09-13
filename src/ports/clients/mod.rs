@@ -8,12 +8,17 @@ use crate::ports::clients::discord::client::Discord;
 use async_trait::async_trait;
 use thiserror::Error;
 
+#[cfg(test)]
+use mockall::automock;
+
 mod discord;
 
+#[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Error)]
 #[error("An error occurred while processing a message")]
 pub struct MessageInterationError(String);
 
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait MessageInteraction {
     async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInterationError>;

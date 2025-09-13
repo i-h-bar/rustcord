@@ -1,10 +1,10 @@
 use crate::domain::search::CardAndImage;
-use crate::domain::utils::fuzzy::ToChars;
+use crate::domain::utils::fuzzy::ToBytes;
 use crate::ports::clients::MessageInteraction;
 use serde::{Deserialize, Serialize};
-use std::str::Chars;
 use uuid::Uuid;
 
+#[cfg_attr(test, derive(Clone, PartialEq))]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Card {
     pub front_name: String,
@@ -71,9 +71,9 @@ impl Card {
     }
 }
 
-impl ToChars for Card {
-    fn to_chars(&self) -> Chars<'_> {
-        self.front_normalised_name.chars()
+impl ToBytes for Card {
+    fn to_bytes(&self) -> &[u8] {
+        self.front_name.as_bytes()
     }
 }
 
@@ -90,12 +90,12 @@ pub async fn card_response<MI: MessageInteraction>(card: Option<CardAndImage>, i
                 .reply(String::from("Failed to find card :("))
                 .await
             {
-                log::error!("Error sending card not found message :( {:?}", why);
+                log::error!("Error sending card not found message :( {why:?}");
             }
         }
         Some((card, images)) => {
             if let Err(why) = interaction.send_card(card, images).await {
-                log::error!("Error sending card message :( {:?}", why);
+                log::error!("Error sending card message :( {why:?}");
             };
         }
     }

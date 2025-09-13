@@ -4,9 +4,13 @@ use crate::adapters::card_store::postgres::Postgres;
 use crate::domain::card::Card;
 use async_trait::async_trait;
 
+#[cfg(test)]
+use mockall::automock;
+
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait CardStore {
-    async fn new() -> Self;
+    async fn create() -> Self;
     async fn search(&self, normalised_name: &str) -> Option<Vec<Card>>;
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>>;
     async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<Card>>;
@@ -17,5 +21,5 @@ pub trait CardStore {
 }
 
 pub async fn init_card_store() -> impl CardStore {
-    Postgres::new().await
+    Postgres::create().await
 }

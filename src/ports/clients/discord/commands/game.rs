@@ -54,7 +54,7 @@ impl GameInteraction for DiscordCommandInteraction {
 
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
-            log::warn!("couldn't create interaction: {}", why);
+            log::warn!("couldn't create interaction: {why}");
         }
 
         Ok(())
@@ -87,7 +87,7 @@ impl GameInteraction for DiscordCommandInteraction {
 
         let response = CreateInteractionResponse::Message(response);
         if let Err(why) = self.command.create_response(&self.ctx.http, response).await {
-            log::error!("couldn't create interaction response: {:?}", why);
+            log::error!("couldn't create interaction response: {why:?}");
         }
 
         Ok(())

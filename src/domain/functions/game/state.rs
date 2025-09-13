@@ -30,6 +30,7 @@ pub struct GameState {
 }
 
 impl GameState {
+    #[must_use]
     pub fn from(card: Card, difficulty: Difficulty) -> Self {
         Self {
             card,
@@ -38,6 +39,7 @@ impl GameState {
         }
     }
 
+    #[must_use]
     pub fn multiplier(&self) -> usize {
         match self.difficulty {
             Difficulty::Hard => 3,
@@ -46,10 +48,12 @@ impl GameState {
         }
     }
 
+    #[must_use]
     pub fn guesses(&self) -> usize {
         self.guess_number
     }
 
+    #[must_use]
     pub fn max_guesses(&self) -> usize {
         match self.difficulty {
             Difficulty::Hard => 4,
@@ -58,14 +62,17 @@ impl GameState {
         }
     }
 
+    #[must_use]
     pub fn difficulty(&self) -> &Difficulty {
         &self.difficulty
     }
 
+    #[must_use]
     pub fn card(&self) -> &Card {
         &self.card
     }
 
+    #[must_use]
     pub fn number_of_guesses(&self) -> usize {
         self.guess_number
     }
@@ -81,7 +88,7 @@ pub async fn fetch<C: Cache + Send + Sync>(id: String, cache: &C) -> Option<Game
     match ron::from_str::<GameState>(&game_state_string) {
         Ok(game_state) => Some(game_state),
         Err(why) => {
-            log::warn!("Couldn't parse game state: {}", why);
+            log::warn!("Couldn't parse game state: {why}");
             None
         }
     }
@@ -89,7 +96,7 @@ pub async fn fetch<C: Cache + Send + Sync>(id: String, cache: &C) -> Option<Game
 
 pub async fn delete<C: Cache + Send + Sync>(id: String, cache: &C) {
     if let Err(why) = cache.delete(id).await {
-        log::warn!("Error deleting key from redis the response: {:?}", why);
+        log::warn!("Error deleting key from redis the response: {why:?}");
     };
 }
 
@@ -97,12 +104,12 @@ pub async fn add<C: Cache + Send + Sync>(game_state: &GameState, id: String, cac
     let ron_string = match ron::to_string(&game_state) {
         Ok(ron_string) => ron_string,
         Err(err) => {
-            log::warn!("Error converting game state to string: {}", err);
+            log::warn!("Error converting game state to string: {err}");
             return;
         }
     };
 
     if let Err(why) = cache.set(id, ron_string).await {
-        log::warn!("Error while trying to set value in redis: {}", why);
+        log::warn!("Error while trying to set value in redis: {why}");
     };
 }

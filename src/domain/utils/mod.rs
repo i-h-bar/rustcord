@@ -1,4 +1,4 @@
-pub(crate) mod fuzzy;
+pub mod fuzzy;
 pub mod mutex;
 
 use regex::Regex;
@@ -29,6 +29,7 @@ pub struct RegexCollection {
     pub reminder_text: Regex,
 }
 
+#[must_use]
 pub fn normalise(name: &str) -> String {
     REGEX_COLLECTION
         .punctuation_removal

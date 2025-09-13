@@ -42,31 +42,31 @@ where
 
     async fn ready(&self, ctx: Context, _: Ready) {
         if let Err(err) = Command::create_global_command(&ctx, play::register()).await {
-            log::warn!("Could not create command {:?}", err);
+            log::warn!("Could not create command {err:?}");
         } else {
             log::info!("Created play command");
         }
 
         if let Err(err) = Command::create_global_command(&ctx, guess::register()).await {
-            log::warn!("Could not create command {:?}", err);
+            log::warn!("Could not create command {err:?}");
         } else {
             log::info!("Created guess command");
         }
 
         if let Err(err) = Command::create_global_command(&ctx, help::register()).await {
-            log::warn!("Could not create command {:?}", err);
+            log::warn!("Could not create command {err:?}");
         } else {
             log::info!("Created help command");
         }
 
         if let Err(err) = Command::create_global_command(&ctx, search::register()).await {
-            log::warn!("Could not create command {:?}", err);
+            log::warn!("Could not create command {err:?}");
         } else {
             log::info!("Created search command");
         }
 
         if let Err(err) = Command::create_global_command(&ctx, give_up::register()).await {
-            log::warn!("Could not create command {:?}", err);
+            log::warn!("Could not create command {err:?}");
         } else {
             log::info!("Created give_up command");
         }
@@ -83,7 +83,7 @@ where
             log::info!(
                 "Received command: {:?} from {}",
                 command.data.name,
-                command.channel_id.to_string(),
+                command.channel_id,
             );
 
             match command.data.name.as_str() {
@@ -95,7 +95,7 @@ where
                     let query_params = match parse::options::<QueryParams>(command.data.options()) {
                         Ok(params) => params,
                         Err(err) => {
-                            log::warn!("{}", err);
+                            log::warn!("{err}");
                             return;
                         }
                     };
@@ -106,7 +106,7 @@ where
                     let options = match parse::options::<PlayOptions>(command.data.options()) {
                         Ok(options) => options,
                         Err(err) => {
-                            log::warn!("{}", err);
+                            log::warn!("{err}");
                             return;
                         }
                     };
@@ -117,7 +117,7 @@ where
                     let guess_options = match parse::options(command.data.options()) {
                         Ok(value) => value,
                         Err(err) => {
-                            log::warn!("Failed to parse guess: {}", err);
+                            log::warn!("Failed to parse guess: {err}");
                             return;
                         }
                     };

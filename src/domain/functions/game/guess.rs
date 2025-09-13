@@ -28,13 +28,16 @@ where
                 .reply(String::from("No game found in this channel :("))
                 .await
             {
-                log::warn!("couldn't create interaction: {}", why);
+                log::warn!("couldn't create interaction: {why}");
             }
             return;
         };
         game_state.add_guess();
 
-        if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75
+        if fuzzy::jaro_winkler_ascii_bitmask(
+            &normalise(&guess),
+            &game_state.card().front_normalised_name,
+        ) > 0.75
         {
             let Ok(images) = self.image_store.fetch(game_state.card()).await else {
                 log::warn!("couldn't fetch image");
@@ -42,7 +45,7 @@ where
             };
 
             if let Err(why) = interaction.send_win_message(game_state, images).await {
-                log::warn!("couldn't send win message: {}", why);
+                log::warn!("couldn't send win message: {why}");
             }
 
             state::delete(interaction.id(), &self.cache).await;
@@ -54,7 +57,7 @@ where
 
             state::delete(interaction.id(), &self.cache).await;
             if let Err(why) = interaction.game_failed_message(game_state, images).await {
-                log::warn!("couldn't send game failed message: {}", why);
+                log::warn!("couldn't send game failed message: {why}");
             }
         } else {
             state::add(&game_state, interaction.id(), &self.cache).await;
@@ -66,7 +69,7 @@ where
                 .send_guess_wrong_message(game_state, images, guess)
                 .await
             {
-                log::warn!("couldn't send guess wrong message: {}", why);
+                log::warn!("couldn't send guess wrong message: {why}");
             }
         }
     }

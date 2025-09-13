@@ -2,7 +2,7 @@ mod queries;
 
 use crate::adapters::card_store::postgres::queries::{
     FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS,
-    FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
+    FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD, RANDOM_SET_CARD,
 };
 use crate::adapters::card_store::CardStore;
 use crate::domain::card::Card;
@@ -18,7 +18,7 @@ pub struct Postgres {
 
 #[async_trait]
 impl CardStore for Postgres {
-    async fn new() -> Self {
+    async fn create() -> Self {
         let uri = env::var("PSQL_URI").expect("Postgres uri wasn't in env vars");
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -112,10 +112,8 @@ impl CardStore for Postgres {
     }
 
     async fn random_card_from_set(&self, set_name: &str) -> Option<Card> {
-        match sqlx::query(&format!(
-            r"select * from set_{} where front_illustration_id is not null order by random() limit 1;",
-            set_name.replace(' ', "_")
-        ))
+        match sqlx::query(RANDOM_SET_CARD)
+            .bind(set_name)
             .fetch_one(&self.pool)
             .await
         {
