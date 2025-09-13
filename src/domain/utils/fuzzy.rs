@@ -2,54 +2,31 @@ use std::cmp::Ordering;
 use std::io::Bytes;
 use std::str::Chars;
 
-pub trait ToChars {
-    fn to_chars(&self) -> Chars<'_>;
+pub trait ToBytes {
+    fn to_bytes(&self) -> Vec<u8>;
 }
 
-impl ToChars for str {
-    fn to_chars(&self) -> Chars<'_> {
-        self.chars()
+impl ToBytes for &str {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
     }
 }
 
-impl ToChars for &str {
-    fn to_chars(&self) -> Chars<'_> {
-        self.chars()
+impl ToBytes for String {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
     }
 }
-
-impl ToChars for &String {
-    fn to_chars(&self) -> Chars<'_> {
-        self.chars()
-    }
-}
-
-impl ToChars for String {
-    fn to_chars(&self) -> Chars<'_> {
-        self.chars()
-    }
-}
-
-impl ToChars for Box<str> {
-    fn to_chars(&self) -> Chars<'_> {
-        self.chars()
-    }
-}
-
 
 #[allow(clippy::cast_precision_loss)]
-pub fn jaro_winkler_ascii_bitmask(a: &str, b: &str) -> Option<f32> {
-    let a_chars = a.bytes().collect::<Vec<u8>>();
-    let b_chars = b.bytes().collect::<Vec<u8>>();
+pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, b: &B) -> f32 {
+    let a_chars = a.to_bytes();
+    let b_chars = b.to_bytes();
     let len_a = a_chars.len();
     let len_b = b_chars.len();
 
-    if len_a > 64 || len_b > 64 {
-        return None;
-    }
-
     if a == b {
-        return Some(1.0);
+        return 1.0;
     }
 
     let max_dist = (len_a.max(len_b) / 2).saturating_sub(1);
@@ -72,7 +49,7 @@ pub fn jaro_winkler_ascii_bitmask(a: &str, b: &str) -> Option<f32> {
     }
 
     if matches == 0.0 {
-        return Some(0.0);
+        return 0.0;
     }
 
     let mut transpositions = 0.0;
@@ -108,68 +85,12 @@ pub fn jaro_winkler_ascii_bitmask(a: &str, b: &str) -> Option<f32> {
     let prefix_len = (prefix_len as usize).min(4) as f32;
     let scaling_factor = 0.1;
 
-    Some(jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity)))
-}
-
-#[allow(clippy::cast_precision_loss)]
-pub fn jaro_winkler<A: PartialEq<B> + ToChars, B: ToChars>(a: &A, b: &B) -> f32 {
-    if a == b {
-        return 1.0;
-    }
-
-    let a: Vec<char> = a.to_chars().collect();
-    let b: Vec<char> = b.to_chars().collect();
-    let len_a = a.len();
-    let len_b = b.len();
-    let max_dist = (len_a.max(len_b) / 2) - 1;
-    let mut matches = 0;
-    let mut hash_a: Vec<u8> = vec![0; len_a];
-    let mut hash_b: Vec<u8> = vec![0; len_b];
-
-    for i in 0..len_a {
-        let i_isize = i32::try_from(i).unwrap_or_default();
-        let max_isize = i32::try_from(max_dist).unwrap_or_default();
-        #[allow(clippy::cast_sign_loss)]
-        for j in 0.max(i_isize - max_isize) as usize..len_b.min(i + max_dist + 1) {
-            if a[i] == b[j] && hash_b[j] == 0 {
-                hash_a[i] = 1;
-                hash_b[j] = 1;
-                matches += 1;
-                break;
-            }
-        }
-    }
-
-    if matches == 0 {
-        return 0.0;
-    }
-
-    let mut t = 0;
-    let mut point = 0;
-
-    for i in 0..len_a {
-        if hash_a[i] != 0 {
-            while hash_b[point] == 0 {
-                point += 1;
-            }
-
-            if a[i] != b[point] {
-                t += 1;
-            }
-            point += 1;
-        }
-    }
-
-    let t = t / 2;
-
-    let match_diff = (matches - t) as f32;
-    let matches = matches as f32;
-    (matches / len_a as f32 + matches / len_b as f32 + match_diff / matches) / 3.0
+    jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity))
 }
 
 pub fn winkliest_match<
-    A: PartialEq<B> + ToChars,
-    B: ToChars,
+    A: PartialEq<B> + ToBytes,
+    B: ToBytes,
     I: AsRef<[B]> + IntoIterator<Item = B>,
 >(
     target: &A,
@@ -178,7 +99,7 @@ pub fn winkliest_match<
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let distance = jaro_winkler(target, &needle);
+            let distance = jaro_winkler_ascii_bitmask(target, &needle);
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
@@ -195,18 +116,9 @@ mod tests {
         let a = "CRATE";
         let b = "TRACE";
 
-        let answer = jaro_winkler_ascii_bitmask(a, b);
-        assert!(answer.is_some());
+        let answer = jaro_winkler_ascii_bitmask(&a, &b);
 
-        assert_eq!(answer.unwrap(), 0.73333335)
-    }
-
-    #[test]
-    fn test_jaro_winkler() {
-        let a = "CRATE";
-        let b = "TRACE";
-
-        assert_eq!(jaro_winkler(&a, &b), 0.73333335)
+        assert_eq!(answer, 0.73333335)
     }
 
     #[test]

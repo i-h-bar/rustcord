@@ -7,11 +7,7 @@ fn bench(c: &mut Criterion) {
     let sentence_2 = "another long sentence";
 
     c.bench_function("Bitmask JW", |b: &mut Bencher| {
-        b.iter(|| fuzzy::jaro_winkler_ascii_bitmask(sentence_1, sentence_2))
-    });
-
-    c.bench_function("Standard JW", |b: &mut Bencher| {
-        b.iter(|| fuzzy::jaro_winkler(&sentence_1, &sentence_2))
+        b.iter(|| fuzzy::jaro_winkler_ascii_bitmask(&sentence_1, &sentence_2))
     });
 }
 

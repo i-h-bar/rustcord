@@ -34,7 +34,7 @@ where
         };
         game_state.add_guess();
 
-        if fuzzy::jaro_winkler(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75
+        if fuzzy::jaro_winkler_ascii_bitmask(&normalise(&guess), &game_state.card().front_normalised_name) > 0.75
         {
             let Ok(images) = self.image_store.fetch(game_state.card()).await else {
                 log::warn!("couldn't fetch image");
