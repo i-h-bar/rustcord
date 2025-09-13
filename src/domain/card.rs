@@ -2,7 +2,6 @@ use crate::domain::search::CardAndImage;
 use crate::domain::utils::fuzzy::ToBytes;
 use crate::ports::clients::MessageInteraction;
 use serde::{Deserialize, Serialize};
-use std::str::Chars;
 use uuid::Uuid;
 
 #[cfg_attr(test, derive(Clone, PartialEq))]
@@ -73,8 +72,8 @@ impl Card {
 }
 
 impl ToBytes for Card {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.front_name.as_bytes().to_vec()
+    fn to_bytes(&self) -> &[u8] {
+        self.front_name.as_bytes()
     }
 }
 

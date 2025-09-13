@@ -29,6 +29,6 @@ pub trait ImageStore {
 }
 
 #[must_use]
-pub async fn init_image_store() -> impl ImageStore {
+pub fn init_image_store() -> impl ImageStore {
     FileSystem::create()
 }

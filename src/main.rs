@@ -22,8 +22,8 @@ async fn main() {
 
     env_logger::init();
     let card_store = init_card_store().await;
-    let image_store = init_image_store().await;
-    let cache = init_cache().await;
+    let image_store = init_image_store();
+    let cache = init_cache();
 
     let app = App::new(image_store, card_store, cache);
     let mut client = create_client(app).await;

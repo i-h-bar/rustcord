@@ -1,20 +1,18 @@
 use std::cmp::Ordering;
-use std::io::Bytes;
-use std::str::Chars;
 
 pub trait ToBytes {
-    fn to_bytes(&self) -> Vec<u8>;
+    fn to_bytes(&self) -> &[u8];
 }
 
 impl ToBytes for &str {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
+    fn to_bytes(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
 impl ToBytes for String {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
+    fn to_bytes(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
@@ -34,12 +32,12 @@ pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, 
     let mut hash_a: u64 = 0;
     let mut hash_b: u64 = 0;
 
-    for i in 0..len_a {
+    for (i, a_char) in a_chars.iter().enumerate().take(len_a) {
         let start = i.saturating_sub(max_dist);
         let end = (i + max_dist + 1).min(len_b);
 
-        for j in start..end {
-            if (hash_b & (1 << j)) == 0 && a_chars[i] == b_chars[j] {
+        for (j, b_char) in b_chars.iter().enumerate().take(end).skip(start) {
+            if (hash_b & (1 << j)) == 0 && a_char == b_char {
                 hash_a |= 1 << i;
                 hash_b |= 1 << j;
                 matches += 1.0;
@@ -55,26 +53,25 @@ pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, 
     let mut transpositions = 0.0;
     let mut b_ptr = 0;
 
-    for i in 0..len_a {
+    for (i, &a_char) in a_chars.iter().enumerate().take(len_a) {
         if (hash_a & (1 << i)) != 0 {
             while (hash_b & (1 << b_ptr)) == 0 {
                 b_ptr += 1;
             }
-            if a_chars[i] != b_chars[b_ptr] {
+            if a_char != b_chars[b_ptr] {
                 transpositions += 1.0;
             }
             b_ptr += 1;
         }
     }
 
-    let jaro_similarity = (1.0 / 3.0) * (
-        matches / len_a as f32 +
-            matches / len_b as f32 +
-            (matches - transpositions / 2.0) / matches
-    );
+    let jaro_similarity = (1.0 / 3.0)
+        * (matches / len_a as f32
+            + matches / len_b as f32
+            + (matches - transpositions / 2.0) / matches);
 
     let mut prefix_len = 0;
-    for (c1, c2) in a_chars.into_iter().zip(b_chars) {
+    for (c1, c2) in a_chars.iter().zip(b_chars) {
         if c1 == c2 {
             prefix_len += 1;
         } else {
@@ -82,6 +79,7 @@ pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, 
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     let prefix_len = (prefix_len as usize).min(4) as f32;
     let scaling_factor = 0.1;
 

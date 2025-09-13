@@ -221,7 +221,6 @@ order by random()
 limit 1;
 ";
 
-
 pub const RANDOM_SET_CARD: &str = r"
 select set.id                     as set_id,
        front.id                   as front_id,

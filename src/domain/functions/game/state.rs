@@ -30,6 +30,7 @@ pub struct GameState {
 }
 
 impl GameState {
+    #[must_use]
     pub fn from(card: Card, difficulty: Difficulty) -> Self {
         Self {
             card,
@@ -38,6 +39,7 @@ impl GameState {
         }
     }
 
+    #[must_use]
     pub fn multiplier(&self) -> usize {
         match self.difficulty {
             Difficulty::Hard => 3,
@@ -46,10 +48,12 @@ impl GameState {
         }
     }
 
+    #[must_use]
     pub fn guesses(&self) -> usize {
         self.guess_number
     }
 
+    #[must_use]
     pub fn max_guesses(&self) -> usize {
         match self.difficulty {
             Difficulty::Hard => 4,
@@ -58,14 +62,17 @@ impl GameState {
         }
     }
 
+    #[must_use]
     pub fn difficulty(&self) -> &Difficulty {
         &self.difficulty
     }
 
+    #[must_use]
     pub fn card(&self) -> &Card {
         &self.card
     }
 
+    #[must_use]
     pub fn number_of_guesses(&self) -> usize {
         self.guess_number
     }

@@ -21,7 +21,14 @@ pub struct NamedGuard<'a> {
     _guard: MutexGuard<'a, ()>,
 }
 
+impl Default for LockByName {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LockByName {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),

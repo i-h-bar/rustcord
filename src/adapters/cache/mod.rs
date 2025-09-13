@@ -20,6 +20,7 @@ pub trait Cache {
     async fn delete(&self, key: String) -> Result<(), CacheError>;
 }
 
-pub async fn init_cache() -> impl Cache {
+#[must_use]
+pub fn init_cache() -> impl Cache {
     Redis::create()
 }
