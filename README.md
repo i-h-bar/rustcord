@@ -1,6 +1,10 @@
 
 # A Magic the Gathering Card Fetching Bot
 
+![Tests](https://img.shields.io/badge/tests-60%20passing-brightgreen)
+[![codecov](https://codecov.io/gh/i-h-bar/rustcord/branch/main/graph/badge.svg)](https://codecov.io/gh/i-h-bar/rustcord)
+![Build](https://github.com/i-h-bar/rustcord/workflows/Test%20Coverage/badge.svg)
+
 ## Invite:
 https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277025507328&integration_type=0&scope=bot
 
