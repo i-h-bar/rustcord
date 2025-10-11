@@ -225,7 +225,9 @@ mod tests {
         let params = QueryParams::from(&captures).unwrap();
 
         assert_eq!(params.name(), "card name");
-        assert_eq!(params.set_name(), Some(&"core".to_string()));
+        // "core" is 4 chars, so it's treated as a set code
+        assert_eq!(params.set_code(), Some(&"core".to_string()));
+        assert_eq!(params.set_name(), None);
     }
 
     #[test]
