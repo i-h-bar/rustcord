@@ -294,4 +294,13 @@ mod tests {
 
         assert!(captures.is_none());
     }
+
+    #[test]
+    fn test_query_params_set_no_whitespace() {
+        let text = "[[card|set=Core Set 2021]]";
+        let captures = REGEX_COLLECTION.cards.captures(text).unwrap();
+        let params = QueryParams::from(&captures).unwrap();
+
+        assert_eq!(params.set_name(), Some(&"core set 2021".to_string()));
+    }
 }
