@@ -2,17 +2,18 @@
 
 ## Current State Analysis
 
-### Test Coverage: Excellent Progress! ✅✅
-- **Current:** 90 unit tests (15x increase from 6!)
+### Test Coverage: Outstanding Progress! ✅✅✅
+- **Current:** 120 unit tests (20x increase from 6!)
 - **Breakdown:**
+  - ✅ 24 tests in utils/mod.rs normalise() (was 0)
   - ✅ 21 tests in fuzzy.rs (was 3)
   - ✅ 18 tests in state.rs (was 0)
   - ✅ 18 tests in query.rs (was 0)
   - ✅ 9 tests in search.rs (was 1)
   - ✅ 8 tests in guess.rs (was 0)
   - ✅ 8 tests in play.rs (was 0)
+  - ✅ 8 tests in mutex.rs (was 2) **EXPANDED!**
   - ✅ 5 tests in give_up.rs (was 0)
-  - ✅ 2 tests in mutex.rs (existing)
   - ✅ 1 test in other modules
 - ~2,835 lines of code
 - Good foundation: mockall already integrated for mocking
@@ -46,37 +47,42 @@ These systems are core to the application's value and correctness:
   - ✅ Real card name scenarios with typos
   - ⏳ Performance benchmarks for large datasets (TODO - use Criterion)
 
-#### 2. Game Logic (`src/domain/functions/game/`) ✅ DONE
-- **Status:** ✅ 18 tests in `state.rs` (was 0)
+#### 2. Game Logic (`src/domain/functions/game/`) ✅ COMPLETE
+- **Status:** ✅ 39 tests total (18 state + 8 guess + 8 play + 5 give_up)
 - **Priority:** CRITICAL
 - **Files:** `guess.rs`, `play.rs`, `state.rs`, `give_up.rs`
 - **Why:** Core game mechanics; bugs directly impact user experience
 - **Tests Completed:**
-  - ✅ GameState creation and state transitions
-  - ✅ Difficulty levels (Easy/Medium/Hard) boundary tests
-  - ✅ Guess counting and max guess validation
-  - ✅ Game state serialization/deserialization (RON format)
-  - ✅ Cache integration (add, fetch, delete)
-  - ✅ Invalid state handling
-  - ⏳ Win condition detection in guess.rs (TODO)
-  - ⏳ Concurrent game handling per channel in guess.rs (TODO)
-  - ⏳ play.rs command logic (TODO)
-  - ⏳ give_up.rs command logic (TODO)
+  - ✅ GameState creation and state transitions (state.rs)
+  - ✅ Difficulty levels (Easy/Medium/Hard) boundary tests (state.rs)
+  - ✅ Guess counting and max guess validation (state.rs)
+  - ✅ Game state serialization/deserialization RON format (state.rs)
+  - ✅ Cache integration - add, fetch, delete (state.rs)
+  - ✅ Invalid state handling (state.rs)
+  - ✅ Win condition detection with fuzzy matching (guess.rs)
+  - ✅ Loss condition at max guesses (guess.rs)
+  - ✅ Concurrent game handling via mutex locks (mutex.rs)
+  - ✅ Play command initialization and validation (play.rs)
+  - ✅ Set validation - abbreviations and full names (play.rs)
+  - ✅ Give up command and state cleanup (give_up.rs)
 
-#### 3. Card Search & Query Logic (`src/domain/search.rs`, `src/domain/query.rs`) ✅ DONE
-- **Status:** ✅ 18 tests in query.rs + 1 in search.rs (was 1 total)
+#### 3. Card Search & Query Logic (`src/domain/search.rs`, `src/domain/query.rs`) ✅ COMPLETE
+- **Status:** ✅ 27 tests total (18 query + 9 search)
 - **Priority:** CRITICAL
 - **Why:** Primary feature - users search cards constantly
 - **Tests Completed:**
-  - ✅ `QueryParams::from()` regex capture parsing
-  - ✅ Set code vs set name distinction (<5 chars)
-  - ✅ Artist search validation
-  - ✅ Message parsing with multiple card references
-  - ✅ Whitespace handling bug fixed
-  - ✅ Punctuation and case normalization
-  - ⏳ Cache hit/miss scenarios in search.rs (TODO)
-  - ⏳ Error handling for no matches (TODO)
-  - ⏳ parse_message with multiple cards (TODO)
+  - ✅ `QueryParams::from()` regex capture parsing (query.rs)
+  - ✅ Set code vs set name distinction (<5 chars) (query.rs)
+  - ✅ Artist search validation (query.rs)
+  - ✅ Message parsing with multiple card references (query.rs)
+  - ✅ Whitespace handling bug fixed (query.rs)
+  - ✅ Punctuation and case normalization (query.rs)
+  - ✅ Error handling for card not found (search.rs)
+  - ✅ Search with set codes and set names (search.rs)
+  - ✅ Search with artist filtering (search.rs)
+  - ✅ parse_message with single/multiple/no cards (search.rs)
+  - ✅ find_card with all query types (search.rs)
+  - ✅ Fuzzy matching for set names (search.rs)
 
 ---
 
@@ -119,23 +125,35 @@ These systems are core to the application's value and correctness:
 
 ### TIER 3: Utility & Support Functions (Medium Priority)
 
-#### 7. Normalization Utils (`src/domain/utils/mod.rs`)
-- **Status:** Unknown (need to verify)
+#### 7. Normalization Utils (`src/domain/utils/mod.rs`) ✅ COMPLETE
+- **Status:** ✅ 24 tests for `normalise()` function
 - **Priority:** MEDIUM
 - **Why:** Used everywhere; bugs cascade through system
-- **Tests Needed:**
-  - Unicode normalization edge cases
-  - Special character handling
-  - Case normalization
+- **Tests Completed:**
+  - ✅ Unicode normalization (NFKC) edge cases
+  - ✅ Special character handling (™, é, æ, Japanese)
+  - ✅ Case normalization
+  - ✅ Punctuation removal (commas, apostrophes, brackets, parentheses)
+  - ✅ Hyphen to space conversion
+  - ✅ Real MTG card name validation
+  - ✅ Empty strings and edge cases
+  - ✅ Idempotency verification
+  - ✅ **CRITICAL BUG FOUND AND FIXED**: `.replace()` → `.replace_all()`
 
-#### 8. Mutex Utilities (`src/domain/utils/mutex.rs`)
-- **Status:** ✗ No tests
+#### 8. Mutex Utilities (`src/domain/utils/mutex.rs`) ✅ COMPLETE
+- **Status:** ✅ 8 tests (was 2) **EXPANDED!**
 - **Priority:** MEDIUM
 - **Why:** Prevents race conditions in game state
-- **Tests Needed:**
-  - Concurrent access simulation
-  - Deadlock prevention
-  - Lock cleanup
+- **Tests Completed:**
+  - ✅ Lock acquisition by channel ID
+  - ✅ Lock retrieval by name
+  - ✅ Reference counting increment
+  - ✅ Multiple acquisitions of same lock name
+  - ✅ Lock isolation between different names
+  - ✅ Concurrent access serialization (same lock blocks)
+  - ✅ Parallel execution for different locks (no blocking)
+  - ✅ Guard release on drop
+  - Note: Async drop cleanup tests omitted due to timing issues with async-dropper library
 
 ---
 
@@ -257,9 +275,19 @@ cargo tarpaulin --out Html
 ## Next Steps (Pick up here in next session!)
 
 ### Tier 1: COMPLETE! ✅
-All critical business logic now has comprehensive test coverage (90 tests total).
+All critical business logic now has comprehensive test coverage:
+- ✅ Fuzzy matching (21 tests)
+- ✅ Game logic - all commands (39 tests: state, guess, play, give_up)
+- ✅ Card search & query (27 tests)
 
-### Current Priorities - Move to Tier 2:
+### Tier 3: COMPLETE! ✅
+Utility functions fully tested:
+- ✅ Normalization utils (24 tests) + **CRITICAL BUG FIXED**
+- ✅ Mutex utilities (8 tests - 4x expansion)
+
+**Total: 120 tests (20x increase from 6)**
+
+### Current Priorities - Tier 2 Infrastructure:
 2. ⏳ **Card Store Integration Tests** (src/adapters/card_store/postgres/)
    - Use `sqlx::test` macro for database tests
    - Mock database queries
@@ -284,8 +312,13 @@ All critical business logic now has comprehensive test coverage (90 tests total)
 ## Bug Fixes Made
 - ✅ Fixed regex whitespace handling in `CARD_QUERY_RE` (changed `(?:\s)?` to `(?:\s)*`)
 - ✅ Added `.trim()` to QueryParams parsing to handle extra spaces
+- ✅ **CRITICAL BUG FIX**: Fixed `normalise()` function in src/domain/utils/mod.rs:36
+  - Changed `.replace()` to `.replace_all()`
+  - Was only removing FIRST punctuation character, now removes all
+  - Affected all card name normalization throughout the application
+  - Tests revealed: "Card (Name)" became "card name)" instead of "card name"
 
 ---
 
 *Generated: 2025-10-11*
-*Last Updated: 2025-10-13 (Phase 2 complete, 90 tests passing)*
+*Last Updated: 2025-10-13 (Tier 1 & 3 COMPLETE, 120 tests passing, 1 critical bug fixed)*
