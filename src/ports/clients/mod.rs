@@ -25,6 +25,7 @@ pub trait MessageInteraction {
     async fn reply(&self, message: String) -> Result<(), MessageInterationError>;
 }
 
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait GameInteraction {
     async fn send_guess_wrong_message(

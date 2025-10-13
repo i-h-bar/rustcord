@@ -165,4 +165,431 @@ mod tests {
 
         app.search(&interaction, query.clone()).await;
     }
+
+    #[tokio::test]
+    async fn test_search_card_not_found() {
+        let query = QueryParams::from_test(String::from("nonexistent card"), None, None, None);
+
+        let image_store = MockImageStore::new();
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search()
+            .times(1)
+            .with(eq(query.name().clone()))
+            .return_const(None);
+
+        let cache = MockCache::new();
+        let mut interaction = MockMessageInteraction::new();
+        interaction
+            .expect_reply()
+            .times(1)
+            .with(eq(String::from("Could not find card :(")))
+            .return_const(Ok(()));
+
+        let app = App::new(image_store, card_store, cache);
+
+        app.search(&interaction, query.clone()).await;
+    }
+
+    #[tokio::test]
+    async fn test_search_with_set_code() {
+        let query = QueryParams::from_test(
+            String::from("lightning bolt"),
+            None,
+            None,
+            Some(String::from("LEA")),
+        );
+        let card = Card {
+            front_name: "Lightning Bolt".to_string(),
+            front_normalised_name: "lightning bolt".to_string(),
+            front_scryfall_url: "https://scryfall.com/card/test".to_string(),
+            front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
+            front_mana_cost: "{R}".to_string(),
+            front_colour_identity: vec!["R".to_string()],
+            front_power: None,
+            front_toughness: None,
+            front_loyalty: None,
+            front_defence: None,
+            front_type_line: "Instant".to_string(),
+            front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
+            back_name: None,
+            back_scryfall_url: None,
+            back_image_id: None,
+            back_illustration_id: None,
+            back_mana_cost: None,
+            back_colour_identity: None,
+            back_power: None,
+            back_toughness: None,
+            back_loyalty: None,
+            back_defence: None,
+            back_type_line: None,
+            back_oracle_text: None,
+            artist: "Christopher Rush".to_string(),
+            set_name: "Limited Edition Alpha".to_string(),
+        };
+        let images = Images {
+            front: vec![1, 2, 3, 4],
+            back: None,
+        };
+
+        let mut image_store = MockImageStore::new();
+        image_store
+            .expect_fetch()
+            .times(1)
+            .return_const(Ok(images.clone()));
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_set_name_from_abbreviation()
+            .times(1)
+            .with(eq("LEA"))
+            .return_const(Some("Limited Edition Alpha".to_string()));
+        card_store
+            .expect_search_set()
+            .times(1)
+            .with(eq("Limited Edition Alpha"), eq(query.name().clone()))
+            .return_const(Some(vec![card.clone()]));
+
+        let cache = MockCache::new();
+        let mut interaction = MockMessageInteraction::new();
+        interaction
+            .expect_send_card()
+            .times(1)
+            .return_const(Ok(()));
+
+        let app = App::new(image_store, card_store, cache);
+
+        app.search(&interaction, query.clone()).await;
+    }
+
+    #[tokio::test]
+    async fn test_search_with_artist() {
+        let query = QueryParams::from_test(
+            String::from("lightning bolt"),
+            Some(String::from("Christopher Rush")),
+            None,
+            None,
+        );
+        let card = Card {
+            front_name: "Lightning Bolt".to_string(),
+            front_normalised_name: "lightning bolt".to_string(),
+            front_scryfall_url: "https://scryfall.com/card/test".to_string(),
+            front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
+            front_mana_cost: "{R}".to_string(),
+            front_colour_identity: vec!["R".to_string()],
+            front_power: None,
+            front_toughness: None,
+            front_loyalty: None,
+            front_defence: None,
+            front_type_line: "Instant".to_string(),
+            front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
+            back_name: None,
+            back_scryfall_url: None,
+            back_image_id: None,
+            back_illustration_id: None,
+            back_mana_cost: None,
+            back_colour_identity: None,
+            back_power: None,
+            back_toughness: None,
+            back_loyalty: None,
+            back_defence: None,
+            back_type_line: None,
+            back_oracle_text: None,
+            artist: "Christopher Rush".to_string(),
+            set_name: "Limited Edition Alpha".to_string(),
+        };
+        let images = Images {
+            front: vec![1, 2, 3, 4],
+            back: None,
+        };
+
+        let mut image_store = MockImageStore::new();
+        image_store
+            .expect_fetch()
+            .times(1)
+            .return_const(Ok(images.clone()));
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search_artist()
+            .times(1)
+            .with(eq("Christopher Rush"), eq(query.name().clone()))
+            .return_const(Some(vec![card.clone()]));
+
+        let cache = MockCache::new();
+        let mut interaction = MockMessageInteraction::new();
+        interaction
+            .expect_send_card()
+            .times(1)
+            .return_const(Ok(()));
+
+        let app = App::new(image_store, card_store, cache);
+
+        app.search(&interaction, query.clone()).await;
+    }
+
+    #[tokio::test]
+    async fn test_parse_message_single_card() {
+        let card = Card {
+            front_name: "Lightning Bolt".to_string(),
+            front_normalised_name: "lightning bolt".to_string(),
+            front_scryfall_url: "https://scryfall.com/card/test".to_string(),
+            front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
+            front_mana_cost: "{R}".to_string(),
+            front_colour_identity: vec!["R".to_string()],
+            front_power: None,
+            front_toughness: None,
+            front_loyalty: None,
+            front_defence: None,
+            front_type_line: "Instant".to_string(),
+            front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
+            back_name: None,
+            back_scryfall_url: None,
+            back_image_id: None,
+            back_illustration_id: None,
+            back_mana_cost: None,
+            back_colour_identity: None,
+            back_power: None,
+            back_toughness: None,
+            back_loyalty: None,
+            back_defence: None,
+            back_type_line: None,
+            back_oracle_text: None,
+            artist: "Christopher Rush".to_string(),
+            set_name: "Limited Edition Alpha".to_string(),
+        };
+        let images = Images {
+            front: vec![1, 2, 3, 4],
+            back: None,
+        };
+
+        let mut image_store = MockImageStore::new();
+        image_store
+            .expect_fetch()
+            .times(1)
+            .return_const(Ok(images.clone()));
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search()
+            .times(1)
+            .with(eq("lightning bolt"))
+            .return_const(Some(vec![card.clone()]));
+
+        let cache = MockCache::new();
+        let app = App::new(image_store, card_store, cache);
+
+        let results = app.parse_message("Check out [[Lightning Bolt]]!").await;
+
+        assert_eq!(results.len(), 1);
+        assert!(results[0].is_some());
+        if let Some((found_card, _)) = &results[0] {
+            assert_eq!(found_card.front_name, "Lightning Bolt");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_parse_message_multiple_cards() {
+        let bolt_card = Card {
+            front_name: "Lightning Bolt".to_string(),
+            front_normalised_name: "lightning bolt".to_string(),
+            front_scryfall_url: "https://scryfall.com/card/test1".to_string(),
+            front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
+            front_mana_cost: "{R}".to_string(),
+            front_colour_identity: vec!["R".to_string()],
+            front_power: None,
+            front_toughness: None,
+            front_loyalty: None,
+            front_defence: None,
+            front_type_line: "Instant".to_string(),
+            front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
+            back_name: None,
+            back_scryfall_url: None,
+            back_image_id: None,
+            back_illustration_id: None,
+            back_mana_cost: None,
+            back_colour_identity: None,
+            back_power: None,
+            back_toughness: None,
+            back_loyalty: None,
+            back_defence: None,
+            back_type_line: None,
+            back_oracle_text: None,
+            artist: "Christopher Rush".to_string(),
+            set_name: "Limited Edition Alpha".to_string(),
+        };
+
+        let giant_card = Card {
+            front_name: "Giant Growth".to_string(),
+            front_normalised_name: "giant growth".to_string(),
+            front_scryfall_url: "https://scryfall.com/card/test2".to_string(),
+            front_image_id: uuid!("22345678-1234-1234-1234-123456789012"),
+            front_illustration_id: Some(uuid!("22345678-1234-1234-1234-123456789013")),
+            front_mana_cost: "{G}".to_string(),
+            front_colour_identity: vec!["G".to_string()],
+            front_power: None,
+            front_toughness: None,
+            front_loyalty: None,
+            front_defence: None,
+            front_type_line: "Instant".to_string(),
+            front_oracle_text: "Target creature gets +3/+3 until end of turn.".to_string(),
+            back_name: None,
+            back_scryfall_url: None,
+            back_image_id: None,
+            back_illustration_id: None,
+            back_mana_cost: None,
+            back_colour_identity: None,
+            back_power: None,
+            back_toughness: None,
+            back_loyalty: None,
+            back_defence: None,
+            back_type_line: None,
+            back_oracle_text: None,
+            artist: "Mark Poole".to_string(),
+            set_name: "Limited Edition Alpha".to_string(),
+        };
+
+        let images = Images {
+            front: vec![1, 2, 3, 4],
+            back: None,
+        };
+
+        let mut image_store = MockImageStore::new();
+        image_store
+            .expect_fetch()
+            .times(2)
+            .returning(move |_| Ok(images.clone()));
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search()
+            .times(1)
+            .with(eq("lightning bolt"))
+            .return_const(Some(vec![bolt_card.clone()]));
+        card_store
+            .expect_search()
+            .times(1)
+            .with(eq("giant growth"))
+            .return_const(Some(vec![giant_card.clone()]));
+
+        let cache = MockCache::new();
+        let app = App::new(image_store, card_store, cache);
+
+        let results = app
+            .parse_message("I love [[Lightning Bolt]] and [[Giant Growth]]!")
+            .await;
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].is_some());
+        assert!(results[1].is_some());
+    }
+
+    #[tokio::test]
+    async fn test_parse_message_no_cards() {
+        let image_store = MockImageStore::new();
+        let card_store = MockCardStore::new();
+        let cache = MockCache::new();
+        let app = App::new(image_store, card_store, cache);
+
+        let results = app
+            .parse_message("This message has no card references")
+            .await;
+
+        assert_eq!(results.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_find_card_with_set_name() {
+        let query = QueryParams::from_test(
+            String::from("lightning bolt"),
+            None,
+            Some(String::from("limited edition alpha")),
+            None,
+        );
+        let card = Card {
+            front_name: "Lightning Bolt".to_string(),
+            front_normalised_name: "lightning bolt".to_string(),
+            front_scryfall_url: "https://scryfall.com/card/test".to_string(),
+            front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
+            front_mana_cost: "{R}".to_string(),
+            front_colour_identity: vec!["R".to_string()],
+            front_power: None,
+            front_toughness: None,
+            front_loyalty: None,
+            front_defence: None,
+            front_type_line: "Instant".to_string(),
+            front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
+            back_name: None,
+            back_scryfall_url: None,
+            back_image_id: None,
+            back_illustration_id: None,
+            back_mana_cost: None,
+            back_colour_identity: None,
+            back_power: None,
+            back_toughness: None,
+            back_loyalty: None,
+            back_defence: None,
+            back_type_line: None,
+            back_oracle_text: None,
+            artist: "Christopher Rush".to_string(),
+            set_name: "Limited Edition Alpha".to_string(),
+        };
+        let images = Images {
+            front: vec![1, 2, 3, 4],
+            back: None,
+        };
+
+        let mut image_store = MockImageStore::new();
+        image_store
+            .expect_fetch()
+            .times(1)
+            .return_const(Ok(images.clone()));
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search_set()
+            .times(1)
+            .with(
+                eq("limited edition alpha"),
+                eq("lightning bolt"),
+            )
+            .return_const(Some(vec![card.clone()]));
+
+        let cache = MockCache::new();
+        let app = App::new(image_store, card_store, cache);
+
+        let result = app.find_card(query).await;
+
+        assert!(result.is_some());
+        if let Some((found_card, _)) = result {
+            assert_eq!(found_card.front_name, "Lightning Bolt");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fuzzy_match_set_name() {
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search_for_set_name()
+            .times(1)
+            .with(eq("limited edition alpha"))
+            .return_const(Some(vec![
+                "Limited Edition Alpha".to_string(),
+                "Limited Edition Beta".to_string(),
+            ]));
+
+        let image_store = MockImageStore::new();
+        let cache = MockCache::new();
+        let app = App::new(image_store, card_store, cache);
+
+        let result = app.fuzzy_match_set_name("limited edition alpha").await;
+
+        assert_eq!(result, Some("Limited Edition Alpha".to_string()));
+    }
 }

@@ -2,14 +2,18 @@
 
 ## Current State Analysis
 
-### Test Coverage: Good Progress! ✅
-- **Current:** 60 unit tests (10x increase from 6!)
+### Test Coverage: Excellent Progress! ✅✅
+- **Current:** 90 unit tests (15x increase from 6!)
 - **Breakdown:**
   - ✅ 21 tests in fuzzy.rs (was 3)
   - ✅ 18 tests in state.rs (was 0)
   - ✅ 18 tests in query.rs (was 0)
-  - ✅ 1 test in search.rs (existing)
-  - ✅ 2 tests in other modules
+  - ✅ 9 tests in search.rs (was 1)
+  - ✅ 8 tests in guess.rs (was 0)
+  - ✅ 8 tests in play.rs (was 0)
+  - ✅ 5 tests in give_up.rs (was 0)
+  - ✅ 2 tests in mutex.rs (existing)
+  - ✅ 1 test in other modules
 - ~2,835 lines of code
 - Good foundation: mockall already integrated for mocking
 
@@ -157,10 +161,17 @@ These systems are core to the application's value and correctness:
 2. ✅ **Game state tests** - Cover all state transitions
 3. ✅ **Query parsing tests** - Validate regex captures
 
-### Phase 2: Core Logic (Week 3-4) ⏳ IN PROGRESS
-4. ⏳ **Game command tests** (play, guess, give_up) - state.rs done, need guess/play/give_up
-5. ⏳ **Search functionality tests** - query.rs done, need more search.rs tests
-6. ⏳ **Card store integration tests** (with test DB)
+### Phase 2: Core Logic (Week 3-4) ✅ COMPLETED
+4. ✅ **Game command tests** (play, guess, give_up) - ALL DONE
+   - ✅ guess.rs - 8 tests covering win/loss conditions, fuzzy matching, edge cases
+   - ✅ play.rs - 8 tests covering set validation, difficulties, abbreviations
+   - ✅ give_up.rs - 5 tests covering game termination, state deletion
+5. ✅ **Search functionality tests** - 9 tests in search.rs
+   - ✅ parse_message with single/multiple/no cards
+   - ✅ find_card with set codes, set names, and artists
+   - ✅ Error handling for card not found
+   - ✅ Fuzzy matching for set names
+6. ⏳ **Card store integration tests** (with test DB) - TODO
 
 ### Phase 3: Infrastructure (Week 5-6)
 7. **Cache layer tests** (mock Redis)
@@ -245,14 +256,10 @@ cargo tarpaulin --out Html
 
 ## Next Steps (Pick up here in next session!)
 
-### Immediate Priorities:
-1. ⏳ **Complete Tier 1** - Add tests for:
-   - `guess.rs` - Win/loss conditions, fuzzy match threshold
-   - `play.rs` - Command initialization, set validation
-   - `give_up.rs` - Game termination logic
-   - `search.rs` - parse_message, error handling
+### Tier 1: COMPLETE! ✅
+All critical business logic now has comprehensive test coverage (90 tests total).
 
-### Then Move to Tier 2:
+### Current Priorities - Move to Tier 2:
 2. ⏳ **Card Store Integration Tests** (src/adapters/card_store/postgres/)
    - Use `sqlx::test` macro for database tests
    - Mock database queries
@@ -281,4 +288,4 @@ cargo tarpaulin --out Html
 ---
 
 *Generated: 2025-10-11*
-*Last Updated: 2025-10-11 (Phase 1 complete, 60 tests passing)*
+*Last Updated: 2025-10-13 (Phase 2 complete, 90 tests passing)*
