@@ -18,6 +18,14 @@ mod discord;
 #[error("An error occurred while processing a message")]
 pub struct MessageInterationError(String);
 
+#[cfg(test)]
+impl MessageInterationError {
+    pub fn new(msg: String) -> Self {
+        Self(msg)
+    }
+}
+
+
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait MessageInteraction {

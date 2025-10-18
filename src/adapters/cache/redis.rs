@@ -65,3 +65,21 @@ impl Redis {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cache_error_display() {
+        let error = CacheError(String::from("Test error"));
+        assert_eq!(error.to_string(), "Error in cache operation");
+    }
+
+    #[test]
+    fn test_cache_error_debug() {
+        let error = CacheError(String::from("Test error"));
+        let debug_str = format!("{:?}", error);
+        assert!(debug_str.contains("CacheError"));
+    }
+}
