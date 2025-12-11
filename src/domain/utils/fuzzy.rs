@@ -257,11 +257,7 @@ mod tests {
     fn test_winkliest_match_exact_substring() {
         // When exact match exists, it should win
         let target = "lightning bolt";
-        let candidates = [
-            "lightning bolt",
-            "lightning strike",
-            "chain lightning",
-        ];
+        let candidates = ["lightning bolt", "lightning strike", "chain lightning"];
 
         let result = winkliest_match(&target, candidates);
         assert_eq!(result, Some("lightning bolt"));

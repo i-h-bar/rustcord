@@ -273,5 +273,4 @@ mod tests {
         let _guard = lock.lock().await;
         // If we got here without blocking, the guard was properly released
     }
-
 }

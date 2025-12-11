@@ -141,7 +141,10 @@ mod tests {
 
         assert_eq!(params.name(), "lightning bolt");
         assert_eq!(params.set_code(), None);
-        assert_eq!(params.set_name(), Some(&"bloomburrow commander".to_string()));
+        assert_eq!(
+            params.set_name(),
+            Some(&"bloomburrow commander".to_string())
+        );
         assert_eq!(params.artist(), None);
     }
 
@@ -251,7 +254,10 @@ mod tests {
         let params = QueryParams::from(&captures).unwrap();
 
         assert_eq!(params.name(), "the gitrog monster");
-        assert_eq!(params.set_name(), Some(&"bloomburrow commander".to_string()));
+        assert_eq!(
+            params.set_name(),
+            Some(&"bloomburrow commander".to_string())
+        );
     }
 
     #[test]
@@ -265,7 +271,10 @@ mod tests {
 
         assert_eq!(params.name(), "gitrog monster");
         assert_eq!(params.artist(), Some(&"jason kang".to_string()));
-        assert_eq!(params.set_name(), Some(&"shadows over innistrad".to_string()));
+        assert_eq!(
+            params.set_name(),
+            Some(&"shadows over innistrad".to_string())
+        );
         assert_eq!(params.set_code(), None);
     }
 

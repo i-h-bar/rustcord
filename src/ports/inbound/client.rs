@@ -12,13 +12,12 @@ use mockall::automock;
 #[error("An error occurred while processing a message")]
 pub struct MessageInteractionError(String);
 
-
 impl MessageInteractionError {
+    #[must_use]
     pub fn new(msg: String) -> Self {
         Self(msg)
     }
 }
-
 
 #[cfg_attr(test, automock)]
 #[async_trait]

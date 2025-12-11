@@ -231,10 +231,7 @@ mod tests {
             .returning(|_, _| Ok(()));
 
         let app = App::new(image_store, card_store, cache);
-        let options = PlayOptions::new(
-            Some("Limited Edition Alpha".to_string()),
-            Difficulty::Hard,
-        );
+        let options = PlayOptions::new(Some("Limited Edition Alpha".to_string()), Difficulty::Hard);
 
         app.play_command(&interaction, options).await;
     }

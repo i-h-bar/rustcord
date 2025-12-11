@@ -254,10 +254,7 @@ mod tests {
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
-        interaction
-            .expect_send_card()
-            .times(1)
-            .return_const(Ok(()));
+        interaction.expect_send_card().times(1).return_const(Ok(()));
 
         let app = App::new(image_store, card_store, cache);
 
@@ -321,10 +318,7 @@ mod tests {
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
-        interaction
-            .expect_send_card()
-            .times(1)
-            .return_const(Ok(()));
+        interaction.expect_send_card().times(1).return_const(Ok(()));
 
         let app = App::new(image_store, card_store, cache);
 
@@ -555,10 +549,7 @@ mod tests {
         card_store
             .expect_search_set()
             .times(1)
-            .with(
-                eq("limited edition alpha"),
-                eq("lightning bolt"),
-            )
+            .with(eq("limited edition alpha"), eq("lightning bolt"))
             .return_const(Some(vec![card.clone()]));
 
         let cache = MockCache::new();

@@ -1,5 +1,5 @@
-use crate::ports::outbound::cache::Cache;
 use crate::domain::card::Card;
+use crate::ports::outbound::cache::Cache;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -377,9 +377,6 @@ mod tests {
         assert_eq!(deserialized_state.number_of_guesses(), 2);
         assert_eq!(deserialized_state.max_guesses(), 4);
         assert_eq!(deserialized_state.multiplier(), 3);
-        assert_eq!(
-            deserialized_state.card().front_name,
-            "Lightning Bolt"
-        );
+        assert_eq!(deserialized_state.card().front_name, "Lightning Bolt");
     }
 }

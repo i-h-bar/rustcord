@@ -11,6 +11,7 @@ use std::env;
 pub struct Discord(DiscordClient);
 
 impl Discord {
+    #[allow(clippy::missing_panics_doc)]
     pub async fn new<IS, CS, C>(app: App<IS, CS, C>) -> Self
     where
         IS: ImageStore + Send + Sync + 'static,

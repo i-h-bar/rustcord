@@ -246,10 +246,7 @@ mod tests {
             let ron_string = ron::to_string(&game_state).unwrap();
 
             let mut cache = MockCache::new();
-            cache
-                .expect_get()
-                .times(1)
-                .return_const(Some(ron_string));
+            cache.expect_get().times(1).return_const(Some(ron_string));
             cache.expect_delete().times(1).returning(|_| Ok(()));
 
             let mut image_store = MockImageStore::new();

@@ -48,7 +48,10 @@ mod tests {
 
     #[test]
     fn test_normalise_with_punctuation() {
-        assert_eq!(normalise("Jace, the Mind Sculptor"), "jace the mind sculptor");
+        assert_eq!(
+            normalise("Jace, the Mind Sculptor"),
+            "jace the mind sculptor"
+        );
     }
 
     #[test]
@@ -146,7 +149,10 @@ mod tests {
     fn test_normalise_real_card_names() {
         assert_eq!(normalise("Dack Fayden"), "dack fayden");
         assert_eq!(normalise("Jace, Vryn's Prodigy"), "jace vryns prodigy");
-        assert_eq!(normalise("Emrakul, the Aeons Torn"), "emrakul the aeons torn");
+        assert_eq!(
+            normalise("Emrakul, the Aeons Torn"),
+            "emrakul the aeons torn"
+        );
     }
 
     #[test]

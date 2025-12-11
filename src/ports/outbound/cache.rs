@@ -8,8 +8,8 @@ use mockall::automock;
 #[error("Error in cache operation")]
 pub struct CacheError(String);
 
-
 impl CacheError {
+    #[must_use]
     pub fn new(msg: String) -> Self {
         Self(msg)
     }

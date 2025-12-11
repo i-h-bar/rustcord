@@ -18,6 +18,7 @@ pub struct Images {
 pub struct ImageRetrievalError(String);
 
 impl ImageRetrievalError {
+    #[must_use]
     pub fn new(msg: String) -> Self {
         Self(msg)
     }
