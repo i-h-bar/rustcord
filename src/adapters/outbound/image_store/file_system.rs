@@ -1,4 +1,4 @@
-use crate::adapters::image_store::{ImageRetrievalError, ImageStore, Images};
+use crate::ports::outbound::image_store::{ImageRetrievalError, ImageStore, Images};
 use crate::domain::card::Card;
 use async_trait::async_trait;
 use std::env;
@@ -24,7 +24,7 @@ impl ImageStore for FileSystem {
         let front = match tokio::fs::read(format!("{}{front_id}.png", self.image_dir)).await {
             Err(why) => {
                 log::warn!("Error getting image {why:?}");
-                return Err(ImageRetrievalError(format!(
+                return Err(ImageRetrievalError::new(format!(
                     "No front image found for {}",
                     card.front_name
                 )));
@@ -45,7 +45,7 @@ impl ImageStore for FileSystem {
 
     async fn fetch_illustration(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
         let Some(illustration_id) = card.front_illustration_id() else {
-            return Err(ImageRetrievalError(String::from(
+            return Err(ImageRetrievalError::new(String::from(
                 "Card had no illustration id",
             )));
         };
@@ -53,7 +53,7 @@ impl ImageStore for FileSystem {
         let front = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id,))
             .await
             .map_err(|_| {
-                ImageRetrievalError(format!("No illustration found for {}", card.front_name))
+                ImageRetrievalError::new(format!("No illustration found for {}", card.front_name))
             })?;
 
         Ok(Images { front, back: None })
@@ -116,13 +116,13 @@ mod tests {
 
     #[test]
     fn test_image_retrieval_error_display() {
-        let error = ImageRetrievalError(String::from("Test error message"));
+        let error = ImageRetrievalError::new(String::from("Test error message"));
         assert_eq!(error.to_string(), "Error Retrieving Image");
     }
 
     #[test]
     fn test_image_retrieval_error_debug() {
-        let error = ImageRetrievalError(String::from("Test error message"));
+        let error = ImageRetrievalError::new(String::from("Test error message"));
         let debug_str = format!("{:?}", error);
         assert!(debug_str.contains("ImageRetrievalError"));
     }

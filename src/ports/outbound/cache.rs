@@ -1,6 +1,3 @@
-mod redis;
-
-use crate::adapters::cache::redis::Redis;
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -11,6 +8,13 @@ use mockall::automock;
 #[error("Error in cache operation")]
 pub struct CacheError(String);
 
+
+impl CacheError {
+    pub fn new(msg: String) -> Self {
+        Self(msg)
+    }
+}
+
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait Cache {
@@ -18,9 +22,4 @@ pub trait Cache {
     async fn get(&self, key: String) -> Option<String>;
     async fn set(&self, key: String, value: String) -> Result<(), CacheError>;
     async fn delete(&self, key: String) -> Result<(), CacheError>;
-}
-
-#[must_use]
-pub fn init_cache() -> impl Cache {
-    Redis::create()
 }

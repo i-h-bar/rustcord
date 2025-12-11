@@ -1,9 +1,9 @@
-use crate::adapters::cache::Cache;
-use crate::adapters::card_store::CardStore;
-use crate::adapters::image_store::ImageStore;
 use crate::domain::app::App;
 use crate::domain::functions::game::state;
-use crate::ports::clients::GameInteraction;
+use crate::ports::inbound::client::GameInteraction;
+use crate::ports::outbound::cache::Cache;
+use crate::ports::outbound::card_store::CardStore;
+use crate::ports::outbound::image_store::ImageStore;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -31,13 +31,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::adapters::cache::MockCache;
-    use crate::adapters::card_store::MockCardStore;
-    use crate::adapters::image_store::{Images, MockImageStore};
     use crate::domain::app::App;
     use crate::domain::card::Card;
     use crate::domain::functions::game::state::{Difficulty, GameState};
-    use crate::ports::clients::MockGameInteraction;
+    use crate::ports::inbound::client::MockGameInteraction;
+    use crate::ports::outbound::cache::MockCache;
+    use crate::ports::outbound::card_store::MockCardStore;
+    use crate::ports::outbound::image_store::{Images, MockImageStore};
     use mockall::predicate::*;
     use uuid::uuid;
 

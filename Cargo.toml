@@ -24,7 +24,6 @@ thiserror = "2.0.16"
 mockall = "0.13.1"
 criterion = "0.7"
 
-
 [[bench]]
 name= "jw_bench"
 harness = false

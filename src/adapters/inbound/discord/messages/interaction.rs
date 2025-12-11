@@ -1,7 +1,7 @@
-use crate::adapters::image_store::Images;
+use crate::adapters::inbound::discord::utils::embed::create_embed;
 use crate::domain::card::Card;
-use crate::ports::clients::discord::utils::embed::create_embed;
-use crate::ports::clients::{MessageInteraction, MessageInterationError};
+use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
+use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
 use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
 use tokio::time::Instant;
@@ -20,7 +20,7 @@ impl DiscordMessageInteration {
         &self.msg.content
     }
 
-    async fn send_message(&self, message: CreateMessage) -> Result<(), MessageInterationError> {
+    async fn send_message(&self, message: CreateMessage) -> Result<(), MessageInteractionError> {
         let start = Instant::now();
         match self
             .msg
@@ -28,7 +28,7 @@ impl DiscordMessageInteration {
             .send_message(&self.ctx.http, message)
             .await
         {
-            Err(why) => Err(MessageInterationError(why.to_string())),
+            Err(why) => Err(MessageInteractionError::new(why.to_string())),
             Ok(response) => {
                 log::info!(
                     "Discord RTT took {}ms to send the message to {:?}",
@@ -43,7 +43,7 @@ impl DiscordMessageInteration {
 
 #[async_trait]
 impl MessageInteraction for DiscordMessageInteration {
-    async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInterationError> {
+    async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
         let back_image = if let Some(back_image) = images.back {
@@ -69,12 +69,12 @@ impl MessageInteraction for DiscordMessageInteration {
         Ok(())
     }
 
-    async fn reply(&self, message: String) -> Result<(), MessageInterationError> {
+    async fn reply(&self, message: String) -> Result<(), MessageInteractionError> {
         self.msg
             .channel_id
             .say(&self.ctx, message)
             .await
-            .map_err(|_| MessageInterationError(String::from("Failed to send message")))?;
+            .map_err(|_| MessageInteractionError::new(String::from("Failed to send message")))?;
 
         Ok(())
     }

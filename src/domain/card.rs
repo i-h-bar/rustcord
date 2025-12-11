@@ -1,6 +1,6 @@
 use crate::domain::search::CardAndImage;
 use crate::domain::utils::fuzzy::ToBytes;
-use crate::ports::clients::MessageInteraction;
+use crate::ports::inbound::client::MessageInteraction;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -104,8 +104,8 @@ pub async fn card_response<MI: MessageInteraction>(card: Option<CardAndImage>, i
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::image_store::Images;
-    use crate::ports::clients::{MessageInterationError, MockMessageInteraction};
+    use crate::ports::inbound::client::{MessageInteractionError, MockMessageInteraction};
+    use crate::ports::outbound::image_store::Images;
 
     fn create_test_card() -> Card {
         Card {
@@ -317,7 +317,7 @@ mod tests {
         mock_interaction
             .expect_send_card()
             .times(1)
-            .returning(|_, _| Err(MessageInterationError::new(String::from("Send error"))));
+            .returning(|_, _| Err(MessageInteractionError::new(String::from("Send error"))));
 
         // Should not panic even when send_card fails
         card_response(card_and_image, &mock_interaction).await;
@@ -346,7 +346,7 @@ mod tests {
                 "Failed to find card :(",
             )))
             .times(1)
-            .returning(|_| Err(MessageInterationError::new(String::from("Reply error"))));
+            .returning(|_| Err(MessageInteractionError::new(String::from("Reply error"))));
 
         // Should not panic even when reply fails
         card_response(None, &mock_interaction).await;

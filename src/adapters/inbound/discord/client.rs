@@ -1,8 +1,8 @@
-use crate::adapters::cache::Cache;
-use crate::adapters::card_store::CardStore;
-use crate::adapters::image_store::ImageStore;
 use crate::domain::app::App;
-use crate::ports::clients::Client;
+use crate::ports::inbound::client::Client;
+use crate::ports::outbound::cache::Cache;
+use crate::ports::outbound::card_store::CardStore;
+use crate::ports::outbound::image_store::ImageStore;
 use async_trait::async_trait;
 use serenity::all::GatewayIntents;
 use serenity::Client as DiscordClient;

@@ -11,3 +11,13 @@ lint:
 mega_lint:
 	@cargo fmt
 	@cargo clippy -- -W clippy::pedantic
+
+coverage:
+	@cargo llvm-cov --all-features --no-cfg-coverage
+
+coverage-html:
+	@cargo llvm-cov --all-features --no-cfg-coverage --html
+	@echo "Coverage report generated at target/llvm-cov/html/index.html"
+
+coverage-open:
+	@cargo llvm-cov --all-features --no-cfg-coverage --open

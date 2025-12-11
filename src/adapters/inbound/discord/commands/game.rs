@@ -1,7 +1,7 @@
-use crate::adapters::image_store::Images;
+use crate::adapters::inbound::discord::utils::embed::{create_embed, create_game_embed};
 use crate::domain::functions::game::state::{Difficulty, GameState};
-use crate::ports::clients::discord::utils::embed::{create_embed, create_game_embed};
-use crate::ports::clients::{GameInteraction, MessageInterationError};
+use crate::ports::inbound::client::{GameInteraction, MessageInteractionError};
+use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
@@ -26,12 +26,12 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Images,
         guess: String,
-    ) -> Result<(), MessageInterationError> {
+    ) -> Result<(), MessageInteractionError> {
         let illustration = if let Some(illustration_id) = state.card().front_illustration_id() {
             CreateAttachment::bytes(images.front, format!("{illustration_id}.png",))
         } else {
             log::warn!("Card had no illustration id");
-            return Err(MessageInterationError(String::from(
+            return Err(MessageInteractionError::new(String::from(
                 "Card had no illustration id",
             )));
         };
@@ -64,9 +64,9 @@ impl GameInteraction for DiscordCommandInteraction {
         &self,
         state: GameState,
         images: Images,
-    ) -> Result<(), MessageInterationError> {
+    ) -> Result<(), MessageInteractionError> {
         let Some(illustration_id) = state.card().front_illustration_id() else {
-            return Err(MessageInterationError(String::from(
+            return Err(MessageInteractionError::new(String::from(
                 "Failed to get image id",
             )));
         };
@@ -97,7 +97,7 @@ impl GameInteraction for DiscordCommandInteraction {
         &self,
         state: GameState,
         images: Images,
-    ) -> Result<(), MessageInterationError> {
+    ) -> Result<(), MessageInteractionError> {
         let image = CreateAttachment::bytes(
             images.front,
             format!("{}.png", state.card().front_image_id()),
@@ -131,7 +131,7 @@ impl GameInteraction for DiscordCommandInteraction {
             .await
             .is_err()
         {
-            return Err(MessageInterationError(String::from(
+            return Err(MessageInteractionError::new(String::from(
                 "Failed to send message",
             )));
         }
@@ -143,7 +143,7 @@ impl GameInteraction for DiscordCommandInteraction {
         &self,
         state: GameState,
         images: Images,
-    ) -> Result<(), MessageInterationError> {
+    ) -> Result<(), MessageInteractionError> {
         let image = CreateAttachment::bytes(
             images.front,
             format!("{}.png", state.card().front_image_id()),
@@ -175,7 +175,7 @@ impl GameInteraction for DiscordCommandInteraction {
             .await
             .is_err()
         {
-            return Err(MessageInterationError(String::from(
+            return Err(MessageInteractionError::new(String::from(
                 "couldn't create interaction",
             )));
         }
@@ -186,7 +186,7 @@ impl GameInteraction for DiscordCommandInteraction {
         self.command.channel_id.to_string()
     }
 
-    async fn reply(&self, message: String) -> Result<(), MessageInterationError> {
+    async fn reply(&self, message: String) -> Result<(), MessageInteractionError> {
         let response = CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(message)
@@ -198,7 +198,7 @@ impl GameInteraction for DiscordCommandInteraction {
             .await
             .is_err()
         {
-            return Err(MessageInterationError(String::from(
+            return Err(MessageInteractionError::new(String::from(
                 "couldn't create interaction",
             )));
         }

@@ -1,11 +1,11 @@
-use crate::adapters::cache::Cache;
-use crate::adapters::card_store::CardStore;
-use crate::adapters::image_store::{ImageStore, Images};
 use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::query::QueryParams;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
-use crate::ports::clients::MessageInteraction;
+use crate::ports::inbound::client::MessageInteraction;
+use crate::ports::outbound::cache::Cache;
+use crate::ports::outbound::card_store::CardStore;
+use crate::ports::outbound::image_store::{ImageStore, Images};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 
@@ -122,10 +122,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::cache::MockCache;
-    use crate::adapters::card_store::MockCardStore;
-    use crate::adapters::image_store::{Images, MockImageStore};
-    use crate::ports::clients::MockMessageInteraction;
+    use crate::ports::inbound::client::MockMessageInteraction;
+    use crate::ports::outbound::cache::MockCache;
+    use crate::ports::outbound::card_store::MockCardStore;
+    use crate::ports::outbound::image_store::{Images, MockImageStore};
     use mockall::predicate::eq;
     use uuid::uuid;
 

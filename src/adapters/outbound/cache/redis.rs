@@ -1,4 +1,4 @@
-use crate::adapters::cache::{Cache, CacheError};
+use crate::ports::outbound::cache::{Cache, CacheError};
 use async_trait::async_trait;
 use redis::aio::MultiplexedConnection;
 use redis::{AsyncCommands, Client, SetExpiry, SetOptions};
@@ -38,7 +38,7 @@ impl Cache for Redis {
             .await
         {
             log::warn!("Error setting value in cache {why:?}");
-            Err(CacheError(String::from("Unable to set value")))
+            Err(CacheError::new(String::from("Unable to set value")))
         } else {
             Ok(())
         }
@@ -47,7 +47,7 @@ impl Cache for Redis {
     async fn delete(&self, key: String) -> Result<(), CacheError> {
         if let Err(why) = self.new_connection().await?.del::<String, ()>(key).await {
             log::warn!("Error deleting value in cache {why:?}");
-            Err(CacheError(String::from("Unable to delete cache")))
+            Err(CacheError::new(String::from("Unable to delete cache")))
         } else {
             Ok(())
         }
@@ -60,7 +60,7 @@ impl Redis {
             Ok(connection) => Ok(connection),
             Err(why) => {
                 log::warn!("Error making connection {why:?}");
-                Err(CacheError(String::from("Unable to get connection")))
+                Err(CacheError::new(String::from("Unable to get connection")))
             }
         }
     }
@@ -72,13 +72,13 @@ mod tests {
 
     #[test]
     fn test_cache_error_display() {
-        let error = CacheError(String::from("Test error"));
+        let error = CacheError::new(String::from("Test error"));
         assert_eq!(error.to_string(), "Error in cache operation");
     }
 
     #[test]
     fn test_cache_error_debug() {
-        let error = CacheError(String::from("Test error"));
+        let error = CacheError::new(String::from("Test error"));
         let debug_str = format!("{:?}", error);
         assert!(debug_str.contains("CacheError"));
     }

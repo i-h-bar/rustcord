@@ -40,6 +40,11 @@ cargo test -- --nocapture
 
 # Run benchmarks (Jaro-Winkler performance tests)
 cargo bench
+
+# Coverage analysis (81% line coverage achieved)
+make coverage          # Text summary
+make coverage-html     # Generate HTML report
+make coverage-open     # Generate and open in browser
 ```
 
 ### Linting
@@ -60,32 +65,78 @@ cargo clippy -- -W clippy::pedantic
 
 This codebase follows **Hexagonal Architecture** (Ports and Adapters pattern) with clear separation of concerns:
 
-### Three-Layer Structure
+### Directory Structure
+
+```
+src/
+  domain/              # Pure business logic (no I/O dependencies)
+    app.rs             # Central coordinator
+    card.rs            # Card domain model
+    search.rs          # Card search logic
+    query.rs           # Query parsing
+    functions/         # Business operations (game, help, etc.)
+    utils/             # Domain utilities (fuzzy matching, etc.)
+
+  ports/               # Interface definitions (traits)
+    inbound/           # Traits for driving the application
+      client.rs        # Client, MessageInteraction, GameInteraction
+    outbound/          # Traits for external dependencies
+      cache.rs         # Cache trait + CacheError
+      card_store.rs    # CardStore trait
+      image_store.rs   # ImageStore trait + Images
+
+  adapters/            # Concrete implementations
+    inbound/           # Things that drive the application
+      discord/         # Discord bot implementation
+    outbound/          # External system integrations
+      cache/           # Redis implementation
+      card_store/      # Postgres implementation
+      image_store/     # Filesystem implementation
+```
+
+### Hexagonal Architecture Layers
 
 ```
 ┌─────────────────────────────────────────┐
-│          PORTS (Clients)                │  Discord bot interface
-│  - Client trait                         │
+│    INBOUND ADAPTERS (Primary)           │  Things that DRIVE the app
+│  - Discord client (commands/messages)   │  ← User interactions come in
+└─────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────┐
+│         INBOUND PORTS (Primary)         │  Interfaces for driving
+│  - Client trait                         │  the application
 │  - MessageInteraction trait             │
 │  - GameInteraction trait                │
-│  - Discord-specific implementations     │
 └─────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────┐
 │          DOMAIN (Business Logic)        │  Pure business logic
-│  - App: Central coordinator             │
+│  - App: Central coordinator             │  (no I/O dependencies)
 │  - Card search & fuzzy matching         │
 │  - Game state management                │
 │  - Query parsing (regex captures)       │
 └─────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────┐
-│       ADAPTERS (External Systems)       │  Infrastructure
-│  - CardStore: Postgres queries          │
-│  - Cache: Redis (game state)            │
-│  - ImageStore: Filesystem               │
+│        OUTBOUND PORTS (Secondary)       │  Interfaces for external
+│  - CardStore trait (Postgres)           │  systems the app USES
+│  - Cache trait (Redis)                  │
+│  - ImageStore trait (Filesystem)        │
+└─────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────┐
+│   OUTBOUND ADAPTERS (Secondary)         │  Things the app DRIVES
+│  - Postgres (card_store)                │  ← App reaches out to these
+│  - Redis (cache)                        │
+│  - Filesystem (image_store)             │
 └─────────────────────────────────────────┘
 ```
+
+**Key Terminology:**
+- **Inbound/Primary**: Things that drive the application (Discord bot receives commands)
+- **Outbound/Secondary**: Things the application drives (app queries Postgres)
+- **Ports**: Interface definitions (Rust traits)
+- **Adapters**: Concrete implementations
 
 ### Key Architectural Patterns
 
@@ -99,7 +150,7 @@ App<IS, CS, C> where
 ```
 
 **Trait-Based Abstraction:**
-All external systems are defined as traits in `src/adapters/*/mod.rs` with `#[cfg_attr(test, automock)]` for mockall integration. Concrete implementations are in subdirectories (e.g., `postgres/`, `redis/`, `file_system/`).
+All ports (interfaces) are defined as traits in `src/ports/inbound/` and `src/ports/outbound/` with `#[cfg_attr(test, automock)]` for mockall integration. Concrete adapter implementations are in `src/adapters/inbound/` and `src/adapters/outbound/` (e.g., `discord/`, `postgres/`, `redis/`, `file_system/`).
 
 **Game State Persistence:**
 Game state is serialized to RON format and stored in Redis with 86400s (24h) TTL. Per-channel mutex locks prevent race conditions during concurrent guesses.
@@ -160,11 +211,24 @@ Card data includes front/back faces (for double-faced cards), illustration IDs, 
 
 ## Testing Strategy
 
-See `TEST_COVERAGE_STRATEGY.md` for comprehensive testing plan. Current coverage is minimal (6 tests). Priority areas:
-1. Game logic (state transitions, difficulty settings)
-2. Fuzzy matching edge cases
-3. Query parsing with regex captures
-4. Card store integration tests
+See `TEST_COVERAGE_STRATEGY.md` for comprehensive testing plan.
+
+**Current Status: EXCELLENT** ✅
+- **149 tests** (25x increase from original 6)
+- **81.09% line coverage** (2,655 / 3,274 lines)
+- **Domain layer: 97-100% coverage** (all critical business logic)
+
+**Coverage by System:**
+- Fuzzy matching: 98.36%
+- Game logic: 97-99%
+- Query parsing: 99.78%
+- Card search: 98.64%
+- Normalization: 100.00%
+
+**Testing Tools:**
+- `mockall` for mocking adapters
+- `criterion` for performance benchmarks
+- `cargo-llvm-cov` for coverage analysis (use `make coverage`)
 
 **Testing with Mocks:**
 All adapter traits have mockall implementations. Example pattern:
@@ -178,14 +242,20 @@ mock_store.expect_search()
 ## Common Development Patterns
 
 **Adding New Discord Commands:**
-1. Define command in `src/ports/clients/discord/commands/register/`
-2. Implement handler in `src/ports/clients/discord/commands/`
+1. Define command in `src/adapters/inbound/discord/commands/register/`
+2. Implement handler in `src/adapters/inbound/discord/commands/`
 3. Add domain logic to `src/domain/functions/`
 4. Register command in Discord client setup
 
+**Adding New Outbound Port (External Dependency):**
+1. Define trait in `src/ports/outbound/` (e.g., `new_service.rs`)
+2. Implement concrete adapter in `src/adapters/outbound/new_service/`
+3. Add to `App` generic parameters if needed
+4. Update mockall expectations in tests
+
 **Adding New Adapter Methods:**
-1. Add trait method to `src/adapters/*/mod.rs`
-2. Implement in concrete adapter (postgres/redis/file_system)
+1. Add trait method to appropriate port file in `src/ports/outbound/`
+2. Implement in concrete adapter in `src/adapters/outbound/`
 3. Update mockall expectations in tests
 
 **Card Data Access:**

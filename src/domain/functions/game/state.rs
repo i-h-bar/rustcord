@@ -1,4 +1,4 @@
-use crate::adapters::cache::Cache;
+use crate::ports::outbound::cache::Cache;
 use crate::domain::card::Card;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -117,7 +117,7 @@ pub async fn add<C: Cache + Send + Sync>(game_state: &GameState, id: String, cac
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::cache::MockCache;
+    use crate::ports::outbound::cache::MockCache;
     use mockall::predicate::eq;
     use uuid::uuid;
 
