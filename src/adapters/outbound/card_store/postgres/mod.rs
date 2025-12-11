@@ -1,11 +1,11 @@
 mod queries;
 
-use crate::adapters::card_store::postgres::queries::{
+use crate::adapters::outbound::card_store::postgres::queries::{
     FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS,
     FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD, RANDOM_SET_CARD,
 };
-use crate::adapters::card_store::CardStore;
 use crate::domain::card::Card;
+use crate::ports::outbound::card_store::CardStore;
 use async_trait::async_trait;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Pool, Row};

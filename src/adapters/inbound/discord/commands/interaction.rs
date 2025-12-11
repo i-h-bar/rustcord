@@ -1,7 +1,7 @@
-use crate::adapters::image_store::Images;
+use crate::adapters::inbound::discord::utils::embed::create_embed;
 use crate::domain::card::Card;
-use crate::ports::clients::discord::utils::embed::create_embed;
-use crate::ports::clients::{MessageInteraction, MessageInterationError};
+use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
+use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
@@ -21,14 +21,14 @@ impl DiscordCommand {
     async fn send_message(
         &self,
         message: CreateInteractionResponseMessage,
-    ) -> Result<(), MessageInterationError> {
+    ) -> Result<(), MessageInteractionError> {
         let start = Instant::now();
         if let Err(why) = self
             .command
             .create_response(&self.ctx, CreateInteractionResponse::Message(message))
             .await
         {
-            Err(MessageInterationError(why.to_string()))
+            Err(MessageInteractionError::new(why.to_string()))
         } else {
             log::info!(
                 "Discord RTT took {}ms to send the message to {:?}",
@@ -42,7 +42,7 @@ impl DiscordCommand {
 
 #[async_trait]
 impl MessageInteraction for DiscordCommand {
-    async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInterationError> {
+    async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
         let back_image = if let Some(back_image) = images.back {
@@ -72,7 +72,7 @@ impl MessageInteraction for DiscordCommand {
         Ok(())
     }
 
-    async fn reply(&self, message: String) -> Result<(), MessageInterationError> {
+    async fn reply(&self, message: String) -> Result<(), MessageInteractionError> {
         let message = CreateInteractionResponseMessage::new().content(message);
         self.send_message(message).await?;
 

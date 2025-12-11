@@ -1,13 +1,12 @@
-use crate::ports::clients::Client;
+use crate::adapters::inbound::create_client;
+use crate::adapters::outbound::cache::init_cache;
+use crate::adapters::outbound::card_store::init_card_store;
+use crate::adapters::outbound::image_store::init_image_store;
+use crate::domain::app::App;
+use crate::ports::inbound::client::Client;
 
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
-
-use crate::domain::app::App;
-use crate::ports::clients::create_client;
-use adapters::cache::init_cache;
-use adapters::card_store::init_card_store;
-use adapters::image_store::init_image_store;
 
 mod adapters;
 mod domain;
