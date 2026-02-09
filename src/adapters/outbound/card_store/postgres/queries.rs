@@ -49,7 +49,7 @@ from card front
          left join set on set.id = front.set_id
          left join price on front.id = price.id
 where front.normalised_name % $1
-order by front.oracle_id, front.release_date desc;
+order by front.oracle_id, random() desc;
 ";
 
 pub const FUZZY_SEARCH_CARD_AND_SET_NAME: &str = r"
@@ -106,7 +106,7 @@ from card front
          left join price on front.id = price.id
 where front.normalised_name % $1
   and set.normalised_name % $2
-order by front.oracle_id, set_sml desc;
+order by front.oracle_id, set_sml, random() desc;
 ";
 
 pub const FUZZY_SEARCH_CARD_AND_ARTIST: &str = r"
@@ -163,7 +163,7 @@ from card front
          left join price on front.id = price.id
 where front.normalised_name % $1
   and artist.normalised_name % $2
-order by front.oracle_id, artist_sml desc;
+order by front.oracle_id, artist_sml, random() desc;
 ";
 
 pub const FUZZY_SEARCH_SET_NAME: &str = r"
