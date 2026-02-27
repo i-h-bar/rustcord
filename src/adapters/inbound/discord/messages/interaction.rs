@@ -56,15 +56,8 @@ impl MessageInteraction for DiscordMessageInteration {
     ) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
-        let back_image = if let Some(back_image) = images.back {
-            card.back_image_id().map(|back_image_id| {
-                CreateAttachment::bytes(back_image, format!("{back_image_id}.png"))
-            })
-        } else {
-            None
-        };
 
-        let (front, back) = create_embed(card);
+        let front = create_embed(card);
         let mut message = CreateMessage::new().add_file(front_image).add_embed(front);
         message = if let Some(sets) = sets {
             let options: Vec<CreateSelectMenuOption> = sets
@@ -82,13 +75,6 @@ impl MessageInteraction for DiscordMessageInteration {
         };
 
         self.send_message(message).await?;
-
-        if let Some(back) = back {
-            if let Some(back_image) = back_image {
-                let message = CreateMessage::new().add_file(back_image).add_embed(back);
-                self.send_message(message).await?;
-            }
-        }
 
         Ok(())
     }

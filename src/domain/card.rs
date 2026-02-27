@@ -22,18 +22,7 @@ pub struct Card {
     pub front_type_line: String,
     pub front_oracle_text: String,
     pub back_name: Option<String>,
-    pub back_oracle_id: Option<Uuid>,
-    pub back_scryfall_url: Option<String>,
-    pub back_image_id: Option<Uuid>,
-    pub back_illustration_id: Option<Uuid>,
-    pub back_mana_cost: Option<String>,
-    pub back_colour_identity: Option<Vec<String>>,
-    pub back_power: Option<String>,
-    pub back_toughness: Option<String>,
-    pub back_loyalty: Option<String>,
-    pub back_defence: Option<String>,
-    pub back_type_line: Option<String>,
-    pub back_oracle_text: Option<String>,
+    pub back_id: Option<Uuid>,
     pub artist: String,
     pub set_name: String,
 }
@@ -45,8 +34,13 @@ impl Card {
     }
 
     #[must_use]
-    pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
-        (&self.front_image_id, self.back_image_id.as_ref())
+    pub fn back_id(&self) -> Option<&Uuid> {
+        self.back_id.as_ref()
+    }
+
+    #[must_use]
+    pub fn image_id(&self) -> &Uuid {
+        &self.front_image_id
     }
 
     #[must_use]
@@ -55,21 +49,13 @@ impl Card {
     }
 
     #[must_use]
-    pub fn back_image_id(&self) -> Option<&Uuid> {
-        self.back_image_id.as_ref()
-    }
-
-    #[must_use]
     pub fn front_illustration_id(&self) -> Option<&Uuid> {
         self.front_illustration_id.as_ref()
     }
 
     #[must_use]
-    pub fn illustration_ids(&self) -> (Option<&Uuid>, Option<&Uuid>) {
-        (
-            self.front_illustration_id.as_ref(),
-            self.back_illustration_id.as_ref(),
-        )
+    pub fn illustration_ids(&self) -> Option<&Uuid> {
+            self.front_illustration_id.as_ref()
     }
 
     #[must_use]
@@ -192,7 +178,7 @@ mod tests {
     #[test]
     fn test_image_ids_single_face() {
         let card = create_test_card();
-        let (front, back) = card.image_ids();
+        let (front, back) = card.image_id();
         assert_eq!(
             front,
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()
@@ -203,7 +189,7 @@ mod tests {
     #[test]
     fn test_image_ids_double_face() {
         let card = create_double_faced_card();
-        let (front, back) = card.image_ids();
+        let (front, back) = card.image_id();
         assert_eq!(
             front,
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()

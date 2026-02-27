@@ -34,7 +34,7 @@ impl MessageInteraction for DiscordComponentInteraction {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
 
-        let (front, _) = create_embed(card);
+        let front = create_embed(card);
         let mut message = CreateInteractionResponseMessage::new()
             .add_file(front_image)
             .add_embed(front);

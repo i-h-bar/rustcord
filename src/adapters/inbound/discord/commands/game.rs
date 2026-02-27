@@ -117,7 +117,7 @@ impl GameInteraction for DiscordCommandInteraction {
             ))
             .build();
 
-        let (embed, _) = create_embed(state.card);
+        let embed = create_embed(state.card);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)
@@ -161,7 +161,7 @@ impl GameInteraction for DiscordCommandInteraction {
             ))
             .build();
 
-        let (embed, _) = create_embed(state.card);
+        let embed = create_embed(state.card);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)

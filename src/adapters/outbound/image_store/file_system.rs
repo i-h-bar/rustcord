@@ -19,7 +19,7 @@ impl ImageStore for FileSystem {
     }
 
     async fn fetch(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
-        let (front_id, back_id) = card.image_ids();
+        let front_id = card.image_id();
 
         let front = match tokio::fs::read(format!("{}{front_id}.png", self.image_dir)).await {
             Err(why) => {
@@ -32,15 +32,7 @@ impl ImageStore for FileSystem {
             Ok(image) => image,
         };
 
-        let back = if let Some(back_id) = back_id {
-            tokio::fs::read(format!("{}{back_id}.png", self.image_dir))
-                .await
-                .ok()
-        } else {
-            None
-        };
-
-        Ok(Images { front, back })
+        Ok(Images { front })
     }
 
     async fn fetch_illustration(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
@@ -56,7 +48,7 @@ impl ImageStore for FileSystem {
                 ImageRetrievalError::new(format!("No illustration found for {}", card.front_name))
             })?;
 
-        Ok(Images { front, back: None })
+        Ok(Images { front })
     }
 }
 
@@ -84,20 +76,9 @@ mod tests {
             front_type_line: String::from("Creature - Test"),
             front_oracle_text: String::from("Test ability"),
             back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
             artist: String::from("Test Artist"),
             set_name: String::from("Test Set"),
+            back_id: None
         }
     }
 
@@ -167,7 +148,7 @@ mod tests {
     #[test]
     fn test_card_helpers_single_face() {
         let card = create_test_card_single_face();
-        let (front_id, back_id) = card.image_ids();
+        let (front_id, back_id) = card.image_id();
 
         assert_eq!(
             front_id,
@@ -179,7 +160,7 @@ mod tests {
     #[test]
     fn test_card_helpers_double_face() {
         let card = create_test_card_double_face();
-        let (front_id, back_id) = card.image_ids();
+        let (front_id, back_id) = card.image_id();
 
         assert_eq!(
             front_id,
