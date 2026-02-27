@@ -3,8 +3,10 @@ use crate::domain::card::Card;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
-use serenity::all::{Context, CreateAttachment, CreateMessage, Message};
+use serenity::all::{Context, CreateActionRow, CreateAttachment, CreateMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, Message};
 use tokio::time::Instant;
+use crate::adapters::inbound::discord::components::interaction::PICK_PRINT_ID;
+use crate::domain::set::Set;
 
 pub struct DiscordMessageInteration {
     ctx: Context,
@@ -43,7 +45,7 @@ impl DiscordMessageInteration {
 
 #[async_trait]
 impl MessageInteraction for DiscordMessageInteration {
-    async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInteractionError> {
+    async fn send_card(&self, card: Card, images: Images, sets: Option<Vec<Set>>) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
         let back_image = if let Some(back_image) = images.back {
@@ -55,7 +57,23 @@ impl MessageInteraction for DiscordMessageInteration {
         };
 
         let (front, back) = create_embed(card);
-        let message = CreateMessage::new().add_file(front_image).add_embed(front);
+        let mut message = CreateMessage::new().add_file(front_image).add_embed(front);
+        message = if let Some(sets) = sets {
+            let options: Vec<CreateSelectMenuOption> = sets
+                .iter()
+                .take(25) // Discord's hard limit
+                .map(|s| CreateSelectMenuOption::new(s.name(), s.card_id().to_string()))
+                .collect();
+            let menu = CreateSelectMenu::new(
+                PICK_PRINT_ID,
+                CreateSelectMenuKind::String { options },
+            )
+                .placeholder("Select a print...");
+            let row = CreateActionRow::SelectMenu(menu);
+            message.components(vec![row])
+        } else {
+            message
+        };
 
         self.send_message(message).await?;
 
