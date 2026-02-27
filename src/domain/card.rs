@@ -43,7 +43,7 @@ impl Card {
     pub fn front_oracle_id(&self) -> &Uuid {
         &self.front_oracle_id
     }
-    
+
     #[must_use]
     pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
         (&self.front_image_id, self.back_image_id.as_ref())
@@ -90,7 +90,10 @@ impl PartialEq<Card> for &str {
     }
 }
 
-pub async fn card_response<MI: MessageInteraction>(card: Option<CardImageAndSets>, interaction: &MI) {
+pub async fn card_response<MI: MessageInteraction>(
+    card: Option<CardImageAndSets>,
+    interaction: &MI,
+) {
     match card {
         None => {
             if let Err(why) = interaction

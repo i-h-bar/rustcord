@@ -56,6 +56,7 @@ order by front.oracle_id, random() desc;
 
 pub const FUZZY_SEARCH_CARD_AND_SET_NAME: &str = r"
 select distinct on (front.oracle_id) front.id                   as front_id,
+                                     front.oracle_id            as front_oracle_id,
                                      front.name                 as front_name,
                                      front.normalised_name      as front_normalised_name,
                                      front.scryfall_url         as front_scryfall_url,
@@ -72,6 +73,7 @@ select distinct on (front.oracle_id) front.id                   as front_id,
                                      front_rule.oracle_text     as front_oracle_text,
 
                                      back.id                    as back_id,
+                                     back.oracle_id             as back_oracle_id,
                                      back.name                  as back_name,
                                      back.scryfall_url          as back_scryfall_url,
                                      back.image_id              as back_image_id,
@@ -113,6 +115,7 @@ order by front.oracle_id, set_sml, random() desc;
 
 pub const FUZZY_SEARCH_CARD_AND_ARTIST: &str = r"
 select distinct on (front.oracle_id) front.id                   as front_id,
+                                     front.oracle_id            as front_oracle_id,
                                      front.name                 as front_name,
                                      front.normalised_name      as front_normalised_name,
                                      front.scryfall_url         as front_scryfall_url,
@@ -129,6 +132,7 @@ select distinct on (front.oracle_id) front.id                   as front_id,
                                      front_rule.oracle_text     as front_oracle_text,
 
                                      back.id                    as back_id,
+                                     back.oracle_id             as back_oracle_id,
                                      back.name                  as back_name,
                                      back.scryfall_url          as back_scryfall_url,
                                      back.image_id              as back_image_id,
@@ -179,6 +183,7 @@ pub const NORMALISED_SET_NAME: &str = r"select normalised_name from set where ab
 pub const RANDOM_CARD: &str = r"
 select set.id                     as set_id,
        front.id                   as front_id,
+       front.oracle_id            as front_oracle_id,
        front.name                 as front_name,
        front.normalised_name      as front_normalised_name,
        front.scryfall_url         as front_scryfall_url,
@@ -195,6 +200,7 @@ select set.id                     as set_id,
        front_rule.oracle_text     as front_oracle_text,
 
        back.id                    as back_id,
+       back.oracle_id             as back_oracle_id,
        back.name                  as back_name,
        back.scryfall_url          as back_scryfall_url,
        back.image_id              as back_image_id,
@@ -226,6 +232,7 @@ limit 1;
 pub const RANDOM_SET_CARD: &str = r"
 select set.id                     as set_id,
        front.id                   as front_id,
+       front.oracle_id            as front_oracle_id,
        front.name                 as front_name,
        front.normalised_name      as front_normalised_name,
        front.scryfall_url         as front_scryfall_url,
@@ -242,6 +249,7 @@ select set.id                     as set_id,
        front_rule.oracle_text     as front_oracle_text,
 
        back.id                    as back_id,
+       back.oracle_id             as back_oracle_id,
        back.name                  as back_name,
        back.scryfall_url          as back_scryfall_url,
        back.image_id              as back_image_id,

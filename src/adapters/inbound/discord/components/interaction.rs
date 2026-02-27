@@ -45,11 +45,9 @@ impl MessageInteraction for DiscordComponentInteraction {
                 .take(25)
                 .map(|s| CreateSelectMenuOption::new(s.name(), s.card_id().to_string()))
                 .collect();
-            let menu = CreateSelectMenu::new(
-                PICK_PRINT_ID,
-                CreateSelectMenuKind::String { options },
-            )
-            .placeholder("Select a print...");
+            let menu =
+                CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
+                    .placeholder("Select a print...");
             let row = CreateActionRow::SelectMenu(menu);
             message = message.components(vec![row]);
         }

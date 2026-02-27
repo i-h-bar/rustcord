@@ -1,6 +1,6 @@
 use crate::domain::card::Card;
-use crate::domain::set::Set;
 use crate::domain::functions::game::state::GameState;
+use crate::domain::set::Set;
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
 use thiserror::Error;
@@ -23,7 +23,12 @@ impl MessageInteractionError {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait MessageInteraction {
-    async fn send_card(&self, card: Card, images: Images, sets: Option<Vec<Set>>) -> Result<(), MessageInteractionError>;
+    async fn send_card(
+        &self,
+        card: Card,
+        images: Images,
+        sets: Option<Vec<Set>>,
+    ) -> Result<(), MessageInteractionError>;
     async fn reply(&self, message: String) -> Result<(), MessageInteractionError>;
 }
 

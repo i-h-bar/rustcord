@@ -7,7 +7,9 @@ mod utils;
 use crate::adapters::inbound::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::inbound::discord::commands::interaction::DiscordCommand;
 use crate::adapters::inbound::discord::commands::register::{give_up, guess, help, play, search};
-use crate::adapters::inbound::discord::components::interaction::{DiscordComponentInteraction, PICK_PRINT_ID};
+use crate::adapters::inbound::discord::components::interaction::{
+    DiscordComponentInteraction, PICK_PRINT_ID,
+};
 use crate::adapters::inbound::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::inbound::discord::utils::help::HELP;
 use crate::domain::app::App;
@@ -18,9 +20,11 @@ use crate::ports::outbound::cache::Cache;
 use crate::ports::outbound::card_store::CardStore;
 use crate::ports::outbound::image_store::ImageStore;
 use async_trait::async_trait;
-use serenity::all::{Command, ComponentInteractionDataKind, Context, EventHandler, Interaction, Message, Ready};
-use uuid::Uuid;
+use serenity::all::{
+    Command, ComponentInteractionDataKind, Context, EventHandler, Interaction, Message, Ready,
+};
 use utils::parse;
+use uuid::Uuid;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -96,13 +100,14 @@ where
                         functions::help::run(&interaction, HELP).await;
                     }
                     "search" => {
-                        let query_params = match parse::options::<QueryParams>(command.data.options()) {
-                            Ok(params) => params,
-                            Err(err) => {
-                                log::warn!("{err}");
-                                return;
-                            }
-                        };
+                        let query_params =
+                            match parse::options::<QueryParams>(command.data.options()) {
+                                Ok(params) => params,
+                                Err(err) => {
+                                    log::warn!("{err}");
+                                    return;
+                                }
+                            };
                         let interaction = DiscordCommand::new(ctx, command);
                         self.search(&interaction, query_params).await;
                     }
@@ -137,11 +142,19 @@ where
             }
             Interaction::Component(component) => {
                 if component.data.custom_id == PICK_PRINT_ID {
-                    if let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind {
+                    if let ComponentInteractionDataKind::StringSelect { values } =
+                        &component.data.kind
+                    {
                         if let Some(card_id_str) = values.first() {
+                            log::info!(
+                                "Received Pick print command for {} from {}",
+                                card_id_str,
+                                component.channel_id,
+                            );
                             match Uuid::parse_str(card_id_str) {
                                 Ok(card_id) => {
-                                    let interaction = DiscordComponentInteraction::new(ctx, component);
+                                    let interaction =
+                                        DiscordComponentInteraction::new(ctx, component);
                                     self.select_print(&interaction, card_id).await;
                                 }
                                 Err(why) => log::warn!("Invalid card_id in print_select: {why}"),

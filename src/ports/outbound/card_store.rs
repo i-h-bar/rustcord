@@ -1,7 +1,7 @@
 use crate::domain::card::Card;
 use crate::domain::set::Set;
-use uuid::Uuid;
 use async_trait::async_trait;
+use uuid::Uuid;
 
 #[cfg(test)]
 use mockall::automock;

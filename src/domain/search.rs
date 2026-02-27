@@ -1,6 +1,7 @@
 use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::query::QueryParams;
+use crate::domain::set::Set;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
 use crate::ports::inbound::client::MessageInteraction;
 use crate::ports::outbound::cache::Cache;
@@ -9,7 +10,6 @@ use crate::ports::outbound::image_store::{ImageStore, Images};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
-use crate::domain::set::Set;
 
 pub type CardImageAndSets = (Card, Images, Option<Vec<Set>>);
 
@@ -96,11 +96,13 @@ where
     }
 
     pub async fn fetch_print(&self, card_id: &Uuid) -> Option<(Card, Images, Option<Vec<Set>>)> {
+        let start = Instant::now();
         let card = self.card_store.fetch_card_by_id(card_id).await?;
         let (sets, images) = tokio::join!(
-          self.card_store.all_prints(card.front_oracle_id()),
-          self.image_store.fetch(&card),
-      );
+            self.card_store.all_prints(card.front_oracle_id()),
+            self.image_store.fetch(&card),
+        );
+        log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
         Some((card, images.ok()?, sets))
     }
 
@@ -140,7 +142,10 @@ where
                 }
             }
             None => {
-                if let Err(why) = interaction.reply(String::from("Could not find that print :(")).await {
+                if let Err(why) = interaction
+                    .reply(String::from("Could not find that print :("))
+                    .await
+                {
                     log::warn!("Error sending print not found: {why}");
                 }
             }
@@ -188,7 +193,11 @@ mod tests {
         interaction
             .expect_send_card()
             .times(1)
-            .with(eq(card.clone()), eq(images.clone()), mockall::predicate::always())
+            .with(
+                eq(card.clone()),
+                eq(images.clone()),
+                mockall::predicate::always(),
+            )
             .return_const(Ok(()));
 
         let app = App::new(image_store, card_store, cache);

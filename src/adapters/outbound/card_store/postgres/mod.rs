@@ -1,14 +1,18 @@
 mod queries;
 
-use crate::adapters::outbound::card_store::postgres::queries::{ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD, RANDOM_SET_CARD};
+use crate::adapters::outbound::card_store::postgres::queries::{
+    ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
+    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
+    RANDOM_SET_CARD,
+};
 use crate::domain::card::Card;
+use crate::domain::set::Set;
 use crate::ports::outbound::card_store::CardStore;
 use async_trait::async_trait;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Pool, Row};
 use std::env;
 use uuid::Uuid;
-use crate::domain::set::Set;
 
 pub struct Postgres {
     pool: Pool<sqlx::Postgres>,
@@ -151,7 +155,6 @@ impl CardStore for Postgres {
         }
     }
 }
-
 
 impl Set {
     fn from(row: &PgRow) -> Self {
