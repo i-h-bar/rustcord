@@ -1,6 +1,7 @@
 use crate::domain::app::App;
 use crate::domain::card::Card;
 use crate::domain::query::QueryParams;
+use crate::domain::set::Set;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
 use crate::ports::inbound::client::MessageInteraction;
 use crate::ports::outbound::cache::Cache;
@@ -8,8 +9,9 @@ use crate::ports::outbound::card_store::CardStore;
 use crate::ports::outbound::image_store::{ImageStore, Images};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
+use uuid::Uuid;
 
-pub type CardAndImage = (Card, Images);
+pub type CardImageAndSets = (Card, Images, Option<Vec<Set>>);
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -17,7 +19,7 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardAndImage>> {
+    pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardImageAndSets>> {
         join_all(
             REGEX_COLLECTION
                 .cards
@@ -65,7 +67,7 @@ where
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
-    pub async fn find_card(&self, query: QueryParams) -> Option<CardAndImage> {
+    pub async fn find_card(&self, query: QueryParams) -> Option<CardImageAndSets> {
         let start = Instant::now();
 
         let found_card = if let Some(set_code) = query.set_code() {
@@ -85,9 +87,23 @@ where
             start.elapsed().as_millis()
         );
 
-        let images = self.image_store.fetch(&found_card).await.ok()?;
+        let (sets, images) = tokio::join!(
+            self.card_store.all_prints(found_card.front_oracle_id()),
+            self.image_store.fetch(&found_card),
+        );
 
-        Some((found_card, images))
+        Some((found_card, images.ok()?, sets))
+    }
+
+    pub async fn fetch_print(&self, card_id: &Uuid) -> Option<(Card, Images, Option<Vec<Set>>)> {
+        let start = Instant::now();
+        let card = self.card_store.fetch_card_by_id(card_id).await?;
+        let (sets, images) = tokio::join!(
+            self.card_store.all_prints(card.front_oracle_id()),
+            self.image_store.fetch(&card),
+        );
+        log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
+        Some((card, images.ok()?, sets))
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
@@ -106,8 +122,8 @@ where
 
     pub async fn search<I: MessageInteraction>(&self, interaction: &I, query_params: QueryParams) {
         let card = self.find_card(query_params).await;
-        if let Some((card, images)) = card {
-            if let Err(why) = interaction.send_card(card, images).await {
+        if let Some((card, images, sets)) = card {
+            if let Err(why) = interaction.send_card(card, images, sets).await {
                 log::warn!("Error sending card from search command: {why}");
             };
         } else if let Err(why) = interaction
@@ -115,6 +131,24 @@ where
             .await
         {
             log::warn!("Error the failed to find card message from search command: {why}");
+        }
+    }
+
+    pub async fn select_print<I: MessageInteraction>(&self, interaction: &I, card_id: Uuid) {
+        match self.fetch_print(&card_id).await {
+            Some((card, images, sets)) => {
+                if let Err(why) = interaction.send_card(card, images, sets).await {
+                    log::warn!("Error updating card for print selection: {why}");
+                }
+            }
+            None => {
+                if let Err(why) = interaction
+                    .reply(String::from("Could not find that print :("))
+                    .await
+                {
+                    log::warn!("Error sending print not found: {why}");
+                }
+            }
         }
     }
 }
@@ -133,7 +167,7 @@ mod tests {
     async fn test_search() {
         let query = QueryParams::from_test(String::from("gitrog monster"), None, None, None);
         let front_image_id = uuid!("40489e28-878d-44a2-847f-07beef1aa0f8");
-        let card = Card { front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_name: None, back_scryfall_url: None, back_image_id: None, back_illustration_id: None, back_mana_cost: None, back_colour_identity: None, back_power: None, back_toughness: None, back_loyalty: None, back_defence: None, back_type_line: None, back_oracle_text: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
+        let card = Card { front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_name: None, back_oracle_id: None, back_scryfall_url: None, back_image_id: None, back_illustration_id: None, back_mana_cost: None, back_colour_identity: None, back_power: None, back_toughness: None, back_loyalty: None, back_defence: None, back_type_line: None, back_oracle_text: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
         let images = Images {
             front: vec![1, 2, 3, 4],
             back: None,
@@ -152,13 +186,18 @@ mod tests {
             .times(1)
             .with(eq(query.clone().name().clone()))
             .return_const(Some(vec![card.clone()]));
+        card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
         interaction
             .expect_send_card()
             .times(1)
-            .with(eq(card.clone()), eq(images.clone()))
+            .with(
+                eq(card.clone()),
+                eq(images.clone()),
+                mockall::predicate::always(),
+            )
             .return_const(Ok(()));
 
         let app = App::new(image_store, card_store, cache);
@@ -205,6 +244,7 @@ mod tests {
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
             front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_oracle_id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
             front_mana_cost: "{R}".to_string(),
             front_colour_identity: vec!["R".to_string()],
@@ -215,6 +255,7 @@ mod tests {
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -251,6 +292,7 @@ mod tests {
             .times(1)
             .with(eq("Limited Edition Alpha"), eq(query.name().clone()))
             .return_const(Some(vec![card.clone()]));
+        card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
@@ -274,6 +316,7 @@ mod tests {
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
             front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_oracle_id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
             front_mana_cost: "{R}".to_string(),
             front_colour_identity: vec!["R".to_string()],
@@ -284,6 +327,7 @@ mod tests {
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -315,6 +359,7 @@ mod tests {
             .times(1)
             .with(eq("Christopher Rush"), eq(query.name().clone()))
             .return_const(Some(vec![card.clone()]));
+        card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
@@ -332,6 +377,7 @@ mod tests {
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
             front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_oracle_id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
             front_mana_cost: "{R}".to_string(),
             front_colour_identity: vec!["R".to_string()],
@@ -342,6 +388,7 @@ mod tests {
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -373,6 +420,7 @@ mod tests {
             .times(1)
             .with(eq("lightning bolt"))
             .return_const(Some(vec![card.clone()]));
+        card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
         let app = App::new(image_store, card_store, cache);
@@ -381,7 +429,7 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert!(results[0].is_some());
-        if let Some((found_card, _)) = &results[0] {
+        if let Some((found_card, _, _)) = &results[0] {
             assert_eq!(found_card.front_name, "Lightning Bolt");
         }
     }
@@ -393,6 +441,7 @@ mod tests {
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test1".to_string(),
             front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_oracle_id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
             front_mana_cost: "{R}".to_string(),
             front_colour_identity: vec!["R".to_string()],
@@ -403,6 +452,7 @@ mod tests {
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -423,6 +473,7 @@ mod tests {
             front_normalised_name: "giant growth".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test2".to_string(),
             front_image_id: uuid!("22345678-1234-1234-1234-123456789012"),
+            front_oracle_id: uuid!("22345678-1234-1234-1234-123456789012"),
             front_illustration_id: Some(uuid!("22345678-1234-1234-1234-123456789013")),
             front_mana_cost: "{G}".to_string(),
             front_colour_identity: vec!["G".to_string()],
@@ -433,6 +484,7 @@ mod tests {
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Target creature gets +3/+3 until end of turn.".to_string(),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -470,6 +522,7 @@ mod tests {
             .times(1)
             .with(eq("giant growth"))
             .return_const(Some(vec![giant_card.clone()]));
+        card_store.expect_all_prints().times(2).returning(|_| None);
 
         let cache = MockCache::new();
         let app = App::new(image_store, card_store, cache);
@@ -510,6 +563,7 @@ mod tests {
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
             front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
+            front_oracle_id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
             front_mana_cost: "{R}".to_string(),
             front_colour_identity: vec!["R".to_string()],
@@ -520,6 +574,7 @@ mod tests {
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -551,6 +606,7 @@ mod tests {
             .times(1)
             .with(eq("limited edition alpha"), eq("lightning bolt"))
             .return_const(Some(vec![card.clone()]));
+        card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
         let app = App::new(image_store, card_store, cache);
@@ -558,7 +614,7 @@ mod tests {
         let result = app.find_card(query).await;
 
         assert!(result.is_some());
-        if let Some((found_card, _)) = result {
+        if let Some((found_card, _, _)) = result {
             assert_eq!(found_card.front_name, "Lightning Bolt");
         }
     }

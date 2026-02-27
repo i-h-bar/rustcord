@@ -1,11 +1,15 @@
 pub mod client;
 mod commands;
+mod components;
 mod messages;
 mod utils;
 
 use crate::adapters::inbound::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::inbound::discord::commands::interaction::DiscordCommand;
 use crate::adapters::inbound::discord::commands::register::{give_up, guess, help, play, search};
+use crate::adapters::inbound::discord::components::interaction::{
+    DiscordComponentInteraction, PICK_PRINT_ID,
+};
 use crate::adapters::inbound::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::inbound::discord::utils::help::HELP;
 use crate::domain::app::App;
@@ -16,8 +20,11 @@ use crate::ports::outbound::cache::Cache;
 use crate::ports::outbound::card_store::CardStore;
 use crate::ports::outbound::image_store::ImageStore;
 use async_trait::async_trait;
-use serenity::all::{Command, Context, EventHandler, Interaction, Message, Ready};
+use serenity::all::{
+    Command, ComponentInteractionDataKind, Context, EventHandler, Interaction, Message, Ready,
+};
 use utils::parse;
+use uuid::Uuid;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -75,61 +82,88 @@ where
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(command) = interaction {
-            if command.user.bot {
-                return;
-            }
+        match interaction {
+            Interaction::Command(command) => {
+                if command.user.bot {
+                    return;
+                }
 
-            log::info!(
-                "Received command: {:?} from {}",
-                command.data.name,
-                command.channel_id,
-            );
+                log::info!(
+                    "Received command: {:?} from {}",
+                    command.data.name,
+                    command.channel_id,
+                );
 
-            match command.data.name.as_str() {
-                "help" => {
-                    let interaction = DiscordCommand::new(ctx, command);
-                    functions::help::run(&interaction, HELP).await;
+                match command.data.name.as_str() {
+                    "help" => {
+                        let interaction = DiscordCommand::new(ctx, command);
+                        functions::help::run(&interaction, HELP).await;
+                    }
+                    "search" => {
+                        let query_params =
+                            match parse::options::<QueryParams>(command.data.options()) {
+                                Ok(params) => params,
+                                Err(err) => {
+                                    log::warn!("{err}");
+                                    return;
+                                }
+                            };
+                        let interaction = DiscordCommand::new(ctx, command);
+                        self.search(&interaction, query_params).await;
+                    }
+                    "play" => {
+                        let options = match parse::options::<PlayOptions>(command.data.options()) {
+                            Ok(options) => options,
+                            Err(err) => {
+                                log::warn!("{err}");
+                                return;
+                            }
+                        };
+                        let interaction = DiscordCommandInteraction::new(ctx, command);
+                        self.play_command(&interaction, options).await;
+                    }
+                    "guess" => {
+                        let guess_options = match parse::options(command.data.options()) {
+                            Ok(value) => value,
+                            Err(err) => {
+                                log::warn!("Failed to parse guess: {err}");
+                                return;
+                            }
+                        };
+                        let interaction = DiscordCommandInteraction::new(ctx, command);
+                        self.guess_command(&interaction, guess_options).await;
+                    }
+                    "give_up" => {
+                        let interaction = DiscordCommandInteraction::new(ctx, command);
+                        self.give_up_command(&interaction).await;
+                    }
+                    _ => (),
                 }
-                "search" => {
-                    let query_params = match parse::options::<QueryParams>(command.data.options()) {
-                        Ok(params) => params,
-                        Err(err) => {
-                            log::warn!("{err}");
-                            return;
-                        }
-                    };
-                    let interaction = DiscordCommand::new(ctx, command);
-                    self.search(&interaction, query_params).await;
-                }
-                "play" => {
-                    let options = match parse::options::<PlayOptions>(command.data.options()) {
-                        Ok(options) => options,
-                        Err(err) => {
-                            log::warn!("{err}");
-                            return;
-                        }
-                    };
-                    let interaction = DiscordCommandInteraction::new(ctx, command);
-                    self.play_command(&interaction, options).await;
-                }
-                "guess" => {
-                    let guess_options = match parse::options(command.data.options()) {
-                        Ok(value) => value,
-                        Err(err) => {
-                            log::warn!("Failed to parse guess: {err}");
-                            return;
-                        }
-                    };
-                    let interaction = DiscordCommandInteraction::new(ctx, command);
-                    self.guess_command(&interaction, guess_options).await;
-                }
-                "give_up" => {
-                    let interaction = DiscordCommandInteraction::new(ctx, command);
-                    self.give_up_command(&interaction).await;
-                }
-                _ => (),
             }
+            Interaction::Component(component) => {
+                if component.data.custom_id == PICK_PRINT_ID {
+                    if let ComponentInteractionDataKind::StringSelect { values } =
+                        &component.data.kind
+                    {
+                        if let Some(card_id_str) = values.first() {
+                            log::info!(
+                                "Received Pick print command for {} from {}",
+                                card_id_str,
+                                component.channel_id,
+                            );
+                            match Uuid::parse_str(card_id_str) {
+                                Ok(card_id) => {
+                                    let interaction =
+                                        DiscordComponentInteraction::new(ctx, component);
+                                    self.select_print(&interaction, card_id).await;
+                                }
+                                Err(why) => log::warn!("Invalid card_id in print_select: {why}"),
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

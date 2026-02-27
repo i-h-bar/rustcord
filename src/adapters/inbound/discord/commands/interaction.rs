@@ -1,11 +1,14 @@
+use crate::adapters::inbound::discord::components::interaction::PICK_PRINT_ID;
 use crate::adapters::inbound::discord::utils::embed::create_embed;
 use crate::domain::card::Card;
+use crate::domain::set::Set;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
 use serenity::all::{
-    CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CommandInteraction, Context, CreateActionRow, CreateAttachment, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption,
 };
 use tokio::time::Instant;
 
@@ -42,7 +45,12 @@ impl DiscordCommand {
 
 #[async_trait]
 impl MessageInteraction for DiscordCommand {
-    async fn send_card(&self, card: Card, images: Images) -> Result<(), MessageInteractionError> {
+    async fn send_card(
+        &self,
+        card: Card,
+        images: Images,
+        sets: Option<Vec<Set>>,
+    ) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
         let back_image = if let Some(back_image) = images.back {
@@ -54,9 +62,24 @@ impl MessageInteraction for DiscordCommand {
         };
 
         let (front, back) = create_embed(card);
-        let message = CreateInteractionResponseMessage::new()
+        let mut message = CreateInteractionResponseMessage::new()
             .add_file(front_image)
             .add_embed(front);
+
+        message = if let Some(sets) = sets {
+            let options: Vec<CreateSelectMenuOption> = sets
+                .iter()
+                .take(25) // Discord's hard limit
+                .map(|s| CreateSelectMenuOption::new(s.name(), s.card_id().to_string()))
+                .collect();
+            let menu =
+                CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
+                    .placeholder("Select a print...");
+            let row = CreateActionRow::SelectMenu(menu);
+            message.components(vec![row])
+        } else {
+            message
+        };
 
         self.send_message(message).await?;
 

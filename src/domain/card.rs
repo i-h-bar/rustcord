@@ -1,4 +1,4 @@
-use crate::domain::search::CardAndImage;
+use crate::domain::search::CardImageAndSets;
 use crate::domain::utils::fuzzy::ToBytes;
 use crate::ports::inbound::client::MessageInteraction;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ use uuid::Uuid;
 pub struct Card {
     pub front_name: String,
     pub front_normalised_name: String,
+    pub front_oracle_id: Uuid,
     pub front_scryfall_url: String,
     pub front_image_id: Uuid,
     pub front_illustration_id: Option<Uuid>,
@@ -21,6 +22,7 @@ pub struct Card {
     pub front_type_line: String,
     pub front_oracle_text: String,
     pub back_name: Option<String>,
+    pub back_oracle_id: Option<Uuid>,
     pub back_scryfall_url: Option<String>,
     pub back_image_id: Option<Uuid>,
     pub back_illustration_id: Option<Uuid>,
@@ -37,6 +39,11 @@ pub struct Card {
 }
 
 impl Card {
+    #[must_use]
+    pub fn front_oracle_id(&self) -> &Uuid {
+        &self.front_oracle_id
+    }
+
     #[must_use]
     pub fn image_ids(&self) -> (&Uuid, Option<&Uuid>) {
         (&self.front_image_id, self.back_image_id.as_ref())
@@ -83,7 +90,10 @@ impl PartialEq<Card> for &str {
     }
 }
 
-pub async fn card_response<MI: MessageInteraction>(card: Option<CardAndImage>, interaction: &MI) {
+pub async fn card_response<MI: MessageInteraction>(
+    card: Option<CardImageAndSets>,
+    interaction: &MI,
+) {
     match card {
         None => {
             if let Err(why) = interaction
@@ -93,8 +103,8 @@ pub async fn card_response<MI: MessageInteraction>(card: Option<CardAndImage>, i
                 log::error!("Error sending card not found message :( {why:?}");
             }
         }
-        Some((card, images)) => {
-            if let Err(why) = interaction.send_card(card, images).await {
+        Some((card, images, sets)) => {
+            if let Err(why) = interaction.send_card(card, images, sets).await {
                 log::error!("Error sending card message :( {why:?}");
             };
         }
@@ -113,6 +123,7 @@ mod tests {
             front_normalised_name: String::from("lightning bolt"),
             front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
             front_image_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            front_oracle_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             front_illustration_id: Some(
                 Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
             ),
@@ -125,6 +136,7 @@ mod tests {
             front_type_line: String::from("Instant"),
             front_oracle_text: String::from("Lightning Bolt deals 3 damage to any target."),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
@@ -292,14 +304,14 @@ mod tests {
             front: vec![1, 2, 3],
             back: None,
         };
-        let card_and_image = Some((card.clone(), images.clone()));
+        let card_and_image = Some((card.clone(), images.clone(), None));
 
         let mut mock_interaction = MockMessageInteraction::new();
         mock_interaction
             .expect_send_card()
-            .withf(move |c, i| c == &card && i.front == images.front && i.back == images.back)
+            .withf(move |c, i, _s| c == &card && i.front == images.front && i.back == images.back)
             .times(1)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         card_response(card_and_image, &mock_interaction).await;
     }
@@ -311,13 +323,13 @@ mod tests {
             front: vec![1, 2, 3],
             back: None,
         };
-        let card_and_image = Some((card, images));
+        let card_and_image = Some((card, images, None));
 
         let mut mock_interaction = MockMessageInteraction::new();
         mock_interaction
             .expect_send_card()
             .times(1)
-            .returning(|_, _| Err(MessageInteractionError::new(String::from("Send error"))));
+            .returning(|_, _, _| Err(MessageInteractionError::new(String::from("Send error"))));
 
         // Should not panic even when send_card fails
         card_response(card_and_image, &mock_interaction).await;

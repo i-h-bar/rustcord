@@ -1,10 +1,12 @@
 mod queries;
 
 use crate::adapters::outbound::card_store::postgres::queries::{
-    FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS,
-    FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD, RANDOM_SET_CARD,
+    ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
+    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
+    RANDOM_SET_CARD,
 };
 use crate::domain::card::Card;
+use crate::domain::set::Set;
 use crate::ports::outbound::card_store::CardStore;
 use async_trait::async_trait;
 use sqlx::postgres::{PgPoolOptions, PgRow};
@@ -124,6 +126,43 @@ impl CardStore for Postgres {
             Ok(row) => Some(Card::from(&row)),
         }
     }
+
+    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<Set>> {
+        match sqlx::query(ALL_PRINTS)
+            .bind(oracle_id)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search all prints fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| Set::from(&row)).collect()),
+        }
+    }
+
+    async fn fetch_card_by_id(&self, id: &Uuid) -> Option<Card> {
+        match sqlx::query(CARD_FROM_ID)
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed card fetch - {why}");
+                None
+            }
+            Ok(row) => Some(Card::from(&row)),
+        }
+    }
+}
+
+impl Set {
+    fn from(row: &PgRow) -> Self {
+        Self::new(
+            row.get::<Uuid, &str>("card_id"),
+            row.get::<String, &str>("set_name"),
+        )
+    }
 }
 
 impl Card {
@@ -131,6 +170,7 @@ impl Card {
         Self {
             front_name: row.get::<String, &str>("front_name"),
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
+            front_oracle_id: row.get::<Uuid, &str>("front_oracle_id"),
             front_scryfall_url: row.get::<String, &str>("front_scryfall_url"),
             front_image_id: row.get::<Uuid, &str>("front_image_id"),
             front_illustration_id: row.get::<Option<Uuid>, &str>("front_illustration_id"),
@@ -143,6 +183,7 @@ impl Card {
             front_type_line: row.get::<String, &str>("front_type_line"),
             front_oracle_text: row.get::<String, &str>("front_oracle_text"),
             back_name: row.get::<Option<String>, &str>("back_name"),
+            back_oracle_id: row.get::<Option<Uuid>, &str>("back_oracle_id"),
             back_scryfall_url: row.get::<Option<String>, &str>("back_scryfall_url"),
             back_image_id: row.get::<Option<Uuid>, &str>("back_image_id"),
             back_illustration_id: row.get::<Option<Uuid>, &str>("back_illustration_id"),

@@ -71,6 +71,7 @@ mod tests {
             front_normalised_name: String::from("test card"),
             front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
             front_image_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            front_oracle_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             front_illustration_id: Some(
                 Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
             ),
@@ -83,6 +84,7 @@ mod tests {
             front_type_line: String::from("Creature - Test"),
             front_oracle_text: String::from("Test ability"),
             back_name: None,
+            back_oracle_id: None,
             back_scryfall_url: None,
             back_image_id: None,
             back_illustration_id: None,
