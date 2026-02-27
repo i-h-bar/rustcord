@@ -86,7 +86,7 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
 
                                      similarity(artist.normalised_name, $2) as artist_sml
 from card
-         left join rule on card.oracle_id = ruke.id
+         left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
 where card.normalised_name % $1
