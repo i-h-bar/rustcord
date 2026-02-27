@@ -182,7 +182,6 @@ impl Card {
             front_defence: row.get::<Option<String>, &str>("front_defence"),
             front_type_line: row.get::<String, &str>("front_type_line"),
             front_oracle_text: row.get::<String, &str>("front_oracle_text"),
-            back_name: row.get::<Option<String>, &str>("back_name"),
             back_id: row.get::<Option<Uuid>, &str>("back_id"),
             artist: row.get::<String, &str>("artist"),
             set_name: row.get::<String, &str>("set_name"),

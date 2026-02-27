@@ -21,7 +21,6 @@ pub struct Card {
     pub front_defence: Option<String>,
     pub front_type_line: String,
     pub front_oracle_text: String,
-    pub back_name: Option<String>,
     pub back_id: Option<Uuid>,
     pub artist: String,
     pub set_name: String,
