@@ -78,7 +78,7 @@ mod tests {
             back_name: None,
             artist: String::from("Test Artist"),
             set_name: String::from("Test Set"),
-            back_id: None
+            back_id: None,
         }
     }
 

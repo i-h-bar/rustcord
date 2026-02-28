@@ -54,7 +54,7 @@ impl Card {
 
     #[must_use]
     pub fn illustration_ids(&self) -> Option<&Uuid> {
-            self.front_illustration_id.as_ref()
+        self.front_illustration_id.as_ref()
     }
 
     #[must_use]

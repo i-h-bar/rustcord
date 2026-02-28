@@ -1,11 +1,11 @@
-use crate::adapters::inbound::discord::components::interaction::{FLIP, PICK_PRINT_ID};
 use crate::adapters::inbound::discord::utils::embed::create_embed;
+use crate::adapters::inbound::discord::utils::message::{build_flip_button, build_set_dropdown};
 use crate::domain::card::Card;
 use crate::domain::set::Set;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
-use serenity::all::{ButtonStyle, Context, CreateActionRow, CreateAttachment, CreateButton, CreateMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, Message};
+use serenity::all::{Context, CreateActionRow, CreateAttachment, CreateMessage, Message};
 use tokio::time::Instant;
 
 pub struct DiscordMessageInteration {
@@ -57,25 +57,12 @@ impl MessageInteraction for DiscordMessageInteration {
         let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
 
         let mut message = CreateMessage::new().add_file(front_image);
-        if let Some(sets) = sets {
-            let options: Vec<CreateSelectMenuOption> = sets
-                .iter()
-                .take(25) // Discord's hard limit
-                .map(|s| CreateSelectMenuOption::new(s.name(), s.card_id().to_string()))
-                .collect();
-            let menu =
-                CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
-                    .placeholder("Select a print...");
-            let row = CreateActionRow::SelectMenu(menu);
-            components.push(row)
+        if let Some(component) = build_set_dropdown(sets) {
+            components.push(component);
         }
 
-        if let Some(back_id) = card.back_id {
-            let button = CreateButton::new(format!("{FLIP}{back_id}"))
-                .label("🔁")
-                .style(ButtonStyle::Secondary);
-            let row = CreateActionRow::Buttons(vec![button]);
-            components.push(row);
+        if let Some(component) = build_flip_button(&card) {
+            components.push(component);
         }
 
         if !components.is_empty() {
