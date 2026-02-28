@@ -120,19 +120,7 @@ mod tests {
             front_defence: None,
             front_type_line: String::from("Instant"),
             front_oracle_text: String::from("Lightning Bolt deals 3 damage to any target."),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: String::from("Christopher Rush"),
             set_name: String::from("Alpha"),
         }
@@ -142,11 +130,7 @@ mod tests {
         let mut card = create_test_card();
         card.front_name = String::from("Delver of Secrets");
         card.front_normalised_name = String::from("delver of secrets");
-        card.back_name = Some(String::from("Insectile Aberration"));
-        card.back_image_id = Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap());
-        card.back_illustration_id =
-            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440003").unwrap());
-        card.back_scryfall_url = Some(String::from("https://scryfall.com/card/test/1/back"));
+        card.back_id = Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap());
         card
     }
 
@@ -162,14 +146,14 @@ mod tests {
     #[test]
     fn test_back_image_id_none() {
         let card = create_test_card();
-        assert!(card.back_image_id().is_none());
+        assert!(card.back_id().is_none());
     }
 
     #[test]
     fn test_back_image_id_some() {
         let card = create_double_faced_card();
         assert_eq!(
-            card.back_image_id(),
+            card.back_id(),
             Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap())
         );
     }
@@ -177,25 +161,20 @@ mod tests {
     #[test]
     fn test_image_ids_single_face() {
         let card = create_test_card();
-        let (front, back) = card.image_id();
+        let front = card.image_id();
         assert_eq!(
             front,
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()
         );
-        assert!(back.is_none());
     }
 
     #[test]
     fn test_image_ids_double_face() {
         let card = create_double_faced_card();
-        let (front, back) = card.image_id();
+        let front = card.image_id();
         assert_eq!(
             front,
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()
-        );
-        assert_eq!(
-            back,
-            Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap())
         );
     }
 
@@ -218,25 +197,20 @@ mod tests {
     #[test]
     fn test_illustration_ids_single_face() {
         let card = create_test_card();
-        let (front, back) = card.illustration_ids();
+        let front = card.illustration_ids();
         assert_eq!(
             front,
             Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap())
         );
-        assert!(back.is_none());
     }
 
     #[test]
     fn test_illustration_ids_double_face() {
         let card = create_double_faced_card();
-        let (front, back) = card.illustration_ids();
+        let front = card.illustration_ids();
         assert_eq!(
             front,
             Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap())
-        );
-        assert_eq!(
-            back,
-            Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440003").unwrap())
         );
     }
 
@@ -287,14 +261,13 @@ mod tests {
         let card = create_test_card();
         let images = Images {
             front: vec![1, 2, 3],
-            back: None,
         };
         let card_and_image = Some((card.clone(), images.clone(), None));
 
         let mut mock_interaction = MockMessageInteraction::new();
         mock_interaction
             .expect_send_card()
-            .withf(move |c, i, _s| c == &card && i.front == images.front && i.back == images.back)
+            .withf(move |c, i, _s| c == &card && i.front == images.front)
             .times(1)
             .returning(|_, _, _| Ok(()));
 
@@ -306,7 +279,6 @@ mod tests {
         let card = create_test_card();
         let images = Images {
             front: vec![1, 2, 3],
-            back: None,
         };
         let card_and_image = Some((card, images, None));
 

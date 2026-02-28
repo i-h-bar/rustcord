@@ -167,10 +167,9 @@ mod tests {
     async fn test_search() {
         let query = QueryParams::from_test(String::from("gitrog monster"), None, None, None);
         let front_image_id = uuid!("40489e28-878d-44a2-847f-07beef1aa0f8");
-        let card = Card { front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_name: None, back_oracle_id: None, back_scryfall_url: None, back_image_id: None, back_illustration_id: None, back_mana_cost: None, back_colour_identity: None, back_power: None, back_toughness: None, back_loyalty: None, back_defence: None, back_type_line: None, back_oracle_text: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
+        let card = Card { front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_id: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
         let images = Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         };
 
         let mut image_store = MockImageStore::new();
@@ -254,25 +253,12 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
         let images = Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         };
 
         let mut image_store = MockImageStore::new();
@@ -326,25 +312,12 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
         let images = Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         };
 
         let mut image_store = MockImageStore::new();
@@ -387,25 +360,12 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
         let images = Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         };
 
         let mut image_store = MockImageStore::new();
@@ -451,19 +411,7 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
@@ -483,26 +431,13 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Target creature gets +3/+3 until end of turn.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Mark Poole".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
 
         let images = Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         };
 
         let mut image_store = MockImageStore::new();
@@ -573,25 +508,12 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
         let images = Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         };
 
         let mut image_store = MockImageStore::new();

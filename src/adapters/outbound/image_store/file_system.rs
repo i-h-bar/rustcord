@@ -75,19 +75,15 @@ mod tests {
             front_defence: None,
             front_type_line: String::from("Creature - Test"),
             front_oracle_text: String::from("Test ability"),
-            back_name: None,
+            back_id: None,
             artist: String::from("Test Artist"),
             set_name: String::from("Test Set"),
-            back_id: None,
         }
     }
 
     fn create_test_card_double_face() -> Card {
         let mut card = create_test_card_single_face();
-        card.back_name = Some(String::from("Test Card Back"));
-        card.back_image_id = Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap());
-        card.back_illustration_id =
-            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440003").unwrap());
+        card.back_id = Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap());
         card
     }
 
@@ -115,22 +111,8 @@ mod tests {
         let front_data = vec![1, 2, 3, 4];
         let images = Images {
             front: front_data.clone(),
-            back: None,
         };
         assert_eq!(images.front, front_data);
-        assert!(images.back.is_none());
-    }
-
-    #[test]
-    fn test_images_struct_double_face() {
-        let front_data = vec![1, 2, 3, 4];
-        let back_data = vec![5, 6, 7, 8];
-        let images = Images {
-            front: front_data.clone(),
-            back: Some(back_data.clone()),
-        };
-        assert_eq!(images.front, front_data);
-        assert_eq!(images.back, Some(back_data));
     }
 
     #[tokio::test]
@@ -148,42 +130,33 @@ mod tests {
     #[test]
     fn test_card_helpers_single_face() {
         let card = create_test_card_single_face();
-        let (front_id, back_id) = card.image_id();
+        let front_id = card.image_id();
 
         assert_eq!(
             front_id,
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()
         );
-        assert!(back_id.is_none());
     }
 
     #[test]
     fn test_card_helpers_double_face() {
         let card = create_test_card_double_face();
-        let (front_id, back_id) = card.image_id();
+        let front_id = card.image_id();
 
         assert_eq!(
             front_id,
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()
-        );
-        assert_eq!(
-            back_id,
-            Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap())
         );
     }
 
     #[test]
     fn test_card_illustration_ids() {
         let card = create_test_card_double_face();
-        let (front_ill, back_ill) = card.illustration_ids();
+        let front_ill = card.illustration_ids();
 
         assert_eq!(
             front_ill,
             Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap())
-        );
-        assert_eq!(
-            back_ill,
-            Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440003").unwrap())
         );
     }
 }
