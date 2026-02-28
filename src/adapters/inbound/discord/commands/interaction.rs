@@ -1,15 +1,11 @@
-use crate::adapters::inbound::discord::components::interaction::PICK_PRINT_ID;
+use crate::adapters::inbound::discord::components::interaction::{PICK_PRINT_ID, FLIP};
 use crate::adapters::inbound::discord::utils::embed::create_embed;
 use crate::domain::card::Card;
 use crate::domain::set::Set;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
-use serenity::all::{
-    CommandInteraction, Context, CreateActionRow, CreateAttachment, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption,
-};
+use serenity::all::{ButtonStyle, CommandInteraction, Context, CreateActionRow, CreateAttachment, CreateButton, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
 use tokio::time::Instant;
 
 pub struct DiscordCommand {
@@ -53,13 +49,12 @@ impl MessageInteraction for DiscordCommand {
     ) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
-
-        let front = create_embed(card);
+        let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
+        
         let mut message = CreateInteractionResponseMessage::new()
-            .add_file(front_image)
-            .add_embed(front);
+            .add_file(front_image);
 
-        message = if let Some(sets) = sets {
+        if let Some(sets) = sets {
             let options: Vec<CreateSelectMenuOption> = sets
                 .iter()
                 .take(25) // Discord's hard limit
@@ -69,11 +64,23 @@ impl MessageInteraction for DiscordCommand {
                 CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
                     .placeholder("Select a print...");
             let row = CreateActionRow::SelectMenu(menu);
-            message.components(vec![row])
-        } else {
-            message
-        };
+            components.push(row);
+        }
 
+        if let Some(back_id) = card.back_id {
+            let button = CreateButton::new(format!("{FLIP}{back_id}"))
+                .label("🔁")
+                .style(ButtonStyle::Secondary);
+            let row = CreateActionRow::Buttons(vec![button]);
+            components.push(row);
+        }
+
+        if !components.is_empty() {
+            message = message.components(components);
+        }
+
+        let front = create_embed(card);
+        message = message.add_embed(front);
         self.send_message(message).await?;
 
         Ok(())

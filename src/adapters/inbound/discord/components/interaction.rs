@@ -4,13 +4,10 @@ use crate::domain::set::Set;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
-use serenity::all::{
-    ComponentInteraction, Context, CreateActionRow, CreateAttachment, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption,
-};
+use serenity::all::{ButtonStyle, ComponentInteraction, Context, CreateActionRow, CreateAttachment, CreateButton, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
 
 pub const PICK_PRINT_ID: &str = "pick-print-id";
+pub const FLIP: &str = "flip:";
 
 pub struct DiscordComponentInteraction {
     ctx: Context,
@@ -33,11 +30,10 @@ impl MessageInteraction for DiscordComponentInteraction {
     ) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
-
-        let front = create_embed(card);
+        let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
+        
         let mut message = CreateInteractionResponseMessage::new()
-            .add_file(front_image)
-            .add_embed(front);
+            .add_file(front_image);
 
         if let Some(sets) = sets {
             let options: Vec<CreateSelectMenuOption> = sets
@@ -49,9 +45,23 @@ impl MessageInteraction for DiscordComponentInteraction {
                 CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
                     .placeholder("Select a print...");
             let row = CreateActionRow::SelectMenu(menu);
-            message = message.components(vec![row]);
+            components.push(row);
         }
 
+        if let Some(back_id) = card.back_id {
+            let button = CreateButton::new(format!("{FLIP}{back_id}"))
+                .label("🔁")
+                .style(ButtonStyle::Secondary);
+            let row = CreateActionRow::Buttons(vec![button]);
+            components.push(row);
+        }
+
+        if !components.is_empty() {
+            message = message.components(components);
+        }
+
+        let front = create_embed(card);
+        message = message.add_embed(front);
         self.component
             .create_response(&self.ctx, CreateInteractionResponse::UpdateMessage(message))
             .await
