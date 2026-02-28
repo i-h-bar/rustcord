@@ -1,175 +1,97 @@
 pub const FUZZY_SEARCH_DISTINCT_CARDS: &str = r"
-select distinct on (front.oracle_id) front.id                   as front_id,
-                                     front.oracle_id            as front_oracle_id,
-                                     front.name                 as front_name,
-                                     front.normalised_name      as front_normalised_name,
-                                     front.scryfall_url         as front_scryfall_url,
-                                     front.image_id             as front_image_id,
-                                     front.illustration_id      as front_illustration_id,
-                                     front_rule.mana_cost       as front_mana_cost,
-                                     front_rule.colour_identity as front_colour_identity,
-                                     front_rule.power           as front_power,
-                                     front_rule.toughness       as front_toughness,
-                                     front_rule.loyalty         as front_loyalty,
-                                     front_rule.defence         as front_defence,
-                                     front_rule.type_line       as front_type_line,
-                                     front_rule.keywords        as front_keywords,
-                                     front_rule.oracle_text     as front_oracle_text,
+select distinct on (card.oracle_id)  card.id                   as front_id,
+                                     card.oracle_id            as front_oracle_id,
+                                     card.name                 as front_name,
+                                     card.normalised_name      as front_normalised_name,
+                                     card.scryfall_url         as front_scryfall_url,
+                                     card.image_id             as front_image_id,
+                                     card.illustration_id      as front_illustration_id,
+                                     card.backside_id          as back_id,
 
-                                     back.id                    as back_id,
-                                     back.oracle_id             as back_oracle_id,
-                                     back.name                  as back_name,
-                                     back.scryfall_url          as back_scryfall_url,
-                                     back.image_id              as back_image_id,
-                                     back.illustration_id       as back_illustration_id,
-                                     back_rule.mana_cost        as back_mana_cost,
-                                     back_rule.colour_identity  as back_colour_identity,
-                                     back_rule.power            as back_power,
-                                     back_rule.toughness        as back_toughness,
-                                     back_rule.loyalty          as back_loyalty,
-                                     back_rule.defence          as back_defence,
-                                     back_rule.type_line        as back_type_line,
-                                     back_rule.keywords         as back_keywords,
-                                     back_rule.oracle_text      as back_oracle_text,
+                                     rule.mana_cost            as front_mana_cost,
+                                     rule.colour_identity      as front_colour_identity,
+                                     rule.power                as front_power,
+                                     rule.toughness            as front_toughness,
+                                     rule.loyalty              as front_loyalty,
+                                     rule.defence              as front_defence,
+                                     rule.type_line            as front_type_line,
+                                     rule.keywords             as front_keywords,
+                                     rule.oracle_text          as front_oracle_text,
 
-                                     front.release_date         as release_date,
-                                     artist.name                as artist,
-                                     set.name                   as set_name,
-
-                                     price.usd                  as usd,
-                                     price.usd_foil             as usd_foil,
-                                     price.usd_etched           as usd_etched,
-                                     price.euro                 as euro,
-                                     price.euro_foil            as euro_foil,
-                                     price.tix                  as tix,
-                                     price.updated_time         as updated_time
-from card front
-         left join card back on front.backside_id = back.id
-         left join rule front_rule on front.oracle_id = front_rule.id
-         left join rule back_rule on back.oracle_id = back_rule.id
-         left join artist on front.artist_id = artist.id
-         left join set on set.id = front.set_id
-         left join price on front.id = price.id
-where front.normalised_name % $1
-order by front.oracle_id, random() desc;
+                                     artist.name               as artist,
+                                     set.name                  as set_name
+from card
+         left join rule on card.oracle_id = rule.id
+         left join artist on card.artist_id = artist.id
+         left join set on set.id = card.set_id
+where card.normalised_name % $1
+order by card.oracle_id, random() desc;
 ";
 
 pub const FUZZY_SEARCH_CARD_AND_SET_NAME: &str = r"
-select distinct on (front.oracle_id) front.id                   as front_id,
-                                     front.oracle_id            as front_oracle_id,
-                                     front.name                 as front_name,
-                                     front.normalised_name      as front_normalised_name,
-                                     front.scryfall_url         as front_scryfall_url,
-                                     front.image_id             as front_image_id,
-                                     front.illustration_id      as front_illustration_id,
-                                     front_rule.mana_cost       as front_mana_cost,
-                                     front_rule.colour_identity as front_colour_identity,
-                                     front_rule.power           as front_power,
-                                     front_rule.toughness       as front_toughness,
-                                     front_rule.loyalty         as front_loyalty,
-                                     front_rule.defence         as front_defence,
-                                     front_rule.type_line       as front_type_line,
-                                     front_rule.keywords        as front_keywords,
-                                     front_rule.oracle_text     as front_oracle_text,
+select distinct on (card.oracle_id)  card.id                   as front_id,
+                                     card.oracle_id            as front_oracle_id,
+                                     card.name                 as front_name,
+                                     card.normalised_name      as front_normalised_name,
+                                     card.scryfall_url         as front_scryfall_url,
+                                     card.image_id             as front_image_id,
+                                     card.illustration_id      as front_illustration_id,
+                                     card.backside_id          as back_id,
+                                     rule.mana_cost            as front_mana_cost,
+                                     rule.colour_identity      as front_colour_identity,
+                                     rule.power                as front_power,
+                                     rule.toughness            as front_toughness,
+                                     rule.loyalty              as front_loyalty,
+                                     rule.defence              as front_defence,
+                                     rule.type_line            as front_type_line,
+                                     rule.keywords             as front_keywords,
 
-                                     back.id                    as back_id,
-                                     back.oracle_id             as back_oracle_id,
-                                     back.name                  as back_name,
-                                     back.scryfall_url          as back_scryfall_url,
-                                     back.image_id              as back_image_id,
-                                     back.illustration_id       as back_illustration_id,
-                                     back_rule.mana_cost        as back_mana_cost,
-                                     back_rule.colour_identity  as back_colour_identity,
-                                     back_rule.power            as back_power,
-                                     back_rule.toughness        as back_toughness,
-                                     back_rule.loyalty          as back_loyalty,
-                                     back_rule.defence          as back_defence,
-                                     back_rule.type_line        as back_type_line,
-                                     back_rule.keywords         as back_keywords,
-                                     back_rule.oracle_text      as back_oracle_text,
+                                     rule.oracle_text          as front_oracle_text,
 
-                                     front.release_date         as release_date,
-                                     artist.name                as artist,
-                                     set.name                   as set_name,
-
-                                     price.usd                  as usd,
-                                     price.usd_foil             as usd_foil,
-                                     price.usd_etched           as usd_etched,
-                                     price.euro                 as euro,
-                                     price.euro_foil            as euro_foil,
-                                     price.tix                  as tix,
-                                     price.updated_time         as updated_time,
+                                     artist.name               as artist,
+                                     set.name                  as set_name,
 
                                      similarity(set.normalised_name, $2) as set_sml
-from card front
-         left join card back on front.backside_id = back.id
-         left join rule front_rule on front.oracle_id = front_rule.id
-         left join rule back_rule on back.oracle_id = back_rule.id
-         left join artist on front.artist_id = artist.id
-         left join set on set.id = front.set_id
-         left join price on front.id = price.id
-where front.normalised_name % $1
+from card
+         left join rule on card.oracle_id = rule.id
+         left join artist on card.artist_id = artist.id
+         left join set on set.id = card.set_id
+where card.normalised_name % $1
   and set.normalised_name % $2
-order by front.oracle_id, set_sml, random() desc;
+order by card.oracle_id, set_sml, random() desc;
 ";
 
 pub const FUZZY_SEARCH_CARD_AND_ARTIST: &str = r"
-select distinct on (front.oracle_id) front.id                   as front_id,
-                                     front.oracle_id            as front_oracle_id,
-                                     front.name                 as front_name,
-                                     front.normalised_name      as front_normalised_name,
-                                     front.scryfall_url         as front_scryfall_url,
-                                     front.image_id             as front_image_id,
-                                     front.illustration_id      as front_illustration_id,
-                                     front_rule.mana_cost       as front_mana_cost,
-                                     front_rule.colour_identity as front_colour_identity,
-                                     front_rule.power           as front_power,
-                                     front_rule.toughness       as front_toughness,
-                                     front_rule.loyalty         as front_loyalty,
-                                     front_rule.defence         as front_defence,
-                                     front_rule.type_line       as front_type_line,
-                                     front_rule.keywords        as front_keywords,
-                                     front_rule.oracle_text     as front_oracle_text,
+select distinct on (card.oracle_id)  card.id                   as front_id,
+                                     card.oracle_id            as front_oracle_id,
+                                     card.name                 as front_name,
+                                     card.normalised_name      as front_normalised_name,
+                                     card.scryfall_url         as front_scryfall_url,
+                                     card.image_id             as front_image_id,
+                                     card.illustration_id      as front_illustration_id,
+                                     card.backside_id          as back_id,
+                                     rule.mana_cost            as front_mana_cost,
+                                     rule.colour_identity      as front_colour_identity,
+                                     rule.power                as front_power,
+                                     rule.toughness            as front_toughness,
+                                     rule.loyalty              as front_loyalty,
+                                     rule.defence              as front_defence,
+                                     rule.type_line            as front_type_line,
+                                     rule.keywords             as front_keywords,
 
-                                     back.id                    as back_id,
-                                     back.oracle_id             as back_oracle_id,
-                                     back.name                  as back_name,
-                                     back.scryfall_url          as back_scryfall_url,
-                                     back.image_id              as back_image_id,
-                                     back.illustration_id       as back_illustration_id,
-                                     back_rule.mana_cost        as back_mana_cost,
-                                     back_rule.colour_identity  as back_colour_identity,
-                                     back_rule.power            as back_power,
-                                     back_rule.toughness        as back_toughness,
-                                     back_rule.loyalty          as back_loyalty,
-                                     back_rule.defence          as back_defence,
-                                     back_rule.type_line        as back_type_line,
-                                     back_rule.keywords         as back_keywords,
-                                     back_rule.oracle_text      as back_oracle_text,
+                                     rule.oracle_text          as front_oracle_text,
 
-                                     front.release_date         as release_date,
-                                     artist.name                as artist,
-                                     set.name                   as set_name,
-
-                                     price.usd                  as usd,
-                                     price.usd_foil             as usd_foil,
-                                     price.usd_etched           as usd_etched,
-                                     price.euro                 as euro,
-                                     price.euro_foil            as euro_foil,
-                                     price.tix                  as tix,
-                                     price.updated_time         as updated_time,
+                                     artist.name               as artist,
+                                     set.name                  as set_name,
 
                                      similarity(artist.normalised_name, $2) as artist_sml
-from card front
-         left join card back on front.backside_id = back.id
-         left join rule front_rule on front.oracle_id = front_rule.id
-         left join rule back_rule on back.oracle_id = back_rule.id
-         left join artist on front.artist_id = artist.id
-         left join set on set.id = front.set_id
-         left join price on front.id = price.id
-where front.normalised_name % $1
+from card
+         left join rule on card.oracle_id = rule.id
+         left join artist on card.artist_id = artist.id
+         left join set on set.id = card.set_id
+where card.normalised_name % $1
   and artist.normalised_name % $2
-order by front.oracle_id, artist_sml, random() desc;
+order by card.oracle_id, artist_sml, random() desc;
 ";
 
 pub const FUZZY_SEARCH_SET_NAME: &str = r"
@@ -189,39 +111,23 @@ select set.id                     as set_id,
        front.scryfall_url         as front_scryfall_url,
        front.image_id             as front_image_id,
        front.illustration_id      as front_illustration_id,
-       front_rule.mana_cost       as front_mana_cost,
-       front_rule.colour_identity as front_colour_identity,
-       front_rule.power           as front_power,
-       front_rule.toughness       as front_toughness,
-       front_rule.loyalty         as front_loyalty,
-       front_rule.defence         as front_defence,
-       front_rule.type_line       as front_type_line,
-       front_rule.keywords        as front_keywords,
-       front_rule.oracle_text     as front_oracle_text,
+       rule.mana_cost             as front_mana_cost,
+       rule.colour_identity       as front_colour_identity,
+       rule.power                 as front_power,
+       rule.toughness             as front_toughness,
+       rule.loyalty               as front_loyalty,
+       rule.defence               as front_defence,
+       rule.type_line             as front_type_line,
+       rule.keywords              as front_keywords,
+       rule.oracle_text           as front_oracle_text,
 
-       back.id                    as back_id,
-       back.oracle_id             as back_oracle_id,
-       back.name                  as back_name,
-       back.scryfall_url          as back_scryfall_url,
-       back.image_id              as back_image_id,
-       back.illustration_id       as back_illustration_id,
-       back_rule.mana_cost        as back_mana_cost,
-       back_rule.colour_identity  as back_colour_identity,
-       back_rule.power            as back_power,
-       back_rule.toughness        as back_toughness,
-       back_rule.loyalty          as back_loyalty,
-       back_rule.defence          as back_defence,
-       back_rule.type_line        as back_type_line,
-       back_rule.keywords         as back_keywords,
-       back_rule.oracle_text      as back_oracle_text,
+       front.backside_id          as back_id,
 
        front.release_date         as release_date,
        artist.name                as artist,
        set.name                   as set_name
 from (select * from card where random() < 0.0001 limit 25) front
-         left join card back on front.backside_id = back.id
-         left join rule front_rule on front.oracle_id = front_rule.id
-         left join rule back_rule on back.oracle_id = back_rule.id
+         left join rule on front.oracle_id = rule.id
          join set on front.set_id = set.id
          left join artist on front.artist_id = artist.id
 where front.illustration_id is not null
@@ -238,39 +144,23 @@ select set.id                     as set_id,
        front.scryfall_url         as front_scryfall_url,
        front.image_id             as front_image_id,
        front.illustration_id      as front_illustration_id,
-       front_rule.mana_cost       as front_mana_cost,
-       front_rule.colour_identity as front_colour_identity,
-       front_rule.power           as front_power,
-       front_rule.toughness       as front_toughness,
-       front_rule.loyalty         as front_loyalty,
-       front_rule.defence         as front_defence,
-       front_rule.type_line       as front_type_line,
-       front_rule.keywords        as front_keywords,
-       front_rule.oracle_text     as front_oracle_text,
+       rule.mana_cost             as front_mana_cost,
+       rule.colour_identity       as front_colour_identity,
+       rule.power                 as front_power,
+       rule.toughness             as front_toughness,
+       rule.loyalty               as front_loyalty,
+       rule.defence               as front_defence,
+       rule.type_line             as front_type_line,
+       rule.keywords              as front_keywords,
+       rule.oracle_text           as front_oracle_text,
 
-       back.id                    as back_id,
-       back.oracle_id             as back_oracle_id,
-       back.name                  as back_name,
-       back.scryfall_url          as back_scryfall_url,
-       back.image_id              as back_image_id,
-       back.illustration_id       as back_illustration_id,
-       back_rule.mana_cost        as back_mana_cost,
-       back_rule.colour_identity  as back_colour_identity,
-       back_rule.power            as back_power,
-       back_rule.toughness        as back_toughness,
-       back_rule.loyalty          as back_loyalty,
-       back_rule.defence          as back_defence,
-       back_rule.type_line        as back_type_line,
-       back_rule.keywords         as back_keywords,
-       back_rule.oracle_text      as back_oracle_text,
+       front.backside_id          as back_id,
 
        front.release_date         as release_date,
        artist.name                as artist,
        set.name                   as set_name
-from (select * from card where random() < 0.1 limit 2500) front
-         left join card back on front.backside_id = back.id
-         left join rule front_rule on front.oracle_id = front_rule.id
-         left join rule back_rule on back.oracle_id = back_rule.id
+from (select * from card where random() < 0.0001 limit 25) front
+         left join rule on front.oracle_id = rule.id
          join set on front.set_id = set.id
          left join artist on front.artist_id = artist.id
 where front.illustration_id is not null
@@ -287,56 +177,30 @@ where card.oracle_id = $1;
 ";
 
 pub const CARD_FROM_ID: &str = r"
-select front.id                   as front_id,
-       front.oracle_id            as front_oracle_id,
-       front.name                 as front_name,
-       front.normalised_name      as front_normalised_name,
-       front.scryfall_url         as front_scryfall_url,
-       front.image_id             as front_image_id,
-       front.illustration_id      as front_illustration_id,
-       front_rule.mana_cost       as front_mana_cost,
-       front_rule.colour_identity as front_colour_identity,
-       front_rule.power           as front_power,
-       front_rule.toughness       as front_toughness,
-       front_rule.loyalty         as front_loyalty,
-       front_rule.defence         as front_defence,
-       front_rule.type_line       as front_type_line,
-       front_rule.keywords        as front_keywords,
-       front_rule.oracle_text     as front_oracle_text,
+select card.id                   as front_id,
+       card.oracle_id            as front_oracle_id,
+       card.name                 as front_name,
+       card.normalised_name      as front_normalised_name,
+       card.scryfall_url         as front_scryfall_url,
+       card.image_id             as front_image_id,
+       card.illustration_id      as front_illustration_id,
+       rule.mana_cost            as front_mana_cost,
+       rule.colour_identity      as front_colour_identity,
+       rule.power                as front_power,
+       rule.toughness            as front_toughness,
+       rule.loyalty              as front_loyalty,
+       rule.defence              as front_defence,
+       rule.type_line            as front_type_line,
+       rule.keywords             as front_keywords,
+       rule.oracle_text          as front_oracle_text,
 
-       back.id                    as back_id,
-       back.oracle_id             as back_oracle_id,
-       back.name                  as back_name,
-       back.scryfall_url          as back_scryfall_url,
-       back.image_id              as back_image_id,
-       back.illustration_id       as back_illustration_id,
-       back_rule.mana_cost        as back_mana_cost,
-       back_rule.colour_identity  as back_colour_identity,
-       back_rule.power            as back_power,
-       back_rule.toughness        as back_toughness,
-       back_rule.loyalty          as back_loyalty,
-       back_rule.defence          as back_defence,
-       back_rule.type_line        as back_type_line,
-       back_rule.keywords         as back_keywords,
-       back_rule.oracle_text      as back_oracle_text,
+       card.backside_id          as back_id,
 
-       front.release_date         as release_date,
-       artist.name                as artist,
-       set.name                   as set_name,
-
-       price.usd                  as usd,
-       price.usd_foil             as usd_foil,
-       price.usd_etched           as usd_etched,
-       price.euro                 as euro,
-       price.euro_foil            as euro_foil,
-       price.tix                  as tix,
-       price.updated_time         as updated_time
-from card front
-         left join card back on front.backside_id = back.id
-         left join rule front_rule on front.oracle_id = front_rule.id
-         left join rule back_rule on back.oracle_id = back_rule.id
-         left join artist on front.artist_id = artist.id
-         left join set on set.id = front.set_id
-         left join price on front.id = price.id
-where front.id = $1;
+       artist.name               as artist,
+       set.name                  as set_name
+from card
+         left join rule on card.oracle_id = rule.id
+         left join artist on card.artist_id = artist.id
+         left join set on set.id = card.set_id
+where card.id = $1;;
 ";

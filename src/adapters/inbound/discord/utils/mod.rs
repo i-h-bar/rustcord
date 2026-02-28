@@ -5,6 +5,7 @@ pub mod colours;
 pub mod embed;
 pub mod emoji;
 pub mod help;
+pub mod message;
 pub mod parse;
 
 pub fn italicise_reminder_text(text: &str) -> String {

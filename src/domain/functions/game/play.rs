@@ -96,19 +96,7 @@ mod tests {
             front_defence: None,
             front_type_line: "Instant".to_string(),
             front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_name: None,
-            back_oracle_id: None,
-            back_scryfall_url: None,
-            back_image_id: None,
-            back_illustration_id: None,
-            back_mana_cost: None,
-            back_colour_identity: None,
-            back_power: None,
-            back_toughness: None,
-            back_loyalty: None,
-            back_defence: None,
-            back_type_line: None,
-            back_oracle_text: None,
+            back_id: None,
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         }
@@ -117,7 +105,6 @@ mod tests {
     fn create_test_images() -> Images {
         Images {
             front: vec![1, 2, 3, 4],
-            back: None,
         }
     }
 

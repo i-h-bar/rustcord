@@ -1,14 +1,11 @@
-use crate::adapters::inbound::discord::components::interaction::PICK_PRINT_ID;
 use crate::adapters::inbound::discord::utils::embed::create_embed;
+use crate::adapters::inbound::discord::utils::message::{build_flip_button, build_set_dropdown};
 use crate::domain::card::Card;
 use crate::domain::set::Set;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;
 use async_trait::async_trait;
-use serenity::all::{
-    Context, CreateActionRow, CreateAttachment, CreateMessage, CreateSelectMenu,
-    CreateSelectMenuKind, CreateSelectMenuOption, Message,
-};
+use serenity::all::{Context, CreateActionRow, CreateAttachment, CreateMessage, Message};
 use tokio::time::Instant;
 
 pub struct DiscordMessageInteration {
@@ -56,39 +53,25 @@ impl MessageInteraction for DiscordMessageInteration {
     ) -> Result<(), MessageInteractionError> {
         let front_image =
             CreateAttachment::bytes(images.front, format!("{}.png", card.front_image_id()));
-        let back_image = if let Some(back_image) = images.back {
-            card.back_image_id().map(|back_image_id| {
-                CreateAttachment::bytes(back_image, format!("{back_image_id}.png"))
-            })
-        } else {
-            None
-        };
 
-        let (front, back) = create_embed(card);
-        let mut message = CreateMessage::new().add_file(front_image).add_embed(front);
-        message = if let Some(sets) = sets {
-            let options: Vec<CreateSelectMenuOption> = sets
-                .iter()
-                .take(25) // Discord's hard limit
-                .map(|s| CreateSelectMenuOption::new(s.name(), s.card_id().to_string()))
-                .collect();
-            let menu =
-                CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
-                    .placeholder("Select a print...");
-            let row = CreateActionRow::SelectMenu(menu);
-            message.components(vec![row])
-        } else {
-            message
-        };
+        let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
 
-        self.send_message(message).await?;
-
-        if let Some(back) = back {
-            if let Some(back_image) = back_image {
-                let message = CreateMessage::new().add_file(back_image).add_embed(back);
-                self.send_message(message).await?;
-            }
+        let mut message = CreateMessage::new().add_file(front_image);
+        if let Some(component) = build_set_dropdown(sets) {
+            components.push(component);
         }
+
+        if let Some(component) = build_flip_button(&card) {
+            components.push(component);
+        }
+
+        if !components.is_empty() {
+            message = message.components(components);
+        }
+
+        let embed = create_embed(card);
+        message = message.add_embed(embed);
+        self.send_message(message).await?;
 
         Ok(())
     }

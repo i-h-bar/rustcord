@@ -9,7 +9,6 @@ use mockall::automock;
 #[derive(Debug)]
 pub struct Images {
     pub front: Vec<u8>,
-    pub back: Option<Vec<u8>>,
 }
 
 #[cfg_attr(test, derive(Clone))]

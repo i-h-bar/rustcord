@@ -8,7 +8,7 @@ use crate::adapters::inbound::discord::commands::game::DiscordCommandInteraction
 use crate::adapters::inbound::discord::commands::interaction::DiscordCommand;
 use crate::adapters::inbound::discord::commands::register::{give_up, guess, help, play, search};
 use crate::adapters::inbound::discord::components::interaction::{
-    DiscordComponentInteraction, PICK_PRINT_ID,
+    DiscordComponentInteraction, FLIP, PICK_PRINT_ID,
 };
 use crate::adapters::inbound::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::inbound::discord::utils::help::HELP;
@@ -160,6 +160,15 @@ where
                                 Err(why) => log::warn!("Invalid card_id in print_select: {why}"),
                             }
                         }
+                    }
+                } else if component.data.custom_id.starts_with(FLIP) {
+                    let id = component.data.custom_id.strip_prefix(FLIP).unwrap();
+                    match Uuid::parse_str(id) {
+                        Ok(id) => {
+                            let interaction = DiscordComponentInteraction::new(ctx, component);
+                            self.select_print(&interaction, id).await;
+                        }
+                        Err(why) => log::warn!("Invalid id in card flip: {why}"),
                     }
                 }
             }
