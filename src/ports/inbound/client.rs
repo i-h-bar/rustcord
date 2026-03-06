@@ -1,7 +1,6 @@
-use crate::domain::card::Card;
+use crate::domain::dto::search_result::SearchResultDto;
 use crate::domain::functions::game::state::GameState;
-use crate::domain::set::Set;
-use crate::ports::outbound::image_store::Images;
+use crate::ports::outbound::image_store::Image;
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -23,12 +22,7 @@ impl MessageInteractionError {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait MessageInteraction {
-    async fn send_card(
-        &self,
-        card: Card,
-        images: Images,
-        sets: Option<Vec<Set>>,
-    ) -> Result<(), MessageInteractionError>;
+    async fn send_card(&self, result: SearchResultDto) -> Result<(), MessageInteractionError>;
     async fn reply(&self, message: String) -> Result<(), MessageInteractionError>;
 }
 
@@ -38,23 +32,23 @@ pub trait GameInteraction {
     async fn send_guess_wrong_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
         guess: String,
     ) -> Result<(), MessageInteractionError>;
     async fn send_new_game_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
     ) -> Result<(), MessageInteractionError>;
     async fn send_win_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
     ) -> Result<(), MessageInteractionError>;
     async fn game_failed_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
     ) -> Result<(), MessageInteractionError>;
     fn id(&self) -> String;
     async fn reply(&self, message: String) -> Result<(), MessageInteractionError>;

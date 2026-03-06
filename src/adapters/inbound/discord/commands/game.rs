@@ -1,7 +1,7 @@
 use crate::adapters::inbound::discord::utils::embed::{create_embed, create_game_embed};
 use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::ports::inbound::client::{GameInteraction, MessageInteractionError};
-use crate::ports::outbound::image_store::Images;
+use crate::ports::outbound::image_store::Image;
 use async_trait::async_trait;
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
@@ -24,11 +24,11 @@ impl GameInteraction for DiscordCommandInteraction {
     async fn send_guess_wrong_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
         guess: String,
     ) -> Result<(), MessageInteractionError> {
         let illustration = if let Some(illustration_id) = state.card().front_illustration_id() {
-            CreateAttachment::bytes(images.front, format!("{illustration_id}.png",))
+            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",))
         } else {
             log::warn!("Card had no illustration id");
             return Err(MessageInteractionError::new(String::from(
@@ -63,7 +63,7 @@ impl GameInteraction for DiscordCommandInteraction {
     async fn send_new_game_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
     ) -> Result<(), MessageInteractionError> {
         let Some(illustration_id) = state.card().front_illustration_id() else {
             return Err(MessageInteractionError::new(String::from(
@@ -71,7 +71,7 @@ impl GameInteraction for DiscordCommandInteraction {
             )));
         };
 
-        let illustration = CreateAttachment::bytes(images.front, format!("{illustration_id}.png",));
+        let illustration = CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",));
         let difficulty = state.difficulty();
         let set_name = state.card().set_name();
         let message = match difficulty {
@@ -96,10 +96,10 @@ impl GameInteraction for DiscordCommandInteraction {
     async fn send_win_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
     ) -> Result<(), MessageInteractionError> {
         let image = CreateAttachment::bytes(
-            images.front,
+            images.bytes(),
             format!("{}.png", state.card().front_image_id()),
         );
 
@@ -117,7 +117,7 @@ impl GameInteraction for DiscordCommandInteraction {
             ))
             .build();
 
-        let embed = create_embed(state.card);
+        let embed = create_embed(&state.card);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)
@@ -142,10 +142,10 @@ impl GameInteraction for DiscordCommandInteraction {
     async fn game_failed_message(
         &self,
         state: GameState,
-        images: Images,
+        images: Image,
     ) -> Result<(), MessageInteractionError> {
         let image = CreateAttachment::bytes(
-            images.front,
+            images.bytes(),
             format!("{}.png", state.card().front_image_id()),
         );
         let number_of_guesses = state.number_of_guesses();
@@ -161,7 +161,7 @@ impl GameInteraction for DiscordCommandInteraction {
             ))
             .build();
 
-        let embed = create_embed(state.card);
+        let embed = create_embed(&state.card);
 
         let response = CreateInteractionResponseMessage::new()
             .add_file(image)

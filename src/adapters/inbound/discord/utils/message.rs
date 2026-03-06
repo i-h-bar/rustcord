@@ -1,12 +1,12 @@
-use crate::adapters::inbound::discord::components::interaction::{FLIP, PICK_PRINT_ID};
-use crate::domain::card::Card;
+use crate::adapters::inbound::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
+use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
 use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,
 };
 
-pub fn build_set_dropdown(sets: Option<Vec<Set>>) -> Option<CreateActionRow> {
+pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
         if sets.len() > 1 {
             let options: Vec<CreateSelectMenuOption> = sets
@@ -19,6 +19,22 @@ pub fn build_set_dropdown(sets: Option<Vec<Set>>) -> Option<CreateActionRow> {
                     .placeholder("Select a print...");
             return Some(CreateActionRow::SelectMenu(menu));
         }
+    }
+
+    None
+}
+
+pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActionRow> {
+    if let Some(cards) = similar {
+        let options: Vec<CreateSelectMenuOption> = cards
+            .iter()
+            .take(25) // Discord's hard limit
+            .map(|c| CreateSelectMenuOption::new(c.name(), c.id().to_string()))
+            .collect();
+        let menu =
+            CreateSelectMenu::new(SIMILAR_ID, CreateSelectMenuKind::String { options })
+                .placeholder("Similar cards...");
+        return Some(CreateActionRow::SelectMenu(menu));
     }
 
     None

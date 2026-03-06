@@ -1,11 +1,7 @@
 mod queries;
 
-use crate::adapters::outbound::card_store::postgres::queries::{
-    ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
-    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
-    RANDOM_SET_CARD,
-};
-use crate::domain::card::Card;
+use crate::adapters::outbound::card_store::postgres::queries::{ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM};
+use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
 use crate::ports::outbound::card_store::CardStore;
 use async_trait::async_trait;
@@ -154,6 +150,20 @@ impl CardStore for Postgres {
             Ok(row) => Some(Card::from(&row)),
         }
     }
+
+    async fn similar_cards(&self, normalised_name: &str) -> Option<Vec<Card>> {
+        match sqlx::query(SIMILAR_CARDS_FROM)
+            .bind(normalised_name)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search all prints fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| Card::from(&row)).collect()),
+        }
+    }
 }
 
 impl Set {
@@ -168,6 +178,7 @@ impl Set {
 impl Card {
     pub fn from(row: &PgRow) -> Self {
         Self {
+            id: row.get::<Uuid, &str>("front_id"),
             front_name: row.get::<String, &str>("front_name"),
             front_normalised_name: row.get::<String, &str>("front_normalised_name"),
             front_oracle_id: row.get::<Uuid, &str>("front_oracle_id"),

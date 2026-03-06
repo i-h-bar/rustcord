@@ -1,5 +1,5 @@
-use crate::domain::card::Card;
-use crate::ports::outbound::image_store::{ImageRetrievalError, ImageStore, Images};
+use crate::domain::dto::card::Card;
+use crate::ports::outbound::image_store::{ImageRetrievalError, ImageStore, Image};
 use async_trait::async_trait;
 use std::env;
 
@@ -18,10 +18,10 @@ impl ImageStore for FileSystem {
         }
     }
 
-    async fn fetch(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
-        let front_id = card.image_id();
+    async fn fetch(&self, card: &Card) -> Result<Image, ImageRetrievalError> {
+        let id = card.image_id();
 
-        let front = match tokio::fs::read(format!("{}{front_id}.png", self.image_dir)).await {
+        let bytes = match tokio::fs::read(format!("{}{id}.png", self.image_dir)).await {
             Err(why) => {
                 log::warn!("Error getting image {why:?}");
                 return Err(ImageRetrievalError::new(format!(
@@ -32,23 +32,23 @@ impl ImageStore for FileSystem {
             Ok(image) => image,
         };
 
-        Ok(Images { front })
+        Ok(Image::new(bytes))
     }
 
-    async fn fetch_illustration(&self, card: &Card) -> Result<Images, ImageRetrievalError> {
+    async fn fetch_illustration(&self, card: &Card) -> Result<Image, ImageRetrievalError> {
         let Some(illustration_id) = card.front_illustration_id() else {
             return Err(ImageRetrievalError::new(String::from(
                 "Card had no illustration id",
             )));
         };
 
-        let front = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id,))
+        let bytes = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id,))
             .await
             .map_err(|_| {
                 ImageRetrievalError::new(format!("No illustration found for {}", card.front_name))
             })?;
 
-        Ok(Images { front })
+        Ok(Image::new(bytes))
     }
 }
 
@@ -59,6 +59,7 @@ mod tests {
 
     fn create_test_card_single_face() -> Card {
         Card {
+            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             front_name: String::from("Test Card"),
             front_normalised_name: String::from("test card"),
             front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
@@ -109,10 +110,8 @@ mod tests {
     #[test]
     fn test_images_struct_single_face() {
         let front_data = vec![1, 2, 3, 4];
-        let images = Images {
-            front: front_data.clone(),
-        };
-        assert_eq!(images.front, front_data);
+        let images = Image::new(front_data.clone());
+        assert_eq!(images.bytes(), &front_data);
     }
 
     #[tokio::test]
@@ -160,3 +159,4 @@ mod tests {
         );
     }
 }
+

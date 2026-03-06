@@ -1,17 +1,15 @@
 use crate::domain::app::App;
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
+use crate::domain::dto::search_result::SearchResultDto;
 use crate::domain::query::QueryParams;
-use crate::domain::set::Set;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
 use crate::ports::inbound::client::MessageInteraction;
 use crate::ports::outbound::cache::Cache;
 use crate::ports::outbound::card_store::CardStore;
-use crate::ports::outbound::image_store::{ImageStore, Images};
+use crate::ports::outbound::image_store::ImageStore;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
-
-pub type CardImageAndSets = (Card, Images, Option<Vec<Set>>);
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -19,7 +17,7 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardImageAndSets>> {
+    pub async fn parse_message(&self, msg: &str) -> Vec<Option<SearchResultDto>> {
         join_all(
             REGEX_COLLECTION
                 .cards
@@ -29,48 +27,48 @@ where
         .await
     }
 
-    async fn search_distinct_cards(&self, normalised_name: &str) -> Option<Card> {
+    async fn search_distinct_cards(&self, normalised_name: &str) -> Option<Vec<Card>> {
         let potentials = self.card_store.search(normalised_name).await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
     pub async fn search_set_abbreviation(
         &self,
         abbreviation: &str,
         normalised_name: &str,
-    ) -> Option<Card> {
+    ) -> Option<Vec<Card>> {
         let set_name = self.set_from_abbreviation(abbreviation).await?;
         let potentials = self
             .card_store
             .search_set(&set_name, normalised_name)
             .await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
     async fn search_set_name(
         &self,
         normalised_set_name: &str,
         normalised_name: &str,
-    ) -> Option<Card> {
+    ) -> Option<Vec<Card>> {
         let potentials = self
             .card_store
             .search_set(normalised_set_name, normalised_name)
             .await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
-    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Card> {
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>> {
         let potentials = self
             .card_store
             .search_artist(artist, normalised_name)
             .await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
-    pub async fn find_card(&self, query: QueryParams) -> Option<CardImageAndSets> {
+    pub async fn find_card(&self, query: QueryParams) -> Option<SearchResultDto> {
         let start = Instant::now();
 
-        let found_card = if let Some(set_code) = query.set_code() {
+        let mut found_cards = if let Some(set_code) = query.set_code() {
             self.search_set_abbreviation(set_code, query.name()).await?
         } else if let Some(set_name) = query.set_name() {
             self.search_set_name(set_name, query.name()).await?
@@ -79,6 +77,8 @@ where
         } else {
             self.search_distinct_cards(query.name()).await?
         };
+
+        let found_card = found_cards.drain(0..1).next()?;
 
         log::info!(
             "Found match for query '{}' -> '{}' in {} ms",
@@ -92,18 +92,23 @@ where
             self.image_store.fetch(&found_card),
         );
 
-        Some((found_card, images.ok()?, sets))
+        Some(
+            SearchResultDto::new(found_card, images.ok()?)
+                .add_printings(sets)
+                .add_similar_cards(found_cards),
+        )
     }
 
-    pub async fn fetch_print(&self, card_id: &Uuid) -> Option<(Card, Images, Option<Vec<Set>>)> {
+    pub async fn fetch_from_id(&self, card_id: &Uuid) -> Option<SearchResultDto> {
         let start = Instant::now();
         let card = self.card_store.fetch_card_by_id(card_id).await?;
+        let similar_cards = self.card_store.similar_cards(&card.front_normalised_name).await?;
         let (sets, images) = tokio::join!(
             self.card_store.all_prints(card.front_oracle_id()),
             self.image_store.fetch(&card),
         );
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
-        Some((card, images.ok()?, sets))
+        Some(SearchResultDto::new(card, images.ok()?).add_printings(sets).add_similar_cards(similar_cards))
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
@@ -121,9 +126,9 @@ where
     }
 
     pub async fn search<I: MessageInteraction>(&self, interaction: &I, query_params: QueryParams) {
-        let card = self.find_card(query_params).await;
-        if let Some((card, images, sets)) = card {
-            if let Err(why) = interaction.send_card(card, images, sets).await {
+        let result = self.find_card(query_params).await;
+        if let Some(result) = result {
+            if let Err(why) = interaction.send_card(result).await {
                 log::warn!("Error sending card from search command: {why}");
             };
         } else if let Err(why) = interaction
@@ -135,9 +140,9 @@ where
     }
 
     pub async fn select_print<I: MessageInteraction>(&self, interaction: &I, card_id: Uuid) {
-        match self.fetch_print(&card_id).await {
-            Some((card, images, sets)) => {
-                if let Err(why) = interaction.send_card(card, images, sets).await {
+        match self.fetch_from_id(&card_id).await {
+            Some(result) => {
+                if let Err(why) = interaction.send_card(result).await {
                     log::warn!("Error updating card for print selection: {why}");
                 }
             }
@@ -159,7 +164,7 @@ mod tests {
     use crate::ports::inbound::client::MockMessageInteraction;
     use crate::ports::outbound::cache::MockCache;
     use crate::ports::outbound::card_store::MockCardStore;
-    use crate::ports::outbound::image_store::{Images, MockImageStore};
+    use crate::ports::outbound::image_store::{Image, MockImageStore};
     use mockall::predicate::eq;
     use uuid::uuid;
 
@@ -167,10 +172,8 @@ mod tests {
     async fn test_search() {
         let query = QueryParams::from_test(String::from("gitrog monster"), None, None, None);
         let front_image_id = uuid!("40489e28-878d-44a2-847f-07beef1aa0f8");
-        let card = Card { front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_id: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let card = Card { id: front_image_id, front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_id: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -189,15 +192,7 @@ mod tests {
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
-        interaction
-            .expect_send_card()
-            .times(1)
-            .with(
-                eq(card.clone()),
-                eq(images.clone()),
-                mockall::predicate::always(),
-            )
-            .return_const(Ok(()));
+        interaction.expect_send_card().times(1).return_const(Ok(()));
 
         let app = App::new(image_store, card_store, cache);
 
@@ -239,6 +234,7 @@ mod tests {
             Some(String::from("LEA")),
         );
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -257,9 +253,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -298,6 +292,7 @@ mod tests {
             None,
         );
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -316,9 +311,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -346,6 +339,7 @@ mod tests {
     #[tokio::test]
     async fn test_parse_message_single_card() {
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -364,9 +358,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -389,14 +381,15 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert!(results[0].is_some());
-        if let Some((found_card, _, _)) = &results[0] {
-            assert_eq!(found_card.front_name, "Lightning Bolt");
+        if let Some(result) = &results[0] {
+            assert_eq!(result.card().front_name, "Lightning Bolt");
         }
     }
 
     #[tokio::test]
     async fn test_parse_message_multiple_cards() {
         let bolt_card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test1".to_string(),
@@ -417,6 +410,7 @@ mod tests {
         };
 
         let giant_card = Card {
+            id: uuid!("22345678-1234-1234-1234-123456789012"),
             front_name: "Giant Growth".to_string(),
             front_normalised_name: "giant growth".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test2".to_string(),
@@ -436,9 +430,7 @@ mod tests {
             set_name: "Limited Edition Alpha".to_string(),
         };
 
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -494,6 +486,7 @@ mod tests {
             None,
         );
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -512,9 +505,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -536,8 +527,8 @@ mod tests {
         let result = app.find_card(query).await;
 
         assert!(result.is_some());
-        if let Some((found_card, _, _)) = result {
-            assert_eq!(found_card.front_name, "Lightning Bolt");
+        if let Some(result) = result {
+            assert_eq!(result.card().front_name, "Lightning Bolt");
         }
     }
 

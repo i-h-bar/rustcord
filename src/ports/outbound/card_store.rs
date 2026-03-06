@@ -1,4 +1,4 @@
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
 use async_trait::async_trait;
 use uuid::Uuid;
@@ -19,4 +19,5 @@ pub trait CardStore {
     async fn random_card_from_set(&self, set_name: &str) -> Option<Card>;
     async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<Set>>;
     async fn fetch_card_by_id(&self, id: &Uuid) -> Option<Card>;
+    async fn similar_cards(&self, normalised_name: &str) -> Option<Vec<Card>>;
 }

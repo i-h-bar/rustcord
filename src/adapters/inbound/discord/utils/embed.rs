@@ -2,7 +2,7 @@ use crate::adapters::inbound::discord::utils::colours::get_colour_identity;
 use crate::adapters::inbound::discord::utils::emoji::add_emoji;
 use crate::adapters::inbound::discord::utils::italicise_reminder_text;
 use crate::adapters::inbound::discord::utils::REGEX_COLLECTION;
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 
@@ -56,13 +56,13 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
     embed
 }
 
-pub fn create_embed(card: Card) -> CreateEmbed {
-    let stats = if let Some(power) = card.front_power {
-        let toughness = card.front_toughness.unwrap_or_else(|| "0".to_string());
+pub fn create_embed(card: &Card) -> CreateEmbed {
+    let stats = if let Some(power) = &card.front_power {
+        let toughness = card.front_toughness.as_deref().unwrap_or("0");
         format!("\n\n{power}/{toughness}")
-    } else if let Some(loyalty) = card.front_loyalty {
+    } else if let Some(loyalty) = &card.front_loyalty {
         format!("\n\n{loyalty}")
-    } else if let Some(defence) = card.front_defence {
+    } else if let Some(defence) = &card.front_defence {
         format!("\n\n{defence}")
     } else {
         String::new()
@@ -81,7 +81,7 @@ pub fn create_embed(card: Card) -> CreateEmbed {
 
     CreateEmbed::default()
         .attachment(format!("{}.png", card.front_image_id))
-        .url(card.front_scryfall_url)
+        .url(&card.front_scryfall_url)
         .title(title)
         .description(rules_text)
         .colour(get_colour_identity(&card.front_colour_identity))

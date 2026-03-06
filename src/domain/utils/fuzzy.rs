@@ -105,6 +105,19 @@ pub fn winkliest_match<
     Some(closest_match)
 }
 
+pub fn winkliest_sort<A: PartialEq<B> + ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
+    target: &A,
+    heap: I,
+) -> Vec<B> {
+    let mut scored: Vec<_> = heap
+        .into_iter()
+        .map(|needle| (jaro_winkler_ascii_bitmask(target, &needle), needle))
+        .collect();
+
+    scored.sort_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
+    scored.into_iter().map(|(_, item)| item).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,6 +293,33 @@ mod tests {
 
         let result = winkliest_match(&target, candidates);
         assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_winkliest_sort_orders_by_score() {
+        let target = "lightning bolt";
+        let candidates = ["chain lightning", "lightning strike", "lightning bolt"];
+
+        let result = winkliest_sort(&target, candidates);
+        assert_eq!(result[0], "lightning bolt");
+    }
+
+    #[test]
+    fn test_winkliest_sort_empty() {
+        let target = "lightning bolt";
+        let candidates: [&str; 0] = [];
+
+        let result = winkliest_sort(&target, candidates);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_winkliest_sort_preserves_all_elements() {
+        let target = "gitrog monster";
+        let candidates = ["the gitrog monster", "gitrog monstre", "gideon of the trials"];
+
+        let result = winkliest_sort(&target, candidates);
+        assert_eq!(result.len(), 3);
     }
 
     #[test]

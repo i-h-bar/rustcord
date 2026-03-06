@@ -204,3 +204,33 @@ from card
          left join set on set.id = card.set_id
 where card.id = $1;;
 ";
+
+pub const SIMILAR_CARDS_FROM: &str = r"
+select distinct on (card.oracle_id)  card.id                   as front_id,
+                                     card.oracle_id            as front_oracle_id,
+                                     card.name                 as front_name,
+                                     card.normalised_name      as front_normalised_name,
+                                     card.scryfall_url         as front_scryfall_url,
+                                     card.image_id             as front_image_id,
+                                     card.illustration_id      as front_illustration_id,
+                                     card.backside_id          as back_id,
+                                     rule.mana_cost            as front_mana_cost,
+                                     rule.colour_identity      as front_colour_identity,
+                                     rule.power                as front_power,
+                                     rule.toughness            as front_toughness,
+                                     rule.loyalty              as front_loyalty,
+                                     rule.defence              as front_defence,
+                                     rule.type_line            as front_type_line,
+                                     rule.keywords             as front_keywords,
+
+                                     rule.oracle_text          as front_oracle_text,
+
+                                     artist.name               as artist,
+                                     set.name                  as set_name
+from card
+         left join rule on card.oracle_id = rule.id
+         left join artist on card.artist_id = artist.id
+         left join set on set.id = card.set_id
+where card.normalised_name % $1 and card.normalised_name != $1
+order by card.oracle_id desc;
+";

@@ -32,17 +32,18 @@ where
 #[cfg(test)]
 mod tests {
     use crate::domain::app::App;
-    use crate::domain::card::Card;
+    use crate::domain::dto::card::Card;
     use crate::domain::functions::game::state::{Difficulty, GameState};
     use crate::ports::inbound::client::MockGameInteraction;
     use crate::ports::outbound::cache::MockCache;
     use crate::ports::outbound::card_store::MockCardStore;
-    use crate::ports::outbound::image_store::{Images, MockImageStore};
+    use crate::ports::outbound::image_store::{Image, MockImageStore};
     use mockall::predicate::*;
     use uuid::uuid;
 
     fn create_test_card() -> Card {
         Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -63,10 +64,8 @@ mod tests {
         }
     }
 
-    fn create_test_images() -> Images {
-        Images {
-            front: vec![1, 2, 3, 4],
-        }
+    fn create_test_images() -> Image {
+        Image::new(vec![1, 2, 3, 4])
     }
 
     #[tokio::test]
@@ -104,8 +103,8 @@ mod tests {
         interaction
             .expect_game_failed_message()
             .times(1)
-            .withf(|state: &GameState, imgs: &Images| {
-                state.card().front_name == "Lightning Bolt" && imgs.front == vec![1, 2, 3, 4]
+            .withf(|state: &GameState, imgs: &Image| {
+                state.card().front_name == "Lightning Bolt" && imgs.bytes() == vec![1, 2, 3, 4]
             })
             .returning(|_, _| Ok(()));
 
@@ -151,7 +150,7 @@ mod tests {
         interaction
             .expect_game_failed_message()
             .times(1)
-            .withf(|state: &GameState, _imgs: &Images| state.number_of_guesses() == 2)
+            .withf(|state: &GameState, _imgs: &Image| state.number_of_guesses() == 2)
             .returning(|_, _| Ok(()));
 
         let app = App::new(image_store, card_store, cache);
