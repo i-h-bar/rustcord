@@ -1,4 +1,4 @@
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use async_trait::async_trait;
 use thiserror::Error;
 

@@ -1,5 +1,5 @@
 use crate::adapters::inbound::discord::components::interaction::{FLIP, PICK_PRINT_ID};
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
 use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,

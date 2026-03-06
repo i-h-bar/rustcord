@@ -5,7 +5,7 @@ use crate::adapters::outbound::card_store::postgres::queries::{
     FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
     RANDOM_SET_CARD,
 };
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
 use crate::ports::outbound::card_store::CardStore;
 use async_trait::async_trait;

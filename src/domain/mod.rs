@@ -5,3 +5,4 @@ pub mod query;
 pub mod search;
 pub mod set;
 pub mod utils;
+pub mod dto;

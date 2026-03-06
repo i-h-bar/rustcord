@@ -32,7 +32,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::domain::app::App;
-    use crate::domain::card::Card;
+    use crate::domain::dto::card::Card;
     use crate::domain::functions::game::state::{Difficulty, GameState};
     use crate::ports::inbound::client::MockGameInteraction;
     use crate::ports::outbound::cache::MockCache;

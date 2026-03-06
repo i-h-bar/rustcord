@@ -1,6 +1,6 @@
 use crate::adapters::inbound::discord::utils::embed::create_embed;
 use crate::adapters::inbound::discord::utils::message::{build_flip_button, build_set_dropdown};
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use crate::ports::outbound::image_store::Images;

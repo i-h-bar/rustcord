@@ -1,5 +1,5 @@
 use crate::domain::app::App;
-use crate::domain::card::Card;
+use crate::domain::dto::card::Card;
 use crate::domain::query::QueryParams;
 use crate::domain::set::Set;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
@@ -10,8 +10,7 @@ use crate::ports::outbound::image_store::{ImageStore, Images};
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
-
-pub type CardImageAndSets = (Card, Images, Option<Vec<Set>>);
+use crate::domain::dto::search_result::SearchResultDto;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -19,7 +18,7 @@ where
     CS: CardStore + Send + Sync,
     C: Cache + Send + Sync,
 {
-    pub async fn parse_message(&self, msg: &str) -> Vec<Option<CardImageAndSets>> {
+    pub async fn parse_message(&self, msg: &str) -> Vec<Option<SearchResultDto>> {
         join_all(
             REGEX_COLLECTION
                 .cards
@@ -67,7 +66,7 @@ where
         fuzzy::winkliest_match(&normalised_name, potentials)
     }
 
-    pub async fn find_card(&self, query: QueryParams) -> Option<CardImageAndSets> {
+    pub async fn find_card(&self, query: QueryParams) -> Option<SearchResultDto> {
         let start = Instant::now();
 
         let found_card = if let Some(set_code) = query.set_code() {
@@ -92,10 +91,10 @@ where
             self.image_store.fetch(&found_card),
         );
 
-        Some((found_card, images.ok()?, sets))
+        Some(SearchResultDto::new(found_card, images.ok()?).add_printings(sets))
     }
 
-    pub async fn fetch_print(&self, card_id: &Uuid) -> Option<(Card, Images, Option<Vec<Set>>)> {
+    pub async fn fetch_print(&self, card_id: &Uuid) -> Option<SearchResultDto> {
         let start = Instant::now();
         let card = self.card_store.fetch_card_by_id(card_id).await?;
         let (sets, images) = tokio::join!(
@@ -103,7 +102,7 @@ where
             self.image_store.fetch(&card),
         );
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
-        Some((card, images.ok()?, sets))
+        Some(SearchResultDto::new(card, images.ok()?).add_printings(sets))
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
@@ -121,9 +120,9 @@ where
     }
 
     pub async fn search<I: MessageInteraction>(&self, interaction: &I, query_params: QueryParams) {
-        let card = self.find_card(query_params).await;
-        if let Some((card, images, sets)) = card {
-            if let Err(why) = interaction.send_card(card, images, sets).await {
+        let result = self.find_card(query_params).await;
+        if let Some(result) = result {
+            if let Err(why) = interaction.send_card(result).await {
                 log::warn!("Error sending card from search command: {why}");
             };
         } else if let Err(why) = interaction
