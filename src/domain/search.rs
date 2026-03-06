@@ -1,16 +1,15 @@
 use crate::domain::app::App;
 use crate::domain::dto::card::Card;
+use crate::domain::dto::search_result::SearchResultDto;
 use crate::domain::query::QueryParams;
-use crate::domain::set::Set;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
 use crate::ports::inbound::client::MessageInteraction;
 use crate::ports::outbound::cache::Cache;
 use crate::ports::outbound::card_store::CardStore;
-use crate::ports::outbound::image_store::{ImageStore, Images};
+use crate::ports::outbound::image_store::ImageStore;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
-use crate::domain::dto::search_result::SearchResultDto;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -28,48 +27,48 @@ where
         .await
     }
 
-    async fn search_distinct_cards(&self, normalised_name: &str) -> Option<Card> {
+    async fn search_distinct_cards(&self, normalised_name: &str) -> Option<Vec<Card>> {
         let potentials = self.card_store.search(normalised_name).await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
     pub async fn search_set_abbreviation(
         &self,
         abbreviation: &str,
         normalised_name: &str,
-    ) -> Option<Card> {
+    ) -> Option<Vec<Card>> {
         let set_name = self.set_from_abbreviation(abbreviation).await?;
         let potentials = self
             .card_store
             .search_set(&set_name, normalised_name)
             .await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
     async fn search_set_name(
         &self,
         normalised_set_name: &str,
         normalised_name: &str,
-    ) -> Option<Card> {
+    ) -> Option<Vec<Card>> {
         let potentials = self
             .card_store
             .search_set(normalised_set_name, normalised_name)
             .await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
-    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Card> {
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>> {
         let potentials = self
             .card_store
             .search_artist(artist, normalised_name)
             .await?;
-        fuzzy::winkliest_match(&normalised_name, potentials)
+        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
     }
 
     pub async fn find_card(&self, query: QueryParams) -> Option<SearchResultDto> {
         let start = Instant::now();
 
-        let found_card = if let Some(set_code) = query.set_code() {
+        let mut found_cards = if let Some(set_code) = query.set_code() {
             self.search_set_abbreviation(set_code, query.name()).await?
         } else if let Some(set_name) = query.set_name() {
             self.search_set_name(set_name, query.name()).await?
@@ -78,6 +77,8 @@ where
         } else {
             self.search_distinct_cards(query.name()).await?
         };
+
+        let found_card = found_cards.drain(0..1).next()?;
 
         log::info!(
             "Found match for query '{}' -> '{}' in {} ms",
@@ -91,18 +92,23 @@ where
             self.image_store.fetch(&found_card),
         );
 
-        Some(SearchResultDto::new(found_card, images.ok()?).add_printings(sets))
+        Some(
+            SearchResultDto::new(found_card, images.ok()?)
+                .add_printings(sets)
+                .add_similar_cards(found_cards),
+        )
     }
 
-    pub async fn fetch_print(&self, card_id: &Uuid) -> Option<SearchResultDto> {
+    pub async fn fetch_from_id(&self, card_id: &Uuid) -> Option<SearchResultDto> {
         let start = Instant::now();
         let card = self.card_store.fetch_card_by_id(card_id).await?;
+        let similar_cards = self.card_store.similar_cards(&card.front_normalised_name).await?;
         let (sets, images) = tokio::join!(
             self.card_store.all_prints(card.front_oracle_id()),
             self.image_store.fetch(&card),
         );
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
-        Some(SearchResultDto::new(card, images.ok()?).add_printings(sets))
+        Some(SearchResultDto::new(card, images.ok()?).add_printings(sets).add_similar_cards(similar_cards))
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
@@ -134,9 +140,9 @@ where
     }
 
     pub async fn select_print<I: MessageInteraction>(&self, interaction: &I, card_id: Uuid) {
-        match self.fetch_print(&card_id).await {
-            Some((card, images, sets)) => {
-                if let Err(why) = interaction.send_card(card, images, sets).await {
+        match self.fetch_from_id(&card_id).await {
+            Some(result) => {
+                if let Err(why) = interaction.send_card(result).await {
                     log::warn!("Error updating card for print selection: {why}");
                 }
             }
@@ -188,15 +194,7 @@ mod tests {
 
         let cache = MockCache::new();
         let mut interaction = MockMessageInteraction::new();
-        interaction
-            .expect_send_card()
-            .times(1)
-            .with(
-                eq(card.clone()),
-                eq(images.clone()),
-                mockall::predicate::always(),
-            )
-            .return_const(Ok(()));
+        interaction.expect_send_card().times(1).return_const(Ok(()));
 
         let app = App::new(image_store, card_store, cache);
 
@@ -388,8 +386,8 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert!(results[0].is_some());
-        if let Some((found_card, _, _)) = &results[0] {
-            assert_eq!(found_card.front_name, "Lightning Bolt");
+        if let Some(result) = &results[0] {
+            assert_eq!(result.card().front_name, "Lightning Bolt");
         }
     }
 
@@ -535,8 +533,8 @@ mod tests {
         let result = app.find_card(query).await;
 
         assert!(result.is_some());
-        if let Some((found_card, _, _)) = result {
-            assert_eq!(found_card.front_name, "Lightning Bolt");
+        if let Some(result) = result {
+            assert_eq!(result.card().front_name, "Lightning Bolt");
         }
     }
 

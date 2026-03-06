@@ -7,9 +7,7 @@ mod utils;
 use crate::adapters::inbound::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::inbound::discord::commands::interaction::DiscordCommand;
 use crate::adapters::inbound::discord::commands::register::{give_up, guess, help, play, search};
-use crate::adapters::inbound::discord::components::interaction::{
-    DiscordComponentInteraction, FLIP, PICK_PRINT_ID,
-};
+use crate::adapters::inbound::discord::components::interaction::{DiscordComponentInteraction, FLIP, PICK_PRINT_ID, SIMILAR_ID};
 use crate::adapters::inbound::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::inbound::discord::utils::help::HELP;
 use crate::domain::app::App;
@@ -41,8 +39,8 @@ where
             functions::help::run(&interaction, HELP).await;
         } else {
             let interaction = DiscordMessageInteration::new(ctx, msg);
-            for card in self.parse_message(interaction.content()).await {
-                card::card_response(card, &interaction).await;
+            for result in self.parse_message(interaction.content()).await {
+                card::card_response(result, &interaction).await;
             }
         }
     }
@@ -141,7 +139,7 @@ where
                 }
             }
             Interaction::Component(component) => {
-                if component.data.custom_id == PICK_PRINT_ID {
+                if component.data.custom_id == PICK_PRINT_ID || component.data.custom_id == SIMILAR_ID {
                     if let ComponentInteractionDataKind::StringSelect { values } =
                         &component.data.kind
                     {

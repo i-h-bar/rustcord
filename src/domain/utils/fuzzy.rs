@@ -105,6 +105,19 @@ pub fn winkliest_match<
     Some(closest_match)
 }
 
+pub fn winkliest_sort<A: PartialEq<B> + ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
+    target: &A,
+    heap: I,
+) -> Vec<B> {
+    let mut scored: Vec<_> = heap
+        .into_iter()
+        .map(|needle| (jaro_winkler_ascii_bitmask(target, &needle), needle))
+        .collect();
+
+    scored.sort_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
+    scored.into_iter().map(|(_, item)| item).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
