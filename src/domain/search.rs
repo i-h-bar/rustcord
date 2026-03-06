@@ -164,7 +164,7 @@ mod tests {
     use crate::ports::inbound::client::MockMessageInteraction;
     use crate::ports::outbound::cache::MockCache;
     use crate::ports::outbound::card_store::MockCardStore;
-    use crate::ports::outbound::image_store::{Images, MockImageStore};
+    use crate::ports::outbound::image_store::{Image, MockImageStore};
     use mockall::predicate::eq;
     use uuid::uuid;
 
@@ -172,10 +172,8 @@ mod tests {
     async fn test_search() {
         let query = QueryParams::from_test(String::from("gitrog monster"), None, None, None);
         let front_image_id = uuid!("40489e28-878d-44a2-847f-07beef1aa0f8");
-        let card = Card { front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_id: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let card = Card { id: front_image_id, front_name: "The Gitrog Monster".to_string(), front_normalised_name: "the gitrog monster".to_string(), front_scryfall_url: "https://scryfall.com/card/eoc/117/the-gitrog-monster?utm_source=api".to_string(), front_image_id, front_oracle_id: front_image_id, front_illustration_id: Some(uuid!("ccf210fd-8ef1-4250-ae86-66ede33614d5")), front_mana_cost: "{3}{B}{G}".to_string(), front_colour_identity: vec!["B".to_string(), "G".to_string()], front_power: Some("6".to_string()), front_toughness: Some("6".to_string()), front_loyalty: None, front_defence: None, front_type_line: "Legendary Creature — Frog Horror".to_string(), front_oracle_text: "Deathtouch\nAt the beginning of your upkeep, sacrifice The Gitrog Monster unless you sacrifice a land.\nYou may play an additional land on each of your turns.\nWhenever one or more land cards are put into your graveyard from anywhere, draw a card.".to_string(), back_id: None, artist: "Jason Kang".to_string(), set_name: "Edge of Eternities Commander".to_string() };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -236,6 +234,7 @@ mod tests {
             Some(String::from("LEA")),
         );
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -254,9 +253,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -295,6 +292,7 @@ mod tests {
             None,
         );
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -313,9 +311,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -343,6 +339,7 @@ mod tests {
     #[tokio::test]
     async fn test_parse_message_single_card() {
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -361,9 +358,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -394,6 +389,7 @@ mod tests {
     #[tokio::test]
     async fn test_parse_message_multiple_cards() {
         let bolt_card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test1".to_string(),
@@ -414,6 +410,7 @@ mod tests {
         };
 
         let giant_card = Card {
+            id: uuid!("22345678-1234-1234-1234-123456789012"),
             front_name: "Giant Growth".to_string(),
             front_normalised_name: "giant growth".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test2".to_string(),
@@ -433,9 +430,7 @@ mod tests {
             set_name: "Limited Edition Alpha".to_string(),
         };
 
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store
@@ -491,6 +486,7 @@ mod tests {
             None,
         );
         let card = Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),
@@ -509,9 +505,7 @@ mod tests {
             artist: "Christopher Rush".to_string(),
             set_name: "Limited Edition Alpha".to_string(),
         };
-        let images = Images {
-            front: vec![1, 2, 3, 4],
-        };
+        let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();
         image_store

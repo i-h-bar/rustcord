@@ -91,6 +91,7 @@ mod tests {
 
     fn create_test_card() -> Card {
         Card {
+            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             front_name: String::from("Lightning Bolt"),
             front_normalised_name: String::from("lightning bolt"),
             front_scryfall_url: String::from("https://scryfall.com/card/test/1"),

@@ -46,7 +46,7 @@ impl MessageInteraction for DiscordMessageInteration {
     async fn send_card(&self, result: SearchResultDto) -> Result<(), MessageInteractionError> {
         let card = result.card();
         let front_image = CreateAttachment::bytes(
-            result.image().front.as_slice(),
+            result.image().bytes(),
             format!("{}.png", card.front_image_id()),
         );
 

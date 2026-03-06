@@ -28,7 +28,7 @@ impl MessageInteraction for DiscordComponentInteraction {
     async fn send_card(&self, result: SearchResultDto) -> Result<(), MessageInteractionError> {
         let card = result.card();
         let front_image = CreateAttachment::bytes(
-            result.image().front.as_slice(),
+            result.image().bytes(),
             format!("{}.png", &card.front_image_id()),
         );
         let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);

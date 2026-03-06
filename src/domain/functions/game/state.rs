@@ -123,6 +123,7 @@ mod tests {
 
     fn create_test_card() -> Card {
         Card {
+            id: uuid!("12345678-1234-1234-1234-123456789012"),
             front_name: "Lightning Bolt".to_string(),
             front_normalised_name: "lightning bolt".to_string(),
             front_scryfall_url: "https://scryfall.com/card/test".to_string(),

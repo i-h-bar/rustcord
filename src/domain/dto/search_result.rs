@@ -1,17 +1,17 @@
 use crate::domain::dto::card::Card;
 use crate::domain::set::Set;
-use crate::ports::outbound::image_store::Images;
+use crate::ports::outbound::image_store::Image;
 
 pub struct SearchResultDto {
     card: Card,
-    image: Images,
+    image: Image,
     printings: Option<Vec<Set>>,
     similar_cards: Option<Vec<Card>>,
 }
 
 impl SearchResultDto {
     #[must_use]
-    pub fn new(card: Card, image: Images) -> Self {
+    pub fn new(card: Card, image: Image) -> Self {
         Self {
             card,
             image,
@@ -34,7 +34,7 @@ impl SearchResultDto {
     }
 
     #[must_use]
-    pub fn image(&self) -> &Images {
+    pub fn image(&self) -> &Image {
         &self.image
     }
 
@@ -61,6 +61,7 @@ mod tests {
 
     fn create_test_card() -> Card {
         Card {
+            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             front_name: String::from("Lightning Bolt"),
             front_normalised_name: String::from("lightning bolt"),
             front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
@@ -85,7 +86,7 @@ mod tests {
 
     #[test]
     fn test_add_printings() {
-        let image = Images { front: vec![] };
+        let image = Image::new(vec![]);
         let card = create_test_card();
         let similar_cards = vec![create_test_card()];
         let printings = vec![Set::new(

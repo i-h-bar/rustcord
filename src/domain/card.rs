@@ -28,11 +28,12 @@ mod tests {
     use crate::domain::dto::card::Card;
     use crate::domain::dto::search_result::SearchResultDto;
     use crate::ports::inbound::client::{MessageInteractionError, MockMessageInteraction};
-    use crate::ports::outbound::image_store::Images;
+    use crate::ports::outbound::image_store::Image;
     use uuid::Uuid;
 
     fn create_test_card() -> Card {
         Card {
+            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             front_name: String::from("Lightning Bolt"),
             front_normalised_name: String::from("lightning bolt"),
             front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
@@ -58,15 +59,13 @@ mod tests {
     #[tokio::test]
     async fn test_card_response_with_card_success() {
         let card = create_test_card();
-        let images = Images {
-            front: vec![1, 2, 3],
-        };
+        let images = Image::new(vec![1, 2, 3]);
         let result = Some(SearchResultDto::new(card.clone(), images.clone()));
 
         let mut mock_interaction = MockMessageInteraction::new();
         mock_interaction
             .expect_send_card()
-            .withf(move |r| r.card() == &card && r.image().front == images.front)
+            .withf(move |r| r.card() == &card && r.image().bytes() == images.bytes())
             .times(1)
             .returning(|_| Ok(()));
 
@@ -76,9 +75,7 @@ mod tests {
     #[tokio::test]
     async fn test_card_response_with_card_error() {
         let card = create_test_card();
-        let images = Images {
-            front: vec![1, 2, 3],
-        };
+        let images = Image::new(vec![1, 2, 3]);
         let result = Some(SearchResultDto::new(card, images));
 
         let mut mock_interaction = MockMessageInteraction::new();

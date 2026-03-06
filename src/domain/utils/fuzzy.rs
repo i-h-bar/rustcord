@@ -296,6 +296,33 @@ mod tests {
     }
 
     #[test]
+    fn test_winkliest_sort_orders_by_score() {
+        let target = "lightning bolt";
+        let candidates = ["chain lightning", "lightning strike", "lightning bolt"];
+
+        let result = winkliest_sort(&target, candidates);
+        assert_eq!(result[0], "lightning bolt");
+    }
+
+    #[test]
+    fn test_winkliest_sort_empty() {
+        let target = "lightning bolt";
+        let candidates: [&str; 0] = [];
+
+        let result = winkliest_sort(&target, candidates);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_winkliest_sort_preserves_all_elements() {
+        let target = "gitrog monster";
+        let candidates = ["the gitrog monster", "gitrog monstre", "gideon of the trials"];
+
+        let result = winkliest_sort(&target, candidates);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
     fn test_to_bytes_trait_string() {
         let s = String::from("test");
         assert_eq!(s.to_bytes(), b"test");
