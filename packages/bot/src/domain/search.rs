@@ -1,6 +1,6 @@
 use crate::domain::app::App;
-use crate::domain::dto::card::Card;
-use crate::domain::dto::search_result::SearchResultDto;
+use contracts::search_result::SearchResultDto;
+use contracts::card::Card;
 use crate::domain::query::QueryParams;
 use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
 use crate::ports::inbound::client::MessageInteraction;

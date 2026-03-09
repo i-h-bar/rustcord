@@ -1,6 +1,6 @@
-use crate::domain::dto::card::Card;
-use crate::domain::set::Set;
-use crate::ports::outbound::image_store::Image;
+use crate::card::Card;
+use crate::image::Image;
+use crate::set::Set;
 
 pub struct SearchResultDto {
     card: Card,

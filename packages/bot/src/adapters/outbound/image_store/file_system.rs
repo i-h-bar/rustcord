@@ -1,5 +1,5 @@
-use crate::domain::dto::card::Card;
-use crate::ports::outbound::image_store::{ImageRetrievalError, ImageStore, Image};
+use contracts::{card::Card, image::Image};
+use crate::ports::outbound::image_store::{ImageRetrievalError, ImageStore};
 use async_trait::async_trait;
 use std::env;
 
@@ -26,7 +26,7 @@ impl ImageStore for FileSystem {
                 log::warn!("Error getting image {why:?}");
                 return Err(ImageRetrievalError::new(format!(
                     "No front image found for {}",
-                    card.front_name
+                    card.name()
                 )));
             }
             Ok(image) => image,
@@ -45,7 +45,7 @@ impl ImageStore for FileSystem {
         let bytes = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id,))
             .await
             .map_err(|_| {
-                ImageRetrievalError::new(format!("No illustration found for {}", card.front_name))
+                ImageRetrievalError::new(format!("No illustration found for {}", card.name()))
             })?;
 
         Ok(Image::new(bytes))

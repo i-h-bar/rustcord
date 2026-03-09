@@ -1,6 +1,6 @@
 use crate::adapters::inbound::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
-use crate::domain::dto::card::Card;
-use crate::domain::set::Set;
+use contracts::card::Card;
+use contracts::set::Set;
 use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,
@@ -41,7 +41,7 @@ pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActio
 }
 
 pub fn build_flip_button(card: &Card) -> Option<CreateActionRow> {
-    if let Some(back_id) = card.back_id {
+    if let Some(back_id) = card.back_id() {
         let button = CreateButton::new(format!("{FLIP}{back_id}"))
             .label("🔁")
             .style(ButtonStyle::Secondary);

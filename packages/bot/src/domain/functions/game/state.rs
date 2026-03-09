@@ -1,4 +1,4 @@
-use crate::domain::dto::card::Card;
+use contracts::card::Card;
 use crate::ports::outbound::cache::Cache;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

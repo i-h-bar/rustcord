@@ -2,5 +2,9 @@
 members = [
     "packages/bot",
     "packages/api",
+    "packages/contracts",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+contracts = { path = "packages/contracts" }

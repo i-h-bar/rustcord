@@ -1,25 +1,10 @@
-use crate::domain::dto::card::Card;
+use contracts::{card::Card, image::Image};
 use async_trait::async_trait;
 use thiserror::Error;
 
 #[cfg(test)]
 use mockall::automock;
 
-#[cfg_attr(test, derive(Clone, PartialEq))]
-#[derive(Debug)]
-pub struct Image {
-    bytes: Vec<u8>,
-}
-
-impl Image {
-    pub fn new(image: Vec<u8>) -> Self {
-        Self { bytes: image }
-    }
-    
-    pub fn bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
-    }
-}
 
 #[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Error)]

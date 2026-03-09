@@ -19,6 +19,7 @@ ron = "0.10.1"
 async-dropper = { version = "0.3", features = [ "tokio", "simple" ] }
 async-trait = "0.1.89"
 thiserror = "2.0.16"
+contracts = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.13.1"

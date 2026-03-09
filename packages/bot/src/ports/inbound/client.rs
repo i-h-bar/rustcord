@@ -1,6 +1,5 @@
-use crate::domain::dto::search_result::SearchResultDto;
+use contracts::{search_result::SearchResultDto, image::Image};
 use crate::domain::functions::game::state::GameState;
-use crate::ports::outbound::image_store::Image;
 use async_trait::async_trait;
 use thiserror::Error;
 

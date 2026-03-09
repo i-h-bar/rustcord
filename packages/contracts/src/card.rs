@@ -1,31 +1,74 @@
-use crate::domain::utils::fuzzy::ToBytes;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[cfg_attr(test, derive(Clone, PartialEq))]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Card {
-    pub id: Uuid,
-    pub front_name: String,
-    pub front_normalised_name: String,
-    pub front_oracle_id: Uuid,
-    pub front_scryfall_url: String,
-    pub front_image_id: Uuid,
-    pub front_illustration_id: Option<Uuid>,
-    pub front_mana_cost: String,
-    pub front_colour_identity: Vec<String>,
-    pub front_power: Option<String>,
-    pub front_toughness: Option<String>,
-    pub front_loyalty: Option<String>,
-    pub front_defence: Option<String>,
-    pub front_type_line: String,
-    pub front_oracle_text: String,
-    pub back_id: Option<Uuid>,
-    pub artist: String,
-    pub set_name: String,
+    id: Uuid,
+    front_name: String,
+    front_normalised_name: String,
+    front_oracle_id: Uuid,
+    front_scryfall_url: String,
+    front_image_id: Uuid,
+    front_illustration_id: Option<Uuid>,
+    front_mana_cost: String,
+    front_colour_identity: Vec<String>,
+    front_power: Option<String>,
+    front_toughness: Option<String>,
+    front_loyalty: Option<String>,
+    front_defence: Option<String>,
+    front_type_line: String,
+    front_oracle_text: String,
+    back_id: Option<Uuid>,
+    artist: String,
+    set_name: String,
 }
 
 impl Card {
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: Uuid,
+        front_name: String,
+        front_normalised_name: String,
+        front_oracle_id: Uuid,
+        front_scryfall_url: String,
+        front_image_id: Uuid,
+        front_illustration_id: Option<Uuid>,
+        front_mana_cost: String,
+        front_colour_identity: Vec<String>,
+        front_power: Option<String>,
+        front_toughness: Option<String>,
+        front_loyalty: Option<String>,
+        front_defence: Option<String>,
+        front_type_line: String,
+        front_oracle_text: String,
+        back_id: Option<Uuid>,
+        artist: String,
+        set_name: String,
+    ) -> Self {
+        Self {
+            id,
+            front_name,
+            front_normalised_name,
+            front_oracle_id,
+            front_scryfall_url,
+            front_image_id,
+            front_illustration_id,
+            front_mana_cost,
+            front_colour_identity,
+            front_power,
+            front_toughness,
+            front_loyalty,
+            front_defence,
+            front_type_line,
+            front_oracle_text,
+            back_id,
+            artist,
+            set_name,
+        }
+    }
+    
     #[must_use]
     pub fn id(&self) -> &Uuid {
         &self.id
@@ -71,12 +114,6 @@ impl Card {
     }
 }
 
-impl ToBytes for Card {
-    fn to_bytes(&self) -> &[u8] {
-        self.front_name.as_bytes()
-    }
-}
-
 impl PartialEq<Card> for &str {
     fn eq(&self, other: &Card) -> bool {
         self == &other.front_normalised_name
@@ -86,7 +123,6 @@ impl PartialEq<Card> for &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dto::card::Card;
     use uuid::Uuid;
 
     fn create_test_card() -> Card {
@@ -206,12 +242,6 @@ mod tests {
     fn test_set_name() {
         let card = create_test_card();
         assert_eq!(card.set_name(), "Alpha");
-    }
-
-    #[test]
-    fn test_to_bytes() {
-        let card = create_test_card();
-        assert_eq!(card.to_bytes(), "Lightning Bolt".as_bytes());
     }
 
     #[test]

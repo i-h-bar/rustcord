@@ -2,7 +2,7 @@ use crate::adapters::inbound::discord::utils::colours::get_colour_identity;
 use crate::adapters::inbound::discord::utils::emoji::add_emoji;
 use crate::adapters::inbound::discord::utils::italicise_reminder_text;
 use crate::adapters::inbound::discord::utils::REGEX_COLLECTION;
-use crate::domain::dto::card::Card;
+use contracts::card::Card;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 

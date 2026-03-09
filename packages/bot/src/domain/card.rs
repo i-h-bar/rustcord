@@ -1,4 +1,4 @@
-use crate::domain::dto::search_result::SearchResultDto;
+use contracts::search_result::SearchResultDto;
 use crate::ports::inbound::client::MessageInteraction;
 
 pub async fn card_response<MI: MessageInteraction>(
@@ -25,10 +25,10 @@ pub async fn card_response<MI: MessageInteraction>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dto::card::Card;
-    use crate::domain::dto::search_result::SearchResultDto;
+    use contracts::card::Card;
+    use contracts::image::Image;
+    use contracts::search_result::SearchResultDto;
     use crate::ports::inbound::client::{MessageInteractionError, MockMessageInteraction};
-    use crate::ports::outbound::image_store::Image;
     use uuid::Uuid;
 
     fn create_test_card() -> Card {

@@ -1,5 +1,5 @@
-use crate::domain::dto::card::Card;
-use crate::domain::set::Set;
+use contracts::card::Card;
+use contracts::set::Set;
 use async_trait::async_trait;
 use uuid::Uuid;
 

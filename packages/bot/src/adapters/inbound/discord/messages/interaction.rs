@@ -1,6 +1,6 @@
 use crate::adapters::inbound::discord::utils::embed::create_embed;
 use crate::adapters::inbound::discord::utils::message::{build_flip_button, build_set_dropdown, build_similar_dropdown};
-use crate::domain::dto::search_result::SearchResultDto;
+use contracts::search_result::SearchResultDto;
 use crate::ports::inbound::client::{MessageInteraction, MessageInteractionError};
 use async_trait::async_trait;
 use serenity::all::{Context, CreateActionRow, CreateAttachment, CreateMessage, Message};

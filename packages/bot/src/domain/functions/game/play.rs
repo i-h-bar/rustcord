@@ -72,7 +72,7 @@ impl PlayOptions {
 mod tests {
     use super::*;
     use crate::domain::app::App;
-    use crate::domain::dto::card::Card;
+    use contracts::card::Card;
     use crate::ports::inbound::client::MockGameInteraction;
     use crate::ports::outbound::cache::MockCache;
     use crate::ports::outbound::card_store::MockCardStore;
