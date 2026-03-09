@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-bot:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -23,19 +23,47 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Run Tests
-        run: cargo test
+        run: cargo test -p rustcord
 
       - name: Login to Docker Hub
         run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/rustcord .
+        run: docker build -f bot/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/rustcord .
 
       - name: Push Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
 
-  deploy:
-    needs: build
+  build-api:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run Tests
+        run: cargo test -p rustcord-api
+
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Image
+        run: docker build -f api/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/rustcord-api .
+
+      - name: Push Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord-api:latest
+
+  deploy-bot:
+    needs: build-bot
     runs-on: self-hosted
     steps:
       - name: Login to Docker Hub

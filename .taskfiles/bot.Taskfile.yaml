@@ -1,0 +1,5 @@
+version: '3'
+
+tasks:
+  test: cargo test -p rustcord
+  coverage: cargo llvm-cov --all-features --no-cfg-coverage -p rustcord

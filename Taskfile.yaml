@@ -1,0 +1,7 @@
+version: '3'
+
+tasks:
+  lint: cargo clippy -- -W clippy::all -W clippy::pedantic
+
+includes:
+  bot: .taskfiles/bot.Taskfile.yaml
