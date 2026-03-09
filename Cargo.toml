@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "bot",
-    "api",
+    "packages/bot",
+    "packages/api",
 ]
 resolver = "2"

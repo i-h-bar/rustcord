@@ -3,8 +3,7 @@ FROM rust:1.93-bullseye AS builder
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
-COPY bot ./bot
-COPY api ./api
+COPY packages ./packages
 
 RUN cargo fetch
 RUN cargo build --release -p rustcord
