@@ -1,5 +1,5 @@
 use contracts::search_result::SearchResultDto;
-use crate::ports::inbound::client::MessageInteraction;
+use crate::ports::drivers::client::MessageInteraction;
 
 pub async fn card_response<MI: MessageInteraction>(
     result: Option<SearchResultDto>,
@@ -28,7 +28,7 @@ mod tests {
     use contracts::card::Card;
     use contracts::image::Image;
     use contracts::search_result::SearchResultDto;
-    use crate::ports::inbound::client::{MessageInteractionError, MockMessageInteraction};
+    use crate::ports::drivers::client::{MessageInteractionError, MockMessageInteraction};
     use uuid::Uuid;
 
     fn create_test_card() -> Card {

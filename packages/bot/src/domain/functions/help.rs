@@ -1,4 +1,4 @@
-use crate::ports::inbound::client::MessageInteraction;
+use crate::ports::drivers::client::MessageInteraction;
 
 pub async fn run<I: MessageInteraction>(interaction: &I, text: &str) {
     if let Err(why) = interaction.reply(text.into()).await {

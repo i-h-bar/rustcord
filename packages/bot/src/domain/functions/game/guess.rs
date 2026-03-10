@@ -1,11 +1,12 @@
 use crate::domain::app::App;
 use crate::domain::functions::game::state;
-use crate::domain::utils::mutex;
-use crate::domain::utils::{fuzzy, normalise};
-use crate::ports::inbound::client::GameInteraction;
-use crate::ports::outbound::cache::Cache;
-use crate::ports::outbound::card_store::CardStore;
-use crate::ports::outbound::image_store::ImageStore;
+use named_lock;
+use crate::domain::utils::normalise;
+use crate::ports::drivers::client::GameInteraction;
+use crate::ports::services::cache::Cache;
+use crate::ports::services::card_store::CardStore;
+use crate::ports::services::image_store::ImageStore;
+use fuzzy;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -15,7 +16,7 @@ where
 {
     pub async fn guess_command<I: GameInteraction>(&self, interaction: &I, options: GuessOptions) {
         let channel_id = interaction.id();
-        let lock = mutex::LOCKS.get(&channel_id).await;
+        let lock = named_lock::LOCKS.get(&channel_id).await;
         let _guard = lock.lock().await;
         self.run_guess(interaction, options).await;
     }
@@ -91,11 +92,11 @@ mod tests {
     use crate::domain::app::App;
     use contracts::card::Card;
     use crate::domain::functions::game::state::{Difficulty, GameState};
-    use crate::ports::inbound::client::MockGameInteraction;
-    use crate::ports::outbound::cache::MockCache;
-    use crate::ports::outbound::card_store::MockCardStore;
+    use crate::ports::drivers::client::MockGameInteraction;
+    use crate::ports::services::cache::MockCache;
+    use crate::ports::services::card_store::MockCardStore;
     use contracts::image::Image;
-    use crate::ports::outbound::image_store::MockImageStore;
+    use crate::ports::services::image_store::MockImageStore;
     use mockall::predicate::*;
     use uuid::uuid;
 

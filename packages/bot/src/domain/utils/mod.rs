@@ -1,6 +1,3 @@
-pub mod fuzzy;
-pub mod mutex;
-
 use regex::Regex;
 use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;

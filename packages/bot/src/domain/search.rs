@@ -2,14 +2,15 @@ use crate::domain::app::App;
 use contracts::search_result::SearchResultDto;
 use contracts::card::Card;
 use crate::domain::query::QueryParams;
-use crate::domain::utils::{fuzzy, REGEX_COLLECTION};
-use crate::ports::inbound::client::MessageInteraction;
-use crate::ports::outbound::cache::Cache;
-use crate::ports::outbound::card_store::CardStore;
-use crate::ports::outbound::image_store::ImageStore;
+use crate::domain::utils::REGEX_COLLECTION;
+use crate::ports::drivers::client::MessageInteraction;
+use crate::ports::services::cache::Cache;
+use crate::ports::services::card_store::CardStore;
+use crate::ports::services::image_store::ImageStore;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
+use fuzzy;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -161,11 +162,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ports::inbound::client::MockMessageInteraction;
-    use crate::ports::outbound::cache::MockCache;
-    use crate::ports::outbound::card_store::MockCardStore;
+    use crate::ports::drivers::client::MockMessageInteraction;
+    use crate::ports::services::cache::MockCache;
+    use crate::ports::services::card_store::MockCardStore;
     use contracts::image::Image;
-    use crate::ports::outbound::image_store::MockImageStore;
+    use crate::ports::services::image_store::MockImageStore;
     use mockall::predicate::eq;
     use uuid::uuid;
 

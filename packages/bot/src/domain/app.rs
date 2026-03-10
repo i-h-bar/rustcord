@@ -1,6 +1,6 @@
-use crate::ports::outbound::cache::Cache;
-use crate::ports::outbound::card_store::CardStore;
-use crate::ports::outbound::image_store::ImageStore;
+use crate::ports::services::cache::Cache;
+use crate::ports::services::card_store::CardStore;
+use crate::ports::services::image_store::ImageStore;
 
 pub struct App<IS, CS, C> {
     pub image_store: IS,

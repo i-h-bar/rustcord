@@ -1,10 +1,13 @@
 [workspace]
 members = [
     "packages/bot",
-    "packages/api",
     "packages/contracts",
+    "packages/fuzzy",
+    "packages/named_lock",
 ]
 resolver = "2"
 
 [workspace.dependencies]
 contracts = { path = "packages/contracts" }
+fuzzy = { path = "packages/fuzzy" }
+named_lock = { path = "packages/named_lock" }

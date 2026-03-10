@@ -1,9 +1,9 @@
-use crate::adapters::inbound::create_client;
-use crate::adapters::outbound::cache::init_cache;
-use crate::adapters::outbound::card_store::init_card_store;
-use crate::adapters::outbound::image_store::init_image_store;
+use crate::adapters::drivers::create_client;
+use crate::adapters::services::cache::init_cache;
+use crate::adapters::services::card_store::init_card_store;
+use crate::adapters::services::image_store::init_image_store;
 use crate::domain::app::App;
-use crate::ports::inbound::client::Client;
+use crate::ports::drivers::client::Client;
 
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
