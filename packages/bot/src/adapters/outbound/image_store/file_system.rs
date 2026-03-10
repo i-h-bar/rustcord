@@ -36,7 +36,7 @@ impl ImageStore for FileSystem {
     }
 
     async fn fetch_illustration(&self, card: &Card) -> Result<Image, ImageRetrievalError> {
-        let Some(illustration_id) = card.front_illustration_id() else {
+        let Some(illustration_id) = card.illustration_id() else {
             return Err(ImageRetrievalError::new(String::from(
                 "Card had no illustration id",
             )));
@@ -58,40 +58,72 @@ mod tests {
     use uuid::Uuid;
 
     fn create_test_card_single_face() -> Card {
-        Card {
-            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            front_name: String::from("Test Card"),
-            front_normalised_name: String::from("test card"),
-            front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
-            front_image_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            front_oracle_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            front_illustration_id: Some(
-                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
-            ),
-            front_mana_cost: String::from("{1}{U}"),
-            front_colour_identity: vec![String::from("U")],
-            front_power: Some(String::from("2")),
-            front_toughness: Some(String::from("2")),
-            front_loyalty: None,
-            front_defence: None,
-            front_type_line: String::from("Creature - Test"),
-            front_oracle_text: String::from("Test ability"),
-            back_id: None,
-            artist: String::from("Test Artist"),
-            set_name: String::from("Test Set"),
-        }
+        Card::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("Test Card"),
+            String::from("test card"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("https://scryfall.com/card/test/1"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap()),
+            String::from("{1}{U}"),
+            vec![String::from("U")],
+            Some(String::from("2")),
+            Some(String::from("2")),
+            None,
+            None,
+            String::from("Creature - Test"),
+            String::from("Test ability"),
+            None,
+            String::from("Test Artist"),
+            String::from("Test Set"),
+        )
     }
 
     fn create_test_card_double_face() -> Card {
-        let mut card = create_test_card_single_face();
-        card.back_id = Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap());
-        card
+        Card::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("Test Card"),
+            String::from("test card"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("https://scryfall.com/card/test/1"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap()),
+            String::from("{1}{U}"),
+            vec![String::from("U")],
+            Some(String::from("2")),
+            Some(String::from("2")),
+            None,
+            None,
+            String::from("Creature - Test"),
+            String::from("Test ability"),
+            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap()),
+            String::from("Test Artist"),
+            String::from("Test Set"),
+        )
     }
 
     fn create_test_card_no_illustration() -> Card {
-        let mut card = create_test_card_single_face();
-        card.front_illustration_id = None;
-        card
+        Card::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("Test Card"),
+            String::from("test card"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("https://scryfall.com/card/test/1"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            None,
+            String::from("{1}{U}"),
+            vec![String::from("U")],
+            Some(String::from("2")),
+            Some(String::from("2")),
+            None,
+            None,
+            String::from("Creature - Test"),
+            String::from("Test ability"),
+            None,
+            String::from("Test Artist"),
+            String::from("Test Set"),
+        )
     }
 
     #[test]
@@ -120,7 +152,7 @@ mod tests {
 
         // We can't easily test the FileSystem implementation without a real filesystem
         // but we can verify the card setup for the test
-        assert!(card.front_illustration_id().is_none());
+        assert!(card.illustration_id().is_none());
 
         // The actual implementation would return an error when front_illustration_id is None
         // This is tested through integration tests with the domain layer
@@ -151,7 +183,7 @@ mod tests {
     #[test]
     fn test_card_illustration_ids() {
         let card = create_test_card_double_face();
-        let front_ill = card.illustration_ids();
+        let front_ill = card.illustration_id();
 
         assert_eq!(
             front_ill,

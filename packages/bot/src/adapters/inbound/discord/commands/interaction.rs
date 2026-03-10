@@ -46,7 +46,7 @@ impl MessageInteraction for DiscordCommand {
         let card = result.card();
         let front_image = CreateAttachment::bytes(
             result.image().bytes(),
-            format!("{}.png", &card.front_image_id()),
+            format!("{}.png", card.image_id()),
         );
         let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
 

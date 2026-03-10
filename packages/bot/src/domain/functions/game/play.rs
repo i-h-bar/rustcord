@@ -76,31 +76,32 @@ mod tests {
     use crate::ports::inbound::client::MockGameInteraction;
     use crate::ports::outbound::cache::MockCache;
     use crate::ports::outbound::card_store::MockCardStore;
-    use crate::ports::outbound::image_store::{Image, MockImageStore};
+    use contracts::image::Image;
+    use crate::ports::outbound::image_store::MockImageStore;
     use mockall::predicate::*;
     use uuid::uuid;
 
     fn create_test_card() -> Card {
-        Card {
-            id: uuid!("12345678-1234-1234-1234-123456789012"),
-            front_name: "Lightning Bolt".to_string(),
-            front_normalised_name: "lightning bolt".to_string(),
-            front_scryfall_url: "https://scryfall.com/card/test".to_string(),
-            front_image_id: uuid!("12345678-1234-1234-1234-123456789012"),
-            front_oracle_id: uuid!("12345678-1234-1234-1234-123456789012"),
-            front_illustration_id: Some(uuid!("12345678-1234-1234-1234-123456789013")),
-            front_mana_cost: "{R}".to_string(),
-            front_colour_identity: vec!["R".to_string()],
-            front_power: None,
-            front_toughness: None,
-            front_loyalty: None,
-            front_defence: None,
-            front_type_line: "Instant".to_string(),
-            front_oracle_text: "Lightning Bolt deals 3 damage to any target.".to_string(),
-            back_id: None,
-            artist: "Christopher Rush".to_string(),
-            set_name: "Limited Edition Alpha".to_string(),
-        }
+        Card::new(
+            uuid!("12345678-1234-1234-1234-123456789012"),
+            "Lightning Bolt".to_string(),
+            "lightning bolt".to_string(),
+            uuid!("12345678-1234-1234-1234-123456789012"),
+            "https://scryfall.com/card/test".to_string(),
+            uuid!("12345678-1234-1234-1234-123456789012"),
+            Some(uuid!("12345678-1234-1234-1234-123456789013")),
+            "{R}".to_string(),
+            vec!["R".to_string()],
+            None,
+            None,
+            None,
+            None,
+            "Instant".to_string(),
+            "Lightning Bolt deals 3 damage to any target.".to_string(),
+            None,
+            "Christopher Rush".to_string(),
+            "Limited Edition Alpha".to_string(),
+        )
     }
 
     fn create_test_images() -> Image {
@@ -134,7 +135,7 @@ mod tests {
             .expect_send_new_game_message()
             .times(1)
             .withf(|state: &GameState, _imgs: &Image| {
-                state.card().front_name == "Lightning Bolt" && state.number_of_guesses() == 0
+                state.card().name() == "Lightning Bolt" && state.number_of_guesses() == 0
             })
             .returning(|_, _| Ok(()));
 

@@ -1,7 +1,7 @@
 use crate::adapters::inbound::discord::utils::embed::{create_embed, create_game_embed};
 use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::ports::inbound::client::{GameInteraction, MessageInteractionError};
-use crate::ports::outbound::image_store::Image;
+use contracts::image::Image;
 use async_trait::async_trait;
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
@@ -27,7 +27,7 @@ impl GameInteraction for DiscordCommandInteraction {
         images: Image,
         guess: String,
     ) -> Result<(), MessageInteractionError> {
-        let illustration = if let Some(illustration_id) = state.card().front_illustration_id() {
+        let illustration = if let Some(illustration_id) = state.card().illustration_id() {
             CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",))
         } else {
             log::warn!("Card had no illustration id");
@@ -65,7 +65,7 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Image,
     ) -> Result<(), MessageInteractionError> {
-        let Some(illustration_id) = state.card().front_illustration_id() else {
+        let Some(illustration_id) = state.card().illustration_id() else {
             return Err(MessageInteractionError::new(String::from(
                 "Failed to get image id",
             )));
@@ -100,7 +100,7 @@ impl GameInteraction for DiscordCommandInteraction {
     ) -> Result<(), MessageInteractionError> {
         let image = CreateAttachment::bytes(
             images.bytes(),
-            format!("{}.png", state.card().front_image_id()),
+            format!("{}.png", state.card().image_id()),
         );
 
         let number_of_guesses = state.number_of_guesses();
@@ -146,7 +146,7 @@ impl GameInteraction for DiscordCommandInteraction {
     ) -> Result<(), MessageInteractionError> {
         let image = CreateAttachment::bytes(
             images.bytes(),
-            format!("{}.png", state.card().front_image_id()),
+            format!("{}.png", state.card().image_id()),
         );
         let number_of_guesses = state.number_of_guesses();
         let guess_plural = if number_of_guesses > 1 {

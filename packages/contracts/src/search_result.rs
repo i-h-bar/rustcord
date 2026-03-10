@@ -60,28 +60,26 @@ mod tests {
     use uuid::Uuid;
 
     fn create_test_card() -> Card {
-        Card {
-            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            front_name: String::from("Lightning Bolt"),
-            front_normalised_name: String::from("lightning bolt"),
-            front_scryfall_url: String::from("https://scryfall.com/card/test/1"),
-            front_image_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            front_oracle_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            front_illustration_id: Some(
-                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
-            ),
-            front_mana_cost: String::from("{R}"),
-            front_colour_identity: vec![String::from("R")],
-            front_power: None,
-            front_toughness: None,
-            front_loyalty: None,
-            front_defence: None,
-            front_type_line: String::from("Instant"),
-            front_oracle_text: String::from("Lightning Bolt deals 3 damage to any target."),
-            back_id: None,
-            artist: String::from("Christopher Rush"),
-            set_name: String::from("Alpha"),
-        }
+        Card::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("Lightning Bolt"),
+            String::from("lightning bolt"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("https://scryfall.com/card/test/1"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap()),
+            String::from("{R}"),
+            vec![String::from("R")],
+            None,
+            None,
+            None,
+            None,
+            String::from("Instant"),
+            String::from("Lightning Bolt deals 3 damage to any target."),
+            None,
+            String::from("Christopher Rush"),
+            String::from("Alpha"),
+        )
     }
 
     #[test]
@@ -101,7 +99,7 @@ mod tests {
         assert!(result.similar_cards.is_some());
         let similar_cards = result.similar_cards.unwrap();
         assert_eq!(similar_cards.len(), 1);
-        assert_eq!(similar_cards[0].front_name, "Lightning Bolt".to_string());
+        assert_eq!(similar_cards[0].name(), "Lightning Bolt");
 
         assert!(result.printings.is_some());
         let printings = result.printings.unwrap();
