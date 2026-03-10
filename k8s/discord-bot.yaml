@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discord-bot
+  labels:
+    type: bot
+    app: discord
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      type: bot
+      app: discord
+  template:
+    metadata:
+      labels:
+        type: bot
+        app: discord
+    spec:
+      containers:
+        - name: rustcord
+          image: gitfrog/rustcord:latest
+          env:
+            - name: BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: BOT_TOKEN
+            - name: PSQL_URI
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: PSQL_URI
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: REDIS_URL
+            - name: IMAGES_DIR
+              value: /var/mtg_cards
+            - name: RUST_LOG
+              value: warn,rustcord=info
+          volumeMounts:
+            - name: images
+              mountPath: /var/mtg_cards
+      volumes:
+        - name: images
+          hostPath:
+            path: /var/mtg_cards/
