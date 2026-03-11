@@ -6,3 +6,8 @@ tasks:
       - uv tool run ruff check . --fix
       - uv tool run ruff format .
 #      - uv tool run ty check .
+
+  setup:
+    cmds:
+      - uv sync --all-packages
+      - uv run pre-commit install
