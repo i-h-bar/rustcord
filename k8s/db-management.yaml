@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: db-migrate
+  name: db-update
 spec:
   ttlSecondsAfterFinished: 120
   backoffLimit: 3
   template:
     spec:
       restartPolicy: Never
-      containers:
+      initContainers:
         - name: db-migrate
           image: gitfrog/rustcord-db-management:latest
           command: ["/app/.venv/bin/alembic", "upgrade", "head"]
@@ -18,6 +18,25 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: PSQL_URI
+      containers:
+        - name: card-insert
+          image: gitfrog/rustcord-db-management:latest
+          command: ["/app/.venv/bin/python", "main.py"]
+          env:
+            - name: PSQL_URI
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: PSQL_URI
+            - name: IMAGES_DIR
+              value: /var/mtg_cards
+          volumeMounts:
+            - name: images
+              mountPath: /var/mtg_cards
+      volumes:
+        - name: images
+          hostPath:
+            path: /var/mtg_cards/
 
 ---
 

@@ -15,3 +15,7 @@ tasks:
       - kubectl apply -f k8s/db-management.yaml
       - kubectl wait pod -l job-name=db-migrate --for=condition=Ready --timeout=60s
       - kubectl logs -l job-name=db-migrate -f
+
+  stop-k3s: sudo systemctl stop k3s
+  start-k3s: sudo systemctl start k3s
+  teardown: kubectl delete -f k8s/

@@ -27,11 +27,21 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: BOT_TOKEN
-            - name: PSQL_URI
+            - name: POSTGRES_PW
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: PSQL_URI
+                  key: POSTGRES_PW
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_DB
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
@@ -41,8 +51,6 @@ spec:
               value: /var/mtg_cards
             - name: RUST_LOG
               value: warn,rustcord=info
-            - name: RUST_BACKTRACE
-              value: "1"
           volumeMounts:
             - name: images
               mountPath: /var/mtg_cards/
