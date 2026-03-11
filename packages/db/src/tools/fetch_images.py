@@ -3,7 +3,6 @@ import os
 
 import asyncpg
 from dotenv import load_dotenv
-
 from utils.images import download_missing_images
 
 load_dotenv()

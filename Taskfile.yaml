@@ -1,7 +1,7 @@
 version: '3'
 
-tasks:
-  lint: cargo clippy -- -W clippy::all -W clippy::pedantic
-
 includes:
   bot: .taskfiles/bot.Taskfile.yaml
+  db: .taskfiles/db.Taskfile.yaml
+  rust: .taskfiles/rust.Taskfile.yaml
+  py: .taskfiles/py.Taskfile.yaml

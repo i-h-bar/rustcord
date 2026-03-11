@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, Field
+from utils.maths import increment_uuid
+from utils.normalise import normalise
 
 from models.artists import Artist
 from models.cards import Card
@@ -12,8 +14,6 @@ from models.price import Price
 from models.related_tokens import RelatedToken, extract_tokens
 from models.rules import Rule
 from models.sets import Set
-from utils.maths import increment_uuid
-from utils.normalise import normalise
 
 if TYPE_CHECKING:
     from utils.custom_types import JSONType

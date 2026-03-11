@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel
-
 from utils.art_ids import parse_art_id
 
 if TYPE_CHECKING:

@@ -3,10 +3,9 @@ import os
 
 import asyncpg
 from asyncpg import OutOfMemoryError
-from dotenv import load_dotenv
-
 from db.materialized_view import slow_drop_all_mv
 from db.queries.materialised_views.drop_all import DROP_MAT_VIEWS
+from dotenv import load_dotenv
 
 load_dotenv()
 

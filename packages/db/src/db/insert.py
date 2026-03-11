@@ -1,19 +1,18 @@
 import asyncio
 from typing import TYPE_CHECKING
 
+from models.card_info import CardInfo
+from models.post_inserts import token_relations
 from tqdm import tqdm
+from utils.card_cache import artist_cache, illustration_cache
+from utils.combo_updates import insert_combos
 
 from db import queries
 from db.delete import truncate_changeable_tables
 from db.post_bulk_inserts import insert_token_relations
-from models.card_info import CardInfo
-from models.post_inserts import token_relations
-from utils.card_cache import artist_cache, illustration_cache
-from utils.combo_updates import insert_combos
 
 if TYPE_CHECKING:
     from asyncpg import Pool
-
     from utils.custom_types import JSONType
 
 

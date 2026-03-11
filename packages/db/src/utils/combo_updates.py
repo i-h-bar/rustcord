@@ -1,10 +1,9 @@
 import asyncio
 from typing import TYPE_CHECKING
 
-from tqdm import tqdm
-
 from db.post_bulk_inserts import insert_combo
 from models.combos import Combo
+from tqdm import tqdm
 
 if TYPE_CHECKING:
     from asyncpg import Pool

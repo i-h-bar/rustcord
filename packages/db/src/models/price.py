@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel
-
 from utils.data import date_cache
 
 if TYPE_CHECKING:

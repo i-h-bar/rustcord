@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel
-
 from utils.normalise import normalise
 
 if TYPE_CHECKING:

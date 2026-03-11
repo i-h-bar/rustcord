@@ -4,9 +4,8 @@ import os
 import sys
 
 import asyncpg
-from dotenv import load_dotenv
-
 from db.insert import insert_data
+from dotenv import load_dotenv
 from utils.data import load_scryfall_data
 from utils.images import download_missing_images
 

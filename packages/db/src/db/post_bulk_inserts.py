@@ -3,14 +3,13 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from asyncpg.exceptions import ForeignKeyViolationError
+from models.post_inserts import token_relations
 from tqdm import tqdm
 
 from db import queries
-from models.post_inserts import token_relations
 
 if TYPE_CHECKING:
     from asyncpg import Pool
-
     from models.combos import Combo
     from models.related_tokens import RelatedToken
 
