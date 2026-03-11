@@ -6,21 +6,41 @@ on:
   workflow_dispatch:
 
 jobs:
+  db-changes:
+    runs-on: ubuntu-20.04
+    outputs:
+      db: ${{ steps.filter.outputs.db }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            db:
+              - 'packages/db/**'
+
+  build-db-management:
+    needs: db-changes
+    if: needs.changes.outputs.db == 'true'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Image
+        run: docker build -f packages/db/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/rustcord-db-management .
+
+      - name: Push Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord-db-management:latest
+
   build-bot:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Cache Cargo Dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
 
       - name: Run Tests
         run: cargo test

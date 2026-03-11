@@ -41,9 +41,12 @@ spec:
               value: /var/mtg_cards
             - name: RUST_LOG
               value: warn,rustcord=info
+            - name: RUST_BACKTRACE
+              value: "1"
           volumeMounts:
             - name: images
-              mountPath: /var/mtg_cards
+              mountPath: /var/mtg_cards/
+              readOnly: true
       volumes:
         - name: images
           hostPath:

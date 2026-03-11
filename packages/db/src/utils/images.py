@@ -55,6 +55,8 @@ async def download_missing_card_images(pool: Pool, base_dir: Path) -> None:
     all_urls = await pool.fetch("SELECT id, scryfall_url from image")
     all_urls = [record for record in all_urls if not await (images_dir / f"{record['id']}.png").exists()]
 
+    logger.info(f"Found {len(all_urls)} images to download")
+
     with tqdm(total=len(all_urls)) as pbar:
         pbar.set_description("Fetching missing card images")
         pbar.refresh()
@@ -72,6 +74,8 @@ async def download_missing_illustrations(pool: Pool, base_dir: Path) -> None:
 
     all_urls = await pool.fetch("SELECT id, scryfall_url from illustration")
     all_urls = [record for record in all_urls if not await (illustration_dir / f"{record['id']}.png").exists()]
+
+    logger.info(f"Found {len(all_urls)} illustrations to download")
 
     with tqdm(total=len(all_urls)) as pbar:
         pbar.set_description("Fetching missing illustrations")

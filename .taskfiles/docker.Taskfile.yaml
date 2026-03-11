@@ -1,0 +1,9 @@
+version: '3'
+
+tasks:
+  build-db: docker build -f packages/db/Dockerfile -t gitfrog/rustcord-db-management .
+  push-db:
+    deps:
+      - build-db
+    cmds:
+      - docker push gitfrog/rustcord-db-management:latest

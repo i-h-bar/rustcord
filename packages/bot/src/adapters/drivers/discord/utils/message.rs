@@ -8,6 +8,10 @@ use serenity::all::{
 
 pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
+        if sets.is_empty() {
+            return None;
+        }
+
         if sets.len() > 1 {
             let options: Vec<CreateSelectMenuOption> = sets
                 .iter()
@@ -26,6 +30,9 @@ pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
 
 pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActionRow> {
     if let Some(cards) = similar {
+        if cards.is_empty() {
+            return None;
+        }
         let options: Vec<CreateSelectMenuOption> = cards
             .iter()
             .take(25) // Discord's hard limit
