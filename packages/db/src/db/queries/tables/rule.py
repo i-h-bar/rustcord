@@ -1,0 +1,30 @@
+UPSERT = """
+         INSERT INTO rule (id,
+                           colour_identity,
+                           mana_cost,
+                           cmc,
+                           power,
+                           toughness,
+                           loyalty,
+                           defence,
+                           type_line,
+                           oracle_text,
+                           colours,
+                           keywords,
+                           produced_mana,
+                           rulings_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         ON CONFLICT(id) DO UPDATE SET colour_identity = EXCLUDED.colour_identity,
+                                       mana_cost       = EXCLUDED.mana_cost,
+                                       cmc             = EXCLUDED.cmc,
+                                       power           = EXCLUDED.power,
+                                       toughness       = EXCLUDED.toughness,
+                                       loyalty         = EXCLUDED.loyalty,
+                                       defence         = EXCLUDED.defence,
+                                       type_line       = EXCLUDED.type_line,
+                                       oracle_text     = EXCLUDED.oracle_text,
+                                       colours         = EXCLUDED.colours,
+                                       keywords        = EXCLUDED.keywords,
+                                       produced_mana   = EXCLUDED.produced_mana,
+                                       rulings_url     = EXCLUDED.rulings_url;
+         """

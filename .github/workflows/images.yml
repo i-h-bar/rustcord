@@ -1,0 +1,19 @@
+name: download-images
+on:
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Download images
+        run: uv run src/tools/fetch_images.py
+        env:
+          IMAGES_DIR: ${{ secrets.IMAGES_DIR }}
+          PSQL_URI: ${{ secrets.PSQL_URI }}
