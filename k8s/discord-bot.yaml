@@ -27,6 +27,11 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: BOT_TOKEN
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_HOST
             - name: POSTGRES_PW
               valueFrom:
                 secretKeyRef:

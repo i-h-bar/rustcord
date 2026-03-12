@@ -4,6 +4,7 @@ metadata:
   name: db-update
 spec:
   ttlSecondsAfterFinished: 120
+  activeDeadlineSeconds: 3600
   backoffLimit: 3
   template:
     spec:
@@ -13,21 +14,51 @@ spec:
           image: gitfrog/rustcord-db-management:latest
           command: ["/app/.venv/bin/alembic", "upgrade", "head"]
           env:
-            - name: PSQL_URI
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: PSQL_URI
+                  key: POSTGRES_USER
+            - name: POSTGRES_PW
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PW
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_HOST
       containers:
         - name: card-insert
           image: gitfrog/rustcord-db-management:latest
           command: ["/app/.venv/bin/python", "main.py"]
           env:
-            - name: PSQL_URI
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: PSQL_URI
+                  key: POSTGRES_USER
+            - name: POSTGRES_PW
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PW
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_HOST
             - name: IMAGES_DIR
               value: /var/mtg_cards
           volumeMounts:
@@ -51,6 +82,7 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 1
+      activeDeadlineSeconds: 3600
       template:
         spec:
           restartPolicy: Never
@@ -59,11 +91,26 @@ spec:
               image: gitfrog/rustcord-db-management:latest
               command: ["/app/.venv/bin/python", "main.py"]
               env:
-                - name: PSQL_URI
+                - name: POSTGRES_USER
                   valueFrom:
                     secretKeyRef:
                       name: app-secrets
-                      key: PSQL_URI
+                      key: POSTGRES_USER
+                - name: POSTGRES_PW
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_PW
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_DB
+                - name: POSTGRES_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_HOST
                 - name: IMAGES_DIR
                   value: /var/mtg_cards
               volumeMounts:

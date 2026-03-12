@@ -21,7 +21,7 @@ jobs:
 
   build-db-management:
     needs: db-changes
-    if: needs.changes.outputs.db == 'true'
+    if: needs.db-changes.outputs.db == 'true'
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
@@ -58,6 +58,7 @@ jobs:
     needs:
       - build-bot
       - build-db-management
+    if: always() && needs.build-bot.result == 'success' && (needs.build-db-management.result == 'success' || needs.build-db-management.result == 'skipped')
     runs-on: self-hosted
     steps:
       - name: Checkout

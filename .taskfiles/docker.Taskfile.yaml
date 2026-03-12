@@ -7,3 +7,10 @@ tasks:
       - build-db
     cmds:
       - docker push gitfrog/rustcord-db-management:latest
+
+  build-discord-bot: docker build -f packages/bot/Dockerfile -t gitfrog/rustcord .
+  push-discord-bot:
+    deps:
+      - build-discord-bot
+    cmds:
+      - docker push gitfrog/rustcord:latest
