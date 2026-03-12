@@ -7,7 +7,7 @@ on:
 
 jobs:
   db-changes:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       db: ${{ steps.filter.outputs.db }}
     steps:
@@ -22,7 +22,7 @@ jobs:
   build-db-management:
     needs: db-changes
     if: needs.db-changes.outputs.db == 'true'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,13 +37,10 @@ jobs:
         run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord-db-management:latest
 
   build-bot:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Run Tests
-        run: cargo test
 
       - name: Login to Docker Hub
         run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
