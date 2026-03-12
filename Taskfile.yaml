@@ -1,0 +1,8 @@
+version: '3'
+
+includes:
+  bot: .taskfiles/bot.Taskfile.yaml
+  rust: .taskfiles/rust.Taskfile.yaml
+  py: .taskfiles/py.Taskfile.yaml
+  k8: .taskfiles/k8.Taskfile.yaml
+  docker: .taskfiles/docker.Taskfile.yaml

@@ -1,0 +1,30 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.15.1
+  hooks:
+    - id: ruff-check
+      name: Ruff Python Linting
+      args: [--fix]
+      always_run: true
+    - id: ruff-format
+      name: Ruff Python Formatting
+      always_run: true
+
+- repo: local
+  hooks:
+#    - id: Ty
+#      name: Ty Python Type Checking
+#      entry: uv run ty check src --error-on-warning
+#      always_run: true
+#      language: system
+#      pass_filenames: false
+#      stages: ["pre-push"]
+    - id: UV Lock
+      name: UV Lock
+      entry: uv lock
+      always_run: true
+      language: system
+      pass_filenames: false

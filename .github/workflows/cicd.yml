@@ -6,21 +6,41 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
+  db-changes:
+    runs-on: ubuntu-20.04
+    outputs:
+      db: ${{ steps.filter.outputs.db }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            db:
+              - 'packages/db/**'
+
+  build-db-management:
+    needs: db-changes
+    if: needs.db-changes.outputs.db == 'true'
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache Cargo Dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Image
+        run: docker build -f packages/db/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/rustcord-db-management .
+
+      - name: Push Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord-db-management:latest
+
+  build-bot:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Run Tests
         run: cargo test
@@ -29,35 +49,35 @@ jobs:
         run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/rustcord .
+        run: docker build -f packages/bot/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/rustcord .
 
       - name: Push Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
 
   deploy:
-    needs: build
+    needs:
+      - build-bot
+      - build-db-management
+    if: always() && needs.build-bot.result == 'success' && (needs.build-db-management.result == 'success' || needs.build-db-management.result == 'skipped')
     runs-on: self-hosted
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Login to Docker Hub
         run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Pull Image From Docker
-        run: docker pull ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
-
-      - name: Delete Old Container
-        run: docker rm -f rustcord-container
-        continue-on-error: true
-
-      - name: Run Docker Container
+      - name: Apply Secrets
         run: |
-          docker run -d \
-          --name rustcord-container \
-          --restart=always \
-          --add-host=host.docker.internal:host-gateway \
-          -v '${{ secrets.HOST_IMAGE_DIR }}:${{ secrets.IMAGES_DIR }}' \
-          -e BOT_TOKEN='${{ secrets.BOT_TOKEN }}' \
-          -e PSQL_URI='${{ secrets.PSQL_URI }}' \
-          -e IMAGES_DIR='${{ secrets.IMAGES_DIR }}' \
-          -e RUST_LOG='${{ secrets.RUST_LOG }}' \
-          -e REDIS_URL='${{ secrets.REDIS_URL }}' \
-          ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
+          kubectl create secret generic app-secrets \
+            --from-literal=BOT_TOKEN=${{ secrets.BOT_TOKEN }} \
+            --from-literal=POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
+            --from-literal=POSTGRES_PW=${{ secrets.POSTGRES_PW }} \
+            --from-literal=POSTGRES_DB=${{ secrets.POSTGRES_DB }} \
+            --from-literal=POSTGRES_HOST=${{ secrets.POSTGRES_HOST }} \
+            --from-literal=IMAGES_DIR=${{ secrets.IMAGES_DIR }} \
+            --from-literal=REDIS_URL=${{ secrets.REDIS_URL }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply
+        run: kubectl apply -f k8s/

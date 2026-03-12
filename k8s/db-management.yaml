@@ -1,0 +1,123 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-update
+spec:
+  ttlSecondsAfterFinished: 120
+  activeDeadlineSeconds: 3600
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: db-migrate
+          image: gitfrog/rustcord-db-management:latest
+          command: ["/app/.venv/bin/alembic", "upgrade", "head"]
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PW
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PW
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_HOST
+      containers:
+        - name: card-insert
+          image: gitfrog/rustcord-db-management:latest
+          command: ["/app/.venv/bin/python", "main.py"]
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PW
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PW
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_HOST
+            - name: IMAGES_DIR
+              value: /var/mtg_cards
+          volumeMounts:
+            - name: images
+              mountPath: /var/mtg_cards
+      volumes:
+        - name: images
+          hostPath:
+            path: /var/mtg_cards/
+
+---
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: card-insert
+
+spec:
+  schedule: "0 6 * * 3"  # Wednesday 06:00 UTC
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: card-insert
+              image: gitfrog/rustcord-db-management:latest
+              command: ["/app/.venv/bin/python", "main.py"]
+              env:
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_USER
+                - name: POSTGRES_PW
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_PW
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_DB
+                - name: POSTGRES_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: POSTGRES_HOST
+                - name: IMAGES_DIR
+                  value: /var/mtg_cards
+              volumeMounts:
+                - name: images
+                  mountPath: /var/mtg_cards
+
+          volumes:
+            - name: images
+              hostPath:
+                path: /var/mtg_cards/

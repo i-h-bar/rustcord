@@ -1,0 +1,21 @@
+**/default-cards*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+.python-version
+
+# Tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Misc
+.env
+*.log

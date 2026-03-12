@@ -1,0 +1,21 @@
+version: '3'
+
+tasks:
+  update-secrets: kubectl create secret generic app-secrets --from-env-file=.kube.env --dry-run=client -o yaml | kubectl apply -f -
+  insert-cards:
+    cmds:
+      - kubectl delete job card-insert-manual --ignore-not-found
+      - kubectl create job card-insert-manual --from=cronjob/card-insert
+      - kubectl wait pod -l job-name=card-insert-manual --for=condition=Ready --timeout=60s
+      - kubectl logs -l job-name=card-insert-manual -f
+
+  migrate:
+    cmds:
+      - kubectl delete job db-migrate --ignore-not-found
+      - kubectl apply -f k8s/db-management.yaml
+      - kubectl wait pod -l job-name=db-migrate --for=condition=Ready --timeout=60s
+      - kubectl logs -l job-name=db-migrate -f
+
+  stop-k3s: sudo systemctl stop k3s
+  start-k3s: sudo systemctl start k3s
+  teardown: kubectl delete -f k8s/

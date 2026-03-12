@@ -1,0 +1,103 @@
+[project]
+name = "rustcord-scripts"
+version = "0.1.0"
+description = "Add your description here"
+
+[tool.uv.workspace]
+members = [
+    "packages/db"
+]
+
+[dependency-groups]
+dev = [
+    "coverage (>=7.10.4,<8.0.0)",
+    "pytest (>=8.4.1,<9.0.0)",
+    "pre-commit (>=4.3,<5.0)",
+    "pytest-asyncio (>=1.1.0,<2)",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "function"
+
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+include = ["packages/**/*.py"]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.lint]
+ignore = ["B904", "COM812"]
+select = [
+    "E",
+    "F",
+    "I",
+    "A",
+    "B",
+    "ANN",
+    "FAST",
+    "ASYNC",
+    "ARG",
+    "S",
+    "BLE",
+    "COM",
+    "C4",
+    "T20",
+    "Q",
+    "RET",
+    "SIM",
+    "TC",
+    "PTH",
+    "N",
+    "PERF",
+    "W",
+    "RUF"
+]
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+]
+
+
+[tool.coverage.run]
+omit = ["*/site-packages/*", "tests/*"]
+command_line = "-m pytest tests"
+source = ["./src"]
+skip_empty = true
+
+[tool.coverage.report]
+include = ["src/*"]
+skip_empty = true
+show_missing = true

@@ -1,0 +1,113 @@
+use crate::card::Card;
+use crate::image::Image;
+use crate::set::Set;
+
+pub struct SearchResultDto {
+    card: Card,
+    image: Image,
+    printings: Option<Vec<Set>>,
+    similar_cards: Option<Vec<Card>>,
+}
+
+impl SearchResultDto {
+    #[must_use]
+    pub fn new(card: Card, image: Image) -> Self {
+        Self {
+            card,
+            image,
+            printings: None,
+            similar_cards: None,
+        }
+    }
+
+    #[must_use]
+    pub fn add_printings(mut self, set: Option<Vec<Set>>) -> Self {
+        self.printings = set;
+
+        self
+    }
+
+    #[must_use]
+    pub fn add_similar_cards(mut self, set: Vec<Card>) -> Self {
+        self.similar_cards = Some(set);
+        self
+    }
+
+    #[must_use]
+    pub fn image(&self) -> &Image {
+        &self.image
+    }
+
+    #[must_use]
+    pub fn card(&self) -> &Card {
+        &self.card
+    }
+
+    #[must_use]
+    pub fn printings(&self) -> Option<&Vec<Set>> {
+        self.printings.as_ref()
+    }
+
+    #[must_use]
+    pub fn similar_cards(&self) -> Option<&Vec<Card>> {
+        self.similar_cards.as_ref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn create_test_card() -> Card {
+        Card::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("Lightning Bolt"),
+            String::from("lightning bolt"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("https://scryfall.com/card/test/1"),
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap()),
+            String::from("{R}"),
+            vec![String::from("R")],
+            None,
+            None,
+            None,
+            None,
+            String::from("Instant"),
+            String::from("Lightning Bolt deals 3 damage to any target."),
+            None,
+            String::from("Christopher Rush"),
+            String::from("Alpha"),
+        )
+    }
+
+    #[test]
+    fn test_add_printings() {
+        let image = Image::new(vec![]);
+        let card = create_test_card();
+        let similar_cards = vec![create_test_card()];
+        let printings = vec![Set::new(
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+            String::from("Alpha"),
+        )];
+
+        let result = SearchResultDto::new(card, image)
+            .add_printings(Some(printings))
+            .add_similar_cards(similar_cards);
+
+        assert!(result.similar_cards.is_some());
+        let similar_cards = result.similar_cards.unwrap();
+        assert_eq!(similar_cards.len(), 1);
+        assert_eq!(similar_cards[0].name(), "Lightning Bolt");
+
+        assert!(result.printings.is_some());
+        let printings = result.printings.unwrap();
+        assert_eq!(printings.len(), 1);
+        assert_eq!(
+            printings[0].card_id().to_string(),
+            "550e8400-e29b-41d4-a716-446655440000".to_string()
+        );
+        assert_eq!(printings[0].name().to_string(), "Alpha".to_string());
+    }
+}

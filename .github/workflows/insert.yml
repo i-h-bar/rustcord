@@ -1,0 +1,21 @@
+name: insert-cards
+
+on:
+  workflow_dispatch:
+
+jobs:
+  insert:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger card-insert job
+        run: kubectl create job --from=cronjob/card-insert card-insert-manual
+
+      - name: Wait for completion
+        run: kubectl wait --for=condition=complete --timeout=3600s job/card-insert-manual
+
+      - name: Delete job
+        if: always()
+        run: kubectl delete job card-insert-manual --ignore-not-found

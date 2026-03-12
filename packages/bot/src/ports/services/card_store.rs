@@ -1,0 +1,23 @@
+use async_trait::async_trait;
+use contracts::card::Card;
+use contracts::set::Set;
+use uuid::Uuid;
+
+#[cfg(test)]
+use mockall::automock;
+
+#[cfg_attr(test, automock)]
+#[async_trait]
+pub trait CardStore {
+    async fn create() -> Self;
+    async fn search(&self, normalised_name: &str) -> Option<Vec<Card>>;
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>>;
+    async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<Card>>;
+    async fn search_for_set_name(&self, normalised_name: &str) -> Option<Vec<String>>;
+    async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String>;
+    async fn random_card(&self) -> Option<Card>;
+    async fn random_card_from_set(&self, set_name: &str) -> Option<Card>;
+    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<Set>>;
+    async fn fetch_card_by_id(&self, id: &Uuid) -> Option<Card>;
+    async fn similar_cards(&self, normalised_name: &str) -> Option<Vec<Card>>;
+}
