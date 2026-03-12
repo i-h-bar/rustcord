@@ -20,7 +20,12 @@ if config.config_file_name is not None:
 
 target_metadata = None
 
-parts = os.getenv("PSQL_URI").split(":")
+user = os.getenv("POSTGRES_USER")
+password = os.getenv("POSTGRES_PW")
+host = os.getenv("POSTGRES_HOST", "localhost:5432")
+db = os.getenv("POSTGRES_DB")
+URI = f"postgresql://{user}:{password}@{host}/{db}"
+parts = URI.split(":")
 parts[0] = "postgresql+asyncpg"
 database_url = ":".join(parts)
 config.set_main_option("sqlalchemy.url", database_url)

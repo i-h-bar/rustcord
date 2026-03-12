@@ -20,7 +20,12 @@ async def main() -> None:
         logger.error("Scryfall data could not be loaded.")
         sys.exit(1)
 
-    async with asyncpg.create_pool(dsn=os.getenv("PSQL_URI")) as pool:
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PW")
+    host = os.getenv("POSTGRES_HOST", "localhost:5432")
+    db = os.getenv("POSTGRES_DB")
+    uri = f"postgresql://{user}:{password}@{host}/{db}"
+    async with asyncpg.create_pool(dsn=uri) as pool:
         data = tuple(
             card
             for card in data
