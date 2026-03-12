@@ -1,7 +1,7 @@
 use async_dropper::AsyncDrop;
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
-use async_trait::async_trait;
 use tokio::sync::{Mutex, MutexGuard};
 
 pub static LOCKS: LazyLock<LockByName> = LazyLock::new(LockByName::new);
@@ -189,8 +189,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_access_blocks() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc as StdArc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
         let locks = StdArc::new(LockByName::new());
         let counter = StdArc::new(AtomicUsize::new(0));

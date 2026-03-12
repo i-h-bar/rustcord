@@ -67,7 +67,7 @@ impl Card {
             set_name,
         }
     }
-    
+
     #[must_use]
     pub fn id(&self) -> &Uuid {
         &self.id
@@ -77,7 +77,7 @@ impl Card {
     pub fn name(&self) -> &str {
         &self.name
     }
-    
+
     #[must_use]
     pub fn normalised_name(&self) -> &str {
         &self.normalised_name
@@ -107,52 +107,52 @@ impl Card {
     pub fn set_name(&self) -> &str {
         &self.set_name
     }
-    
+
     #[must_use]
     pub fn toughness(&self) -> Option<&str> {
         self.toughness.as_deref()
     }
-    
+
     #[must_use]
     pub fn loyalty(&self) -> Option<&str> {
         self.loyalty.as_deref()
     }
-    
+
     #[must_use]
     pub fn defence(&self) -> Option<&str> {
         self.defence.as_deref()
     }
-    
+
     #[must_use]
     pub fn type_line(&self) -> &str {
         &self.type_line
     }
-    
+
     #[must_use]
     pub fn oracle_text(&self) -> &str {
         &self.oracle_text
     }
-    
+
     #[must_use]
     pub fn power(&self) -> Option<&str> {
         self.power.as_deref()
     }
-    
+
     #[must_use]
     pub fn artist(&self) -> &str {
         &self.artist
     }
-    
+
     #[must_use]
     pub fn colour_identity(&self) -> &[String] {
         &self.colour_identity
     }
-    
+
     #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
-    
+
     #[must_use]
     pub fn mana_cost(&self) -> &str {
         &self.mana_cost
@@ -178,9 +178,7 @@ mod tests {
             url: String::from("https://scryfall.com/card/test/1"),
             image_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             oracle_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            illustration_id: Some(
-                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
-            ),
+            illustration_id: Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap()),
             mana_cost: String::from("{R}"),
             colour_identity: vec![String::from("R")],
             power: None,

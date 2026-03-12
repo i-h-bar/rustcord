@@ -1,12 +1,12 @@
 use crate::domain::app::App;
 use crate::domain::functions::game::state;
-use named_lock;
 use crate::domain::utils::normalise;
 use crate::ports::drivers::client::GameInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
 use fuzzy;
+use named_lock;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -90,13 +90,13 @@ impl GuessOptions {
 mod tests {
     use super::*;
     use crate::domain::app::App;
-    use contracts::card::Card;
     use crate::domain::functions::game::state::{Difficulty, GameState};
     use crate::ports::drivers::client::MockGameInteraction;
     use crate::ports::services::cache::MockCache;
     use crate::ports::services::card_store::MockCardStore;
-    use contracts::image::Image;
     use crate::ports::services::image_store::MockImageStore;
+    use contracts::card::Card;
+    use contracts::image::Image;
     use mockall::predicate::*;
     use uuid::uuid;
 

@@ -1,6 +1,6 @@
-use contracts::{card::Card, image::Image};
 use crate::ports::services::image_store::{ImageRetrievalError, ImageStore};
 use async_trait::async_trait;
+use contracts::{card::Card, image::Image};
 use std::env;
 
 pub struct FileSystem {
@@ -191,4 +191,3 @@ mod tests {
         );
     }
 }
-

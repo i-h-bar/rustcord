@@ -7,7 +7,9 @@ mod utils;
 use crate::adapters::drivers::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::drivers::discord::commands::interaction::DiscordCommand;
 use crate::adapters::drivers::discord::commands::register::{give_up, guess, help, play, search};
-use crate::adapters::drivers::discord::components::interaction::{DiscordComponentInteraction, FLIP, PICK_PRINT_ID, SIMILAR_ID};
+use crate::adapters::drivers::discord::components::interaction::{
+    DiscordComponentInteraction, FLIP, PICK_PRINT_ID, SIMILAR_ID,
+};
 use crate::adapters::drivers::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::drivers::discord::utils::help::HELP;
 use crate::domain::app::App;
@@ -139,7 +141,9 @@ where
                 }
             }
             Interaction::Component(component) => {
-                if component.data.custom_id == PICK_PRINT_ID || component.data.custom_id == SIMILAR_ID {
+                if component.data.custom_id == PICK_PRINT_ID
+                    || component.data.custom_id == SIMILAR_ID
+                {
                     if let ComponentInteractionDataKind::StringSelect { values } =
                         &component.data.kind
                     {

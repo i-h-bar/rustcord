@@ -1,10 +1,9 @@
-use contracts::{card::Card, image::Image};
 use async_trait::async_trait;
+use contracts::{card::Card, image::Image};
 use thiserror::Error;
 
 #[cfg(test)]
 use mockall::automock;
-
 
 #[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Error)]

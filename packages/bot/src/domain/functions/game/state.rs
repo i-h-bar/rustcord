@@ -1,5 +1,5 @@
-use contracts::card::Card;
 use crate::ports::services::cache::Cache;
+use contracts::card::Card;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

@@ -32,13 +32,13 @@ where
 #[cfg(test)]
 mod tests {
     use crate::domain::app::App;
-    use contracts::card::Card;
     use crate::domain::functions::game::state::{Difficulty, GameState};
     use crate::ports::drivers::client::MockGameInteraction;
     use crate::ports::services::cache::MockCache;
     use crate::ports::services::card_store::MockCardStore;
-    use contracts::image::Image;
     use crate::ports::services::image_store::MockImageStore;
+    use contracts::card::Card;
+    use contracts::image::Image;
     use mockall::predicate::*;
     use uuid::uuid;
 

@@ -1,6 +1,6 @@
-use contracts::{search_result::SearchResultDto, image::Image};
 use crate::domain::functions::game::state::GameState;
 use async_trait::async_trait;
+use contracts::{image::Image, search_result::SearchResultDto};
 use thiserror::Error;
 
 #[cfg(test)]

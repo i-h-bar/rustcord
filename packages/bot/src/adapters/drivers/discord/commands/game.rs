@@ -1,8 +1,8 @@
 use crate::adapters::drivers::discord::utils::embed::{create_embed, create_game_embed};
 use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::ports::drivers::client::{GameInteraction, MessageInteractionError};
-use contracts::image::Image;
 use async_trait::async_trait;
+use contracts::image::Image;
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
     CreateInteractionResponseMessage, MessageBuilder,
@@ -71,7 +71,8 @@ impl GameInteraction for DiscordCommandInteraction {
             )));
         };
 
-        let illustration = CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",));
+        let illustration =
+            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",));
         let difficulty = state.difficulty();
         let set_name = state.card().set_name();
         let message = match difficulty {
@@ -98,10 +99,8 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Image,
     ) -> Result<(), MessageInteractionError> {
-        let image = CreateAttachment::bytes(
-            images.bytes(),
-            format!("{}.png", state.card().image_id()),
-        );
+        let image =
+            CreateAttachment::bytes(images.bytes(), format!("{}.png", state.card().image_id()));
 
         let number_of_guesses = state.number_of_guesses();
         let guess_plural = if number_of_guesses > 1 {
@@ -144,10 +143,8 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Image,
     ) -> Result<(), MessageInteractionError> {
-        let image = CreateAttachment::bytes(
-            images.bytes(),
-            format!("{}.png", state.card().image_id()),
-        );
+        let image =
+            CreateAttachment::bytes(images.bytes(), format!("{}.png", state.card().image_id()));
         let number_of_guesses = state.number_of_guesses();
         let guess_plural = if number_of_guesses > 1 {
             "guesses"

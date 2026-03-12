@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
 use contracts::card::Card;
+use std::cmp::Ordering;
 
 pub trait ToBytes {
     fn to_bytes(&self) -> &[u8];
@@ -74,8 +74,8 @@ pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, 
 
     let jaro_similarity = (1.0 / 3.0)
         * (matches / len_a as f32
-        + matches / len_b as f32
-        + (matches - transpositions / 2.0) / matches);
+            + matches / len_b as f32
+            + (matches - transpositions / 2.0) / matches);
 
     let mut prefix_len = 0;
     for (c1, c2) in a_chars.iter().zip(b_chars) {
@@ -323,7 +323,11 @@ mod tests {
     #[test]
     fn test_winkliest_sort_preserves_all_elements() {
         let target = "gitrog monster";
-        let candidates = ["the gitrog monster", "gitrog monstre", "gideon of the trials"];
+        let candidates = [
+            "the gitrog monster",
+            "gitrog monstre",
+            "gideon of the trials",
+        ];
 
         let result = winkliest_sort(&target, candidates);
         assert_eq!(result.len(), 3);
@@ -351,4 +355,3 @@ mod tests {
         assert!(score > 0.0);
     }
 }
-

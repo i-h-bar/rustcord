@@ -38,9 +38,8 @@ pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActio
             .take(25) // Discord's hard limit
             .map(|c| CreateSelectMenuOption::new(c.name(), c.id().to_string()))
             .collect();
-        let menu =
-            CreateSelectMenu::new(SIMILAR_ID, CreateSelectMenuKind::String { options })
-                .placeholder("Similar cards...");
+        let menu = CreateSelectMenu::new(SIMILAR_ID, CreateSelectMenuKind::String { options })
+            .placeholder("Similar cards...");
         return Some(CreateActionRow::SelectMenu(menu));
     }
 

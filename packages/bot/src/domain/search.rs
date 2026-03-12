@@ -1,16 +1,16 @@
 use crate::domain::app::App;
-use contracts::search_result::SearchResultDto;
-use contracts::card::Card;
 use crate::domain::query::QueryParams;
 use crate::domain::utils::REGEX_COLLECTION;
 use crate::ports::drivers::client::MessageInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use contracts::card::Card;
+use contracts::search_result::SearchResultDto;
+use fuzzy;
 use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
-use fuzzy;
 
 impl<IS, CS, C> App<IS, CS, C>
 where
@@ -103,13 +103,20 @@ where
     pub async fn fetch_from_id(&self, card_id: &Uuid) -> Option<SearchResultDto> {
         let start = Instant::now();
         let card = self.card_store.fetch_card_by_id(card_id).await?;
-        let similar_cards = self.card_store.similar_cards(card.normalised_name()).await?;
+        let similar_cards = self
+            .card_store
+            .similar_cards(card.normalised_name())
+            .await?;
         let (sets, images) = tokio::join!(
             self.card_store.all_prints(card.oracle_id()),
             self.image_store.fetch(&card),
         );
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
-        Some(SearchResultDto::new(card, images.ok()?).add_printings(sets).add_similar_cards(similar_cards))
+        Some(
+            SearchResultDto::new(card, images.ok()?)
+                .add_printings(sets)
+                .add_similar_cards(similar_cards),
+        )
     }
 
     pub async fn fuzzy_match_set_name(&self, normalised_set_name: &str) -> Option<String> {
@@ -165,8 +172,8 @@ mod tests {
     use crate::ports::drivers::client::MockMessageInteraction;
     use crate::ports::services::cache::MockCache;
     use crate::ports::services::card_store::MockCardStore;
-    use contracts::image::Image;
     use crate::ports::services::image_store::MockImageStore;
+    use contracts::image::Image;
     use mockall::predicate::eq;
     use uuid::uuid;
 
@@ -254,7 +261,12 @@ mod tests {
             None,
             Some(String::from("LEA")),
         );
-        let card = make_test_card(uuid!("12345678-1234-1234-1234-123456789012"), "Lightning Bolt", "lightning bolt", "Limited Edition Alpha");
+        let card = make_test_card(
+            uuid!("12345678-1234-1234-1234-123456789012"),
+            "Lightning Bolt",
+            "lightning bolt",
+            "Limited Edition Alpha",
+        );
         let images = Image::new(vec![1, 2, 3, 4]);
 
         let mut image_store = MockImageStore::new();

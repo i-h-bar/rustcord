@@ -1,10 +1,14 @@
 mod queries;
 
-use crate::adapters::services::card_store::postgres::queries::{ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME, FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM};
-use contracts::card::Card;
-use contracts::set::Set;
+use crate::adapters::services::card_store::postgres::queries::{
+    ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
+    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
+    RANDOM_SET_CARD, SIMILAR_CARDS_FROM,
+};
 use crate::ports::services::card_store::CardStore;
 use async_trait::async_trait;
+use contracts::card::Card;
+use contracts::set::Set;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Pool, Row};
 use std::env;
@@ -179,24 +183,24 @@ fn set_from(row: &PgRow) -> Set {
 }
 
 fn card_from(row: &PgRow) -> Card {
-        Card::new(
-            row.get::<Uuid, &str>("front_id"),
-            row.get::<String, &str>("front_name"),
-            row.get::<String, &str>("front_normalised_name"),
-            row.get::<Uuid, &str>("front_oracle_id"),
-            row.get::<String, &str>("front_scryfall_url"),
-            row.get::<Uuid, &str>("front_image_id"),
-            row.get::<Option<Uuid>, &str>("front_illustration_id"),
-            row.get::<String, &str>("front_mana_cost"),
-            row.get::<Vec<String>, &str>("front_colour_identity"),
-            row.get::<Option<String>, &str>("front_power"),
-            row.get::<Option<String>, &str>("front_toughness"),
-            row.get::<Option<String>, &str>("front_loyalty"),
-            row.get::<Option<String>, &str>("front_defence"),
-            row.get::<String, &str>("front_type_line"),
-            row.get::<String, &str>("front_oracle_text"),
-            row.get::<Option<Uuid>, &str>("back_id"),
-            row.get::<String, &str>("artist"),
-            row.get::<String, &str>("set_name"),
-            )
-    }
+    Card::new(
+        row.get::<Uuid, &str>("front_id"),
+        row.get::<String, &str>("front_name"),
+        row.get::<String, &str>("front_normalised_name"),
+        row.get::<Uuid, &str>("front_oracle_id"),
+        row.get::<String, &str>("front_scryfall_url"),
+        row.get::<Uuid, &str>("front_image_id"),
+        row.get::<Option<Uuid>, &str>("front_illustration_id"),
+        row.get::<String, &str>("front_mana_cost"),
+        row.get::<Vec<String>, &str>("front_colour_identity"),
+        row.get::<Option<String>, &str>("front_power"),
+        row.get::<Option<String>, &str>("front_toughness"),
+        row.get::<Option<String>, &str>("front_loyalty"),
+        row.get::<Option<String>, &str>("front_defence"),
+        row.get::<String, &str>("front_type_line"),
+        row.get::<String, &str>("front_oracle_text"),
+        row.get::<Option<Uuid>, &str>("back_id"),
+        row.get::<String, &str>("artist"),
+        row.get::<String, &str>("set_name"),
+    )
+}

@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use contracts::card::Card;
 use contracts::set::Set;
-use async_trait::async_trait;
 use uuid::Uuid;
 
 #[cfg(test)]

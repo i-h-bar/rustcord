@@ -1,8 +1,10 @@
 use crate::adapters::drivers::discord::utils::embed::create_embed;
-use crate::adapters::drivers::discord::utils::message::{build_flip_button, build_set_dropdown, build_similar_dropdown};
-use contracts::search_result::SearchResultDto;
+use crate::adapters::drivers::discord::utils::message::{
+    build_flip_button, build_set_dropdown, build_similar_dropdown,
+};
 use crate::ports::drivers::client::{MessageInteraction, MessageInteractionError};
 use async_trait::async_trait;
+use contracts::search_result::SearchResultDto;
 use serenity::all::{Context, CreateActionRow, CreateAttachment, CreateMessage, Message};
 use tokio::time::Instant;
 
@@ -45,10 +47,8 @@ impl DiscordMessageInteration {
 impl MessageInteraction for DiscordMessageInteration {
     async fn send_card(&self, result: SearchResultDto) -> Result<(), MessageInteractionError> {
         let card = result.card();
-        let front_image = CreateAttachment::bytes(
-            result.image().bytes(),
-            format!("{}.png", card.image_id()),
-        );
+        let front_image =
+            CreateAttachment::bytes(result.image().bytes(), format!("{}.png", card.image_id()));
 
         let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
 

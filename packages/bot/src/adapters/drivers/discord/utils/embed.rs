@@ -29,9 +29,7 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
 
     if guesses > multiplier * 2 {
         let stats = if let Some(power) = card.power() {
-            let toughness = card
-                .toughness()
-                .unwrap_or("0");
+            let toughness = card.toughness().unwrap_or("0");
             format!("\n\n{power}/{toughness}")
         } else if let Some(loyalty) = card.loyalty() {
             format!("\n\n{loyalty}")
@@ -47,10 +45,7 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
 
         let oracle_text = italicise_reminder_text(&rules_text);
 
-        embed = embed.description(format!(
-            "{}\n\n{}{}",
-            card.type_line(), oracle_text, stats
-        ));
+        embed = embed.description(format!("{}\n\n{}{}", card.type_line(), oracle_text, stats));
     }
 
     embed
