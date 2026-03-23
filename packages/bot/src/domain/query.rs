@@ -84,7 +84,7 @@ impl QueryParams {
     }
 
     #[must_use]
-    pub fn name(&self) -> &String {
+    pub fn name(&self) -> &str {
         &self.name
     }
 }
