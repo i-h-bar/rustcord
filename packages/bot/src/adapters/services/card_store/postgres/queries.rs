@@ -58,7 +58,7 @@ from card
          left join set on set.id = card.set_id
 where card.normalised_name % $1
   and set.normalised_name % $2
-order by card.oracle_id, set_sml, random() desc;
+order by card.oracle_id, set_sml desc;
 ";
 
 pub const FUZZY_SEARCH_CARD_AND_ARTIST: &str = r"
@@ -91,7 +91,7 @@ from card
          left join set on set.id = card.set_id
 where card.normalised_name % $1
   and artist.normalised_name % $2
-order by card.oracle_id, artist_sml, random() desc;
+order by card.oracle_id, artist_sml desc;
 ";
 
 pub const FUZZY_SEARCH_SET_NAME: &str = r"

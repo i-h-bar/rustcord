@@ -6,22 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  db-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      db: ${{ steps.filter.outputs.db }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            db:
-              - 'packages/db/**'
-
   build-db-management:
-    needs: db-changes
-    if: needs.db-changes.outputs.db == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -29,8 +29,7 @@ where
     }
 
     async fn search_distinct_cards(&self, normalised_name: &str) -> Option<Vec<Card>> {
-        let potentials = self.card_store.search(normalised_name).await?;
-        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
+        self.card_store.search(normalised_name).await
     }
 
     pub async fn search_set_abbreviation(
@@ -39,11 +38,7 @@ where
         normalised_name: &str,
     ) -> Option<Vec<Card>> {
         let set_name = self.set_from_abbreviation(abbreviation).await?;
-        let potentials = self
-            .card_store
-            .search_set(&set_name, normalised_name)
-            .await?;
-        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
+        self.card_store.search_set(&set_name, normalised_name).await
     }
 
     async fn search_set_name(
@@ -51,25 +46,19 @@ where
         normalised_set_name: &str,
         normalised_name: &str,
     ) -> Option<Vec<Card>> {
-        let potentials = self
-            .card_store
+        self.card_store
             .search_set(normalised_set_name, normalised_name)
-            .await?;
-        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
+            .await
     }
 
     async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>> {
-        let potentials = self
-            .card_store
-            .search_artist(artist, normalised_name)
-            .await?;
-        Some(fuzzy::winkliest_sort(&normalised_name, potentials))
+        self.card_store.search_artist(artist, normalised_name).await
     }
 
     pub async fn find_card(&self, query: QueryParams) -> Option<SearchResultDto> {
         let start = Instant::now();
 
-        let mut found_cards = if let Some(set_code) = query.set_code() {
+        let found_cards = if let Some(set_code) = query.set_code() {
             self.search_set_abbreviation(set_code, query.name()).await?
         } else if let Some(set_name) = query.set_name() {
             self.search_set_name(set_name, query.name()).await?
@@ -79,7 +68,19 @@ where
             self.search_distinct_cards(query.name()).await?
         };
 
-        let found_card = found_cards.drain(0..1).next()?;
+        if found_cards.is_empty() {
+            log::info!(
+                "No match for query '{}' in {} ms",
+                query.name(),
+                start.elapsed().as_millis()
+            );
+
+            return None;
+        }
+
+        let mut found_cards_sorted = fuzzy::winkliest_sort(&query.name(), found_cards);
+
+        let found_card = found_cards_sorted.drain(0..1).next()?;
 
         log::info!(
             "Found match for query '{}' -> '{}' in {} ms",
@@ -96,7 +97,7 @@ where
         Some(
             SearchResultDto::new(found_card, images.ok()?)
                 .add_printings(sets)
-                .add_similar_cards(found_cards),
+                .add_similar_cards(found_cards_sorted),
         )
     }
 
@@ -175,7 +176,7 @@ mod tests {
     use crate::ports::services::image_store::MockImageStore;
     use contracts::image::Image;
     use mockall::predicate::eq;
-    use uuid::uuid;
+    use uuid::{uuid, Uuid};
 
     #[tokio::test]
     async fn test_search() {
@@ -210,11 +211,12 @@ mod tests {
             .with(eq(card.clone()))
             .return_const(Ok(images.clone()));
 
+        let name = query.name().to_string();
         let mut card_store = MockCardStore::new();
         card_store
             .expect_search()
             .times(1)
-            .with(eq(query.clone().name().clone()))
+            .with(eq(name))
             .return_const(Some(vec![card.clone()]));
         card_store.expect_all_prints().returning(|_| None);
 
@@ -230,6 +232,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_card_not_found() {
         let query = QueryParams::from_test(String::from("nonexistent card"), None, None, None);
+        let name = query.name().to_string();
 
         let image_store = MockImageStore::new();
 
@@ -237,7 +240,7 @@ mod tests {
         card_store
             .expect_search()
             .times(1)
-            .with(eq(query.name().clone()))
+            .with(eq(name))
             .return_const(None);
 
         let cache = MockCache::new();
@@ -281,10 +284,11 @@ mod tests {
             .times(1)
             .with(eq("LEA"))
             .return_const(Some("Limited Edition Alpha".to_string()));
+        let name = query.name().to_string();
         card_store
             .expect_search_set()
             .times(1)
-            .with(eq("Limited Edition Alpha"), eq(query.name().clone()))
+            .with(eq("Limited Edition Alpha"), eq(name))
             .return_const(Some(vec![card.clone()]));
         card_store.expect_all_prints().returning(|_| None);
 
@@ -297,7 +301,7 @@ mod tests {
         app.search(&interaction, query.clone()).await;
     }
 
-    fn make_test_card(id: uuid::Uuid, name: &str, normalised_name: &str, set_name: &str) -> Card {
+    fn make_test_card(id: Uuid, name: &str, normalised_name: &str, set_name: &str) -> Card {
         Card::new(
             id,
             name.to_string(),
@@ -305,7 +309,7 @@ mod tests {
             id,
             "https://scryfall.com/card/test".to_string(),
             id,
-            Some(uuid::Uuid::from_u128(id.as_u128() + 1)),
+            Some(Uuid::from_u128(id.as_u128() + 1)),
             "{R}".to_string(),
             vec!["R".to_string()],
             None,
@@ -343,10 +347,11 @@ mod tests {
             .return_const(Ok(images.clone()));
 
         let mut card_store = MockCardStore::new();
+        let name = query.name().to_string();
         card_store
             .expect_search_artist()
             .times(1)
-            .with(eq("Christopher Rush"), eq(query.name().clone()))
+            .with(eq("Christopher Rush"), eq(name))
             .return_const(Some(vec![card.clone()]));
         card_store.expect_all_prints().returning(|_| None);
 
@@ -496,6 +501,28 @@ mod tests {
         if let Some(result) = result {
             assert_eq!(result.card().name(), "Lightning Bolt");
         }
+    }
+
+    #[tokio::test]
+    async fn test_find_card_returns_none_when_found_cards_is_empty() {
+        let query = QueryParams::from_test(String::from("nonexistent card"), None, None, None);
+        let name = query.name().to_string();
+
+        let image_store = MockImageStore::new();
+
+        let mut card_store = MockCardStore::new();
+        card_store
+            .expect_search()
+            .times(1)
+            .with(eq(name))
+            .return_const(Some(vec![]));
+
+        let cache = MockCache::new();
+        let app = App::new(image_store, card_store, cache);
+
+        let result = app.find_card(query).await;
+
+        assert!(result.is_none());
     }
 
     #[tokio::test]
