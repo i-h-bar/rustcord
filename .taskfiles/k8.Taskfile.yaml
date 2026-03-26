@@ -19,3 +19,14 @@ tasks:
   stop-k3s: sudo systemctl stop k3s
   start-k3s: sudo systemctl start k3s
   teardown: kubectl delete -f k8s/
+
+  up:
+    cmds:
+      - task: start-k3s
+      - task: update-secrets
+      - kubectl apply -f k8s/
+
+  down:
+    cmds:
+      - task: teardown
+      - task: stop-k3s

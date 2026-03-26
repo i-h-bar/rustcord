@@ -1,3 +1,4 @@
+use fuzzy::ToBytes;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -9,7 +10,7 @@ pub struct Card {
     oracle_id: Uuid,
     url: String,
     image_id: Uuid,
-    illustration_id: Option<Uuid>,
+    illustration_id: Option<Uuid>, 
     mana_cost: String,
     colour_identity: Vec<String>,
     power: Option<String>,
@@ -162,6 +163,12 @@ impl Card {
 impl PartialEq<Card> for &str {
     fn eq(&self, other: &Card) -> bool {
         self == &other.normalised_name
+    }
+}
+
+impl ToBytes for Card {
+    fn to_bytes(&self) -> &[u8] {
+        self.name().as_bytes()
     }
 }
 

@@ -5,7 +5,7 @@ use crate::adapters::services::image_store::init_image_store;
 use crate::domain::app::App;
 use crate::ports::drivers::client::Client;
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "local-dev")]
 use dotenv::dotenv;
 
 mod adapters;
@@ -14,10 +14,8 @@ mod ports;
 
 #[tokio::main]
 async fn main() {
-    #[cfg(debug_assertions)]
-    {
-        dotenv().ok();
-    }
+    #[cfg(feature = "local-dev")]
+    dotenv().ok();
 
     env_logger::init();
     let card_store = init_card_store().await;

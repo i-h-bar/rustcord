@@ -1,4 +1,3 @@
-use contracts::card::Card;
 use std::cmp::Ordering;
 
 pub trait ToBytes {
@@ -17,11 +16,6 @@ impl ToBytes for String {
     }
 }
 
-impl ToBytes for Card {
-    fn to_bytes(&self) -> &[u8] {
-        self.name().as_bytes()
-    }
-}
 
 #[allow(clippy::cast_precision_loss)]
 pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, b: &B) -> f32 {
