@@ -10,7 +10,7 @@ pub struct Card {
     oracle_id: Uuid,
     url: String,
     image_id: Uuid,
-    illustration_id: Option<Uuid>, 
+    illustration_id: Option<Uuid>,
     mana_cost: String,
     colour_identity: Vec<String>,
     power: Option<String>,

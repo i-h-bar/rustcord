@@ -16,7 +16,6 @@ impl ToBytes for String {
     }
 }
 
-
 #[allow(clippy::cast_precision_loss)]
 pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, b: &B) -> f32 {
     let a_chars = a.to_bytes();
