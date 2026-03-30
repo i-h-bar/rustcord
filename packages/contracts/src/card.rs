@@ -1,3 +1,4 @@
+use fuzzy::ToBytes;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -162,6 +163,12 @@ impl Card {
 impl PartialEq<Card> for &str {
     fn eq(&self, other: &Card) -> bool {
         self == &other.normalised_name
+    }
+}
+
+impl ToBytes for Card {
+    fn to_bytes(&self) -> &[u8] {
+        self.name().as_bytes()
     }
 }
 

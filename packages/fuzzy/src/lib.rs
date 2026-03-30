@@ -1,4 +1,3 @@
-use contracts::card::Card;
 use std::cmp::Ordering;
 
 pub trait ToBytes {
@@ -14,12 +13,6 @@ impl ToBytes for &str {
 impl ToBytes for String {
     fn to_bytes(&self) -> &[u8] {
         self.as_bytes()
-    }
-}
-
-impl ToBytes for Card {
-    fn to_bytes(&self) -> &[u8] {
-        self.name().as_bytes()
     }
 }
 
