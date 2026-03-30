@@ -3,13 +3,13 @@ kind: Job
 metadata:
   name: db-update
 spec:
-  ttlSecondsAfterFinished: 120
+  ttlSecondsAfterFinished: 86400
   activeDeadlineSeconds: 3600
   backoffLimit: 3
   template:
     spec:
       restartPolicy: Never
-      initContainers:
+      containers:
         - name: db-migrate
           image: gitfrog/rustcord-db-management:latest
           command: ["/app/.venv/bin/alembic", "upgrade", "head"]
@@ -34,40 +34,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: POSTGRES_HOST
-      containers:
-        - name: card-insert
-          image: gitfrog/rustcord-db-management:latest
-          command: ["/app/.venv/bin/python", "main.py"]
-          env:
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: POSTGRES_USER
-            - name: POSTGRES_PW
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: POSTGRES_PW
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: POSTGRES_DB
-            - name: POSTGRES_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: POSTGRES_HOST
-            - name: IMAGES_DIR
-              value: /var/mtg_cards
-          volumeMounts:
-            - name: images
-              mountPath: /var/mtg_cards
-      volumes:
-        - name: images
-          hostPath:
-            path: /var/mtg_cards/
 
 ---
 
