@@ -28,7 +28,7 @@ impl GameInteraction for DiscordCommandInteraction {
         guess: String,
     ) -> Result<(), MessageInteractionError> {
         let illustration = if let Some(illustration_id) = state.card().illustration_id() {
-            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",))
+            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png"))
         } else {
             log::warn!("Card had no illustration id");
             return Err(MessageInteractionError::new(String::from(
@@ -72,7 +72,7 @@ impl GameInteraction for DiscordCommandInteraction {
         };
 
         let illustration =
-            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png",));
+            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png"));
         let difficulty = state.difficulty();
         let set_name = state.card().set_name();
         let message = match difficulty {

@@ -160,9 +160,10 @@ impl CardStore for Postgres {
         }
     }
 
-    async fn similar_cards(&self, normalised_name: &str) -> Option<Vec<Card>> {
+    async fn similar_cards(&self, card: &Card) -> Option<Vec<Card>> {
         match sqlx::query(SIMILAR_CARDS_FROM)
-            .bind(normalised_name)
+            .bind(card.normalised_name())
+            .bind(card.oracle_id())
             .fetch_all(&self.pool)
             .await
         {
