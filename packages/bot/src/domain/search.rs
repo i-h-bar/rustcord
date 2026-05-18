@@ -5,6 +5,7 @@ use crate::ports::drivers::client::MessageInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use crate::domain::utils::card_picking::extract_match;
 use contracts::card::Card;
 use contracts::search_result::SearchResultDto;
 use fuzzy;
@@ -78,9 +79,7 @@ where
             return None;
         }
 
-        let mut found_cards_sorted = fuzzy::winkliest_sort(&query.name(), found_cards);
-
-        let found_card = found_cards_sorted.drain(0..1).next()?;
+        let (found_card, discarded) = extract_match(found_cards, query.name())?;
 
         log::info!(
             "Found match for query '{}' -> '{}' in {} ms",
@@ -97,7 +96,7 @@ where
         Some(
             SearchResultDto::new(found_card, images.ok()?)
                 .add_printings(sets)
-                .add_similar_cards(found_cards_sorted),
+                .add_similar_cards(discarded),
         )
     }
 

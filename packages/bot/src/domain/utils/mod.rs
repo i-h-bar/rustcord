@@ -1,3 +1,5 @@
+pub mod card_picking;
+
 use regex::Regex;
 use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;
