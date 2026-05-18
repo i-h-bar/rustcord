@@ -1,5 +1,6 @@
 use crate::domain::app::App;
 use crate::domain::query::QueryParams;
+use crate::domain::utils::card_picking::extract_match;
 use crate::domain::utils::REGEX_COLLECTION;
 use crate::ports::drivers::client::MessageInteraction;
 use crate::ports::services::cache::Cache;
@@ -78,9 +79,7 @@ where
             return None;
         }
 
-        let mut found_cards_sorted = fuzzy::winkliest_sort(&query.name(), found_cards);
-
-        let found_card = found_cards_sorted.drain(0..1).next()?;
+        let (found_card, discarded) = extract_match(found_cards, query.name())?;
 
         log::info!(
             "Found match for query '{}' -> '{}' in {} ms",
@@ -97,21 +96,21 @@ where
         Some(
             SearchResultDto::new(found_card, images.ok()?)
                 .add_printings(sets)
-                .add_similar_cards(found_cards_sorted),
+                .add_similar_cards(discarded),
         )
     }
 
     pub async fn fetch_from_id(&self, card_id: &Uuid) -> Option<SearchResultDto> {
         let start = Instant::now();
         let card = self.card_store.fetch_card_by_id(card_id).await?;
-        let similar_cards = self
-            .card_store
-            .similar_cards(card.normalised_name())
-            .await?;
-        let (sets, images) = tokio::join!(
+
+        let (sets, images, similar_cards) = tokio::join!(
             self.card_store.all_prints(card.oracle_id()),
             self.image_store.fetch(&card),
+            self.card_store.similar_cards(&card),
         );
+
+        let similar_cards = fuzzy::winkliest_sort(&card.normalised_name(), similar_cards?);
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
         Some(
             SearchResultDto::new(card, images.ok()?)

@@ -123,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_jaro_winkler_bitmasl() {
+    fn test_jaro_winkler_bitmask() {
         let a = "CRATE";
         let b = "TRACE";
 

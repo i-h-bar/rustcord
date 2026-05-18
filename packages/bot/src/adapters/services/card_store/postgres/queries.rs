@@ -231,6 +231,6 @@ from card
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
-where card.normalised_name % $1 and card.normalised_name != $1
+where card.normalised_name % $1 and card.oracle_id != $2
 order by card.oracle_id desc;
 ";

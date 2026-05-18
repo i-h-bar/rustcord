@@ -42,7 +42,7 @@ impl ImageStore for FileSystem {
             )));
         };
 
-        let bytes = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id,))
+        let bytes = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id))
             .await
             .map_err(|_| {
                 ImageRetrievalError::new(format!("No illustration found for {}", card.name()))
