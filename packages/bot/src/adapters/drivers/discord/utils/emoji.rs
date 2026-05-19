@@ -1,4 +1,105 @@
+#![allow(clippy::unreadable_literal)]
+use contracts::card::Card;
 use regex::Captures;
+use serenity::all::{EmojiId, ReactionType};
+
+const MANA_W: u64 = 1376146180525789234;
+const MANA_U: u64 = 1376146058744303756;
+const MANA_B: u64 = 1375912886932865136;
+const MANA_R: u64 = 1376145976808570960;
+const MANA_G: u64 = 1375927262590931014;
+const MANA_C: u64 = 1375913113299189871;
+
+const MANA_WU: u64 = 1376146222556905502;
+const MANA_WB: u64 = 1376146178797735946;
+const MANA_RW: u64 = 1376145969946820690;
+const MANA_GW: u64 = 1375927260212629654;
+const MANA_UB: u64 = 1376146057355858031;
+const MANA_UR: u64 = 1376146183529037825;
+const MANA_GU: u64 = 1375927256471572601;
+const MANA_BR: u64 = 1375912881316561026;
+const MANA_BG: u64 = 1375912885615591504;
+const MANA_RG: u64 = 1376145975009087569;
+
+const MANA_WP: u64 = 1376146169771593778;
+const MANA_UP: u64 = 1376146054600196116;
+const MANA_BP: u64 = 1375912882604343408;
+const MANA_RP: u64 = 1376145971771346954;
+const MANA_GP: u64 = 1375927566363262976;
+const MANA_CP: u64 = 1375913107360190555;
+
+const MANA_WUP: u64 = 1376146220833177740;
+const MANA_WBP: u64 = 1376146171365425222;
+const MANA_UBP: u64 = 1376146055795703818;
+const MANA_URP: u64 = 1376146182073749514;
+const MANA_BRP: u64 = 1375912879881977906;
+const MANA_BGP: u64 = 1375912884084805722;
+const MANA_RGP: u64 = 1376145973448937674;
+const MANA_RWP: u64 = 1376145967547682836;
+const MANA_GWP: u64 = 1375914260474892319;
+const MANA_GUP: u64 = 1376160251824574534;
+
+fn custom_emoji(id: u64, name: &str) -> ReactionType {
+    ReactionType::Custom {
+        animated: false,
+        id: EmojiId::new(id),
+        name: Some(name.to_string()),
+    }
+}
+
+pub fn colour_id_emoji(card: &Card) -> ReactionType {
+    let identity = card.colour_identity().join("");
+
+    if identity.is_empty() {
+        return custom_emoji(MANA_C, "C_");
+    }
+
+    if card.mana_cost().contains("/P") {
+        return match identity.as_str() {
+            "W" => custom_emoji(MANA_WP, "W_P"),
+            "U" => custom_emoji(MANA_UP, "U_P"),
+            "B" => custom_emoji(MANA_BP, "B_P"),
+            "R" => custom_emoji(MANA_RP, "R_P"),
+            "G" => custom_emoji(MANA_GP, "G_P"),
+            "C" => custom_emoji(MANA_CP, "C_P"),
+            "WU" | "UW" => custom_emoji(MANA_WUP, "W_U_P"),
+            "WB" | "BW" => custom_emoji(MANA_WBP, "W_B_P"),
+            "UB" | "BU" => custom_emoji(MANA_UBP, "U_B_P"),
+            "UR" | "RU" => custom_emoji(MANA_URP, "U_R_P"),
+            "BR" | "RB" => custom_emoji(MANA_BRP, "B_R_P"),
+            "BG" | "GB" => custom_emoji(MANA_BGP, "B_G_P"),
+            "RG" | "GR" => custom_emoji(MANA_RGP, "R_G_P"),
+            "RW" | "WR" => custom_emoji(MANA_RWP, "R_W_P"),
+            "GW" | "WG" => custom_emoji(MANA_GWP, "G_W_P"),
+            "GU" | "UG" => custom_emoji(MANA_GUP, "G_U_P"),
+            s if s.len() == 5 => ReactionType::Unicode("🌈".to_string()),
+            _ => ReactionType::Unicode("✨".to_string()),
+        };
+    }
+
+    match identity.as_str() {
+        // Single colours
+        "W" => custom_emoji(MANA_W, "W_"),
+        "U" => custom_emoji(MANA_U, "U_"),
+        "B" => custom_emoji(MANA_B, "B_"),
+        "R" => custom_emoji(MANA_R, "R_"),
+        "G" => custom_emoji(MANA_G, "G_"),
+        "C" => custom_emoji(MANA_C, "C_"),
+        // Two colours (both orderings)
+        "WU" | "UW" => custom_emoji(MANA_WU, "W_U"),
+        "WB" | "BW" => custom_emoji(MANA_WB, "W_B"),
+        "WR" | "RW" => custom_emoji(MANA_RW, "R_W"),
+        "WG" | "GW" => custom_emoji(MANA_GW, "G_W"),
+        "UB" | "BU" => custom_emoji(MANA_UB, "U_B"),
+        "UR" | "RU" => custom_emoji(MANA_UR, "U_R"),
+        "UG" | "GU" => custom_emoji(MANA_GU, "G_U"),
+        "BR" | "RB" => custom_emoji(MANA_BR, "B_R"),
+        "BG" | "GB" => custom_emoji(MANA_BG, "B_G"),
+        "RG" | "GR" => custom_emoji(MANA_RG, "R_G"),
+        s if s.len() == 5 => ReactionType::Unicode("🌈".to_string()),
+        _ => ReactionType::Unicode("✨".to_string()),
+    }
+}
 
 pub fn add_emoji(cap: &Captures) -> String {
     match &cap[0] {

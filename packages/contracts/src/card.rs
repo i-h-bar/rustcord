@@ -1,5 +1,6 @@
 use fuzzy::ToBytes;
 use serde::{Deserialize, Serialize};
+use time::Date;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -22,6 +23,8 @@ pub struct Card {
     back_id: Option<Uuid>,
     artist: String,
     set_name: String,
+    set_abbreviation: String,
+    release_date: Date,
 }
 
 impl Card {
@@ -46,6 +49,8 @@ impl Card {
         back_id: Option<Uuid>,
         artist: String,
         set_name: String,
+        set_abbreviation: String,
+        release_date: Date,
     ) -> Self {
         Self {
             id,
@@ -66,6 +71,8 @@ impl Card {
             back_id,
             artist,
             set_name,
+            set_abbreviation,
+            release_date,
         }
     }
 
@@ -158,6 +165,16 @@ impl Card {
     pub fn mana_cost(&self) -> &str {
         &self.mana_cost
     }
+
+    #[must_use]
+    pub fn release_date(&self) -> &Date {
+        &self.release_date
+    }
+
+    #[must_use]
+    pub fn set_abbreviation(&self) -> &str {
+        &self.set_abbreviation
+    }
 }
 
 impl PartialEq<Card> for &str {
@@ -197,6 +214,8 @@ mod tests {
             back_id: None,
             artist: String::from("Christopher Rush"),
             set_name: String::from("Alpha"),
+            set_abbreviation: String::from("LEA"),
+            release_date: time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         }
     }
 

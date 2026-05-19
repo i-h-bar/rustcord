@@ -413,6 +413,7 @@ version = "0.1.0"
 dependencies = [
  "fuzzy",
  "serde",
+ "time",
  "uuid",
 ]
 
@@ -2026,6 +2027,7 @@ dependencies = [
  "serenity",
  "sqlx",
  "thiserror 2.0.16",
+ "time",
  "tokio",
  "unicode-normalization",
  "uuid",

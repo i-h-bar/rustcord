@@ -79,6 +79,8 @@ mod tests {
             None,
             String::from("Christopher Rush"),
             String::from("Alpha"),
+            String::from("LEA"),
+            time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         )
     }
 
@@ -90,6 +92,8 @@ mod tests {
         let printings = vec![Set::new(
             Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             String::from("Alpha"),
+            &String::from("ALP"),
+            time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         )];
 
         let result = SearchResultDto::new(card, image)

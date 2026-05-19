@@ -55,6 +55,8 @@ mod tests {
             back_id, // back_id
             String::new(),
             String::new(),
+            String::new(),
+            time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         )
     }
 

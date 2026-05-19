@@ -1,6 +1,7 @@
 use crate::adapters::drivers::discord::utils::colours::get_colour_identity;
 use crate::adapters::drivers::discord::utils::emoji::add_emoji;
 use crate::adapters::drivers::discord::utils::italicise_reminder_text;
+use crate::adapters::drivers::discord::utils::title::create_title;
 use crate::adapters::drivers::discord::utils::REGEX_COLLECTION;
 use contracts::card::Card;
 use regex::Captures;
@@ -69,10 +70,7 @@ pub fn create_embed(card: &Card) -> CreateEmbed {
     let oracle_text = italicise_reminder_text(&oracle_text);
 
     let rules_text = format!("{}\n\n{}{}", card.type_line(), oracle_text, stats);
-    let mana_cost = REGEX_COLLECTION
-        .symbols
-        .replace_all(card.mana_cost(), |cap: &Captures| add_emoji(cap));
-    let title = format!("{}        {}", card.name(), mana_cost);
+    let title = create_title(card);
 
     CreateEmbed::default()
         .attachment(format!("{}.png", card.image_id()))

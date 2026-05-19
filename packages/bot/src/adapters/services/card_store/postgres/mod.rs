@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use contracts::card::Card;
 use contracts::set::Set;
 use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::types::time::Date;
 use sqlx::{Pool, Row};
 use std::env;
 use uuid::Uuid;
@@ -180,6 +181,8 @@ fn set_from(row: &PgRow) -> Set {
     Set::new(
         row.get::<Uuid, &str>("card_id"),
         row.get::<String, &str>("set_name"),
+        row.get::<&str, &str>("set_abbreviation"),
+        row.get::<Date, &str>("release_date"),
     )
 }
 
@@ -203,5 +206,7 @@ fn card_from(row: &PgRow) -> Card {
         row.get::<Option<Uuid>, &str>("back_id"),
         row.get::<String, &str>("artist"),
         row.get::<String, &str>("set_name"),
+        row.get::<String, &str>("set_abbreviation").to_uppercase(),
+        row.get::<Date, &str>("release_date"),
     )
 }

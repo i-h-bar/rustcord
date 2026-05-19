@@ -77,6 +77,8 @@ mod tests {
             None,
             String::from("Test Artist"),
             String::from("Test Set"),
+            String::from("TST"),
+            time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
         )
     }
 
@@ -100,6 +102,8 @@ mod tests {
             Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap()),
             String::from("Test Artist"),
             String::from("Test Set"),
+            String::from("TST"),
+            time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
         )
     }
 
@@ -123,6 +127,8 @@ mod tests {
             None,
             String::from("Test Artist"),
             String::from("Test Set"),
+            String::from("TST"),
+            time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
         )
     }
 
