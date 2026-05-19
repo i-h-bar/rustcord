@@ -181,10 +181,14 @@ limit 1;
 ";
 
 pub const ALL_PRINTS: &str = r"
-select card.id as card_id,
-       set.name as set_name
+select card.id           as card_id,
+       set.name          as set_name,
+       set.abbreviation  as set_abbreviation,
+       card.release_date as release_date
+
        from card left join set on set.id = card.set_id
-where card.oracle_id = $1;
+where card.oracle_id = $1
+order by release_date desc;
 ";
 
 pub const CARD_FROM_ID: &str = r"

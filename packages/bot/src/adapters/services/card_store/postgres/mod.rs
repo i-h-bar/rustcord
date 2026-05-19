@@ -181,6 +181,8 @@ fn set_from(row: &PgRow) -> Set {
     Set::new(
         row.get::<Uuid, &str>("card_id"),
         row.get::<String, &str>("set_name"),
+        row.get::<&str, &str>("set_abbreviation"),
+        row.get::<Date, &str>("release_date"),
     )
 }
 

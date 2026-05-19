@@ -170,6 +170,11 @@ impl Card {
     pub fn release_date(&self) -> &Date {
         &self.release_date
     }
+    
+    #[must_use]
+    pub fn set_abbreviation(&self) -> &str {
+        &self.set_abbreviation
+    }
 }
 
 impl PartialEq<Card> for &str {

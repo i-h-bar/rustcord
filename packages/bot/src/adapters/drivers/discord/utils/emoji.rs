@@ -1,3 +1,4 @@
+#![allow(clippy::unreadable_literal)]
 use contracts::card::Card;
 use regex::Captures;
 use serenity::all::{EmojiId, ReactionType};
