@@ -1,10 +1,10 @@
+use std::time::Instant;
 use crate::adapters::drivers::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
 use contracts::card::Card;
 use contracts::set::Set;
-use serenity::all::{
-    ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption,
-};
+use serenity::all::{ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, ReactionType};
+use crate::adapters::drivers::discord::utils::description::create_description;
+use crate::adapters::drivers::discord::utils::emoji::colour_id_emoji;
 
 pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
@@ -36,13 +36,15 @@ pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActio
         let options: Vec<CreateSelectMenuOption> = cards
             .iter()
             .take(25) // Discord's hard limit
-            .map(|c| CreateSelectMenuOption::new(c.name(), c.id().to_string()))
+            .map(|c| CreateSelectMenuOption::new(c.name(), c.id().to_string())
+                .emoji(colour_id_emoji(c))
+                .description(create_description(c))
+            )
             .collect();
         let menu = CreateSelectMenu::new(SIMILAR_ID, CreateSelectMenuKind::String { options })
             .placeholder("Similar cards...");
         return Some(CreateActionRow::SelectMenu(menu));
     }
-
     None
 }
 
