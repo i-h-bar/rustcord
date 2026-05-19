@@ -19,7 +19,9 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
                                      rule.oracle_text          as front_oracle_text,
 
                                      artist.name               as artist,
-                                     set.name                  as set_name
+                                     set.name                  as set_name,
+                                     set.abbreviation          as set_abbreviation,
+                                     card.release_date         as release_date
 from card
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
@@ -50,6 +52,8 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
 
                                      artist.name               as artist,
                                      set.name                  as set_name,
+                                     set.abbreviation          as set_abbreviation,
+                                     card.release_date         as release_date
 
                                      similarity(set.normalised_name, $2) as set_sml
 from card
@@ -83,6 +87,8 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
 
                                      artist.name               as artist,
                                      set.name                  as set_name,
+                                     set.abbreviation          as set_abbreviation,
+                                     card.release_date         as release_date
 
                                      similarity(artist.normalised_name, $2) as artist_sml
 from card
@@ -125,7 +131,9 @@ select set.id                     as set_id,
 
        front.release_date         as release_date,
        artist.name                as artist,
-       set.name                   as set_name
+       set.name                   as set_name,
+       set.abbreviation          as set_abbreviation,
+       front.release_date         as release_date
 from (select * from card where random() < 0.0001 limit 25) front
          left join rule on front.oracle_id = rule.id
          join set on front.set_id = set.id
@@ -158,7 +166,10 @@ select set.id                     as set_id,
 
        front.release_date         as release_date,
        artist.name                as artist,
-       set.name                   as set_name
+       set.name                   as set_name,
+       set.abbreviation           as set_abbreviation,
+       card.release_date          as release_date
+
 from (select * from card where random() < 0.0001 limit 25) front
          left join rule on front.oracle_id = rule.id
          join set on front.set_id = set.id
@@ -197,7 +208,9 @@ select card.id                   as front_id,
        card.backside_id          as back_id,
 
        artist.name               as artist,
-       set.name                  as set_name
+       set.name                  as set_name,
+       set.abbreviation          as set_abbreviation,
+       card.release_date         as release_date
 from card
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
@@ -226,12 +239,13 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
                                      rule.oracle_text          as front_oracle_text,
 
                                      artist.name               as artist,
-                                     set.name                  as set_name
+                                     set.name                  as set_name,
+                                     set.abbreviation          as set_abbreviation,
+                                     card.release_date         as release_date
 from card
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
 where card.normalised_name % $1 and card.oracle_id != $2
 order by card.oracle_id desc
-limit 25;
 ";

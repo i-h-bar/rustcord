@@ -200,6 +200,8 @@ mod tests {
             None,
             "Jason Kang".to_string(),
             "Edge of Eternities Commander".to_string(),
+            "EOC".to_string(),
+            time::Date::from_calendar_date(2025, time::Month::June, 13).unwrap(),
         );
         let images = Image::new(vec![1, 2, 3, 4]);
 
@@ -320,6 +322,8 @@ mod tests {
             None,
             "Christopher Rush".to_string(),
             set_name.to_string(),
+            "LEA".to_string(),
+            time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         )
     }
 

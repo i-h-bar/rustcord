@@ -79,6 +79,8 @@ mod tests {
             None,
             String::from("Christopher Rush"),
             String::from("Alpha"),
+            String::from("LEA"),
+            time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         )
     }
 

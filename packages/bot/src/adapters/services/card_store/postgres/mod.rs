@@ -12,6 +12,7 @@ use contracts::set::Set;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Pool, Row};
 use std::env;
+use sqlx::types::time::Date;
 use uuid::Uuid;
 
 pub struct Postgres {
@@ -203,5 +204,7 @@ fn card_from(row: &PgRow) -> Card {
         row.get::<Option<Uuid>, &str>("back_id"),
         row.get::<String, &str>("artist"),
         row.get::<String, &str>("set_name"),
+        row.get::<String, &str>("set_abbreviation").to_uppercase(),
+        row.get::<Date, &str>("release_date"),
     )
 }
