@@ -1,12 +1,12 @@
 use crate::adapters::drivers::discord::utils::colours::get_colour_identity;
 use crate::adapters::drivers::discord::utils::emoji::add_emoji;
 use crate::adapters::drivers::discord::utils::italicise_reminder_text;
+use crate::adapters::drivers::discord::utils::title::create_title;
 use crate::adapters::drivers::discord::utils::REGEX_COLLECTION;
 use contracts::card::Card;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use uuid::Uuid;
-use crate::adapters::drivers::discord::utils::title::create_title;
 
 pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()

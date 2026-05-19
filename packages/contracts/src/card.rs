@@ -1,7 +1,7 @@
 use fuzzy::ToBytes;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use time::Date;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Card {
@@ -24,7 +24,7 @@ pub struct Card {
     artist: String,
     set_name: String,
     set_abbreviation: String,
-    release_date: Date
+    release_date: Date,
 }
 
 impl Card {
@@ -72,7 +72,7 @@ impl Card {
             artist,
             set_name,
             set_abbreviation,
-            release_date
+            release_date,
         }
     }
 
@@ -170,7 +170,7 @@ impl Card {
     pub fn release_date(&self) -> &Date {
         &self.release_date
     }
-    
+
     #[must_use]
     pub fn set_abbreviation(&self) -> &str {
         &self.set_abbreviation

@@ -1,9 +1,14 @@
 use crate::adapters::drivers::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
+use crate::adapters::drivers::discord::utils::description::{
+    create_card_description, create_set_description,
+};
+use crate::adapters::drivers::discord::utils::emoji::colour_id_emoji;
 use contracts::card::Card;
 use contracts::set::Set;
-use serenity::all::{ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
-use crate::adapters::drivers::discord::utils::description::{create_card_description, create_set_description};
-use crate::adapters::drivers::discord::utils::emoji::colour_id_emoji;
+use serenity::all::{
+    ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption,
+};
 
 pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
@@ -15,8 +20,10 @@ pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
             let options: Vec<CreateSelectMenuOption> = sets
                 .iter()
                 .take(25) // Discord's hard limit
-                .map(|s| CreateSelectMenuOption::new(s.name(), s.card_id().to_string())
-                    .description(create_set_description(s)))
+                .map(|s| {
+                    CreateSelectMenuOption::new(s.name(), s.card_id().to_string())
+                        .description(create_set_description(s))
+                })
                 .collect();
             let menu =
                 CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
@@ -36,10 +43,11 @@ pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActio
         let options: Vec<CreateSelectMenuOption> = cards
             .iter()
             .take(25) // Discord's hard limit
-            .map(|c| CreateSelectMenuOption::new(c.name(), c.id().to_string())
-                .emoji(colour_id_emoji(c))
-                .description(create_card_description(c))
-            )
+            .map(|c| {
+                CreateSelectMenuOption::new(c.name(), c.id().to_string())
+                    .emoji(colour_id_emoji(c))
+                    .description(create_card_description(c))
+            })
             .collect();
         let menu = CreateSelectMenu::new(SIMILAR_ID, CreateSelectMenuKind::String { options })
             .placeholder("Similar cards...");

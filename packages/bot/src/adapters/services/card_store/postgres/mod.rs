@@ -10,9 +10,9 @@ use async_trait::async_trait;
 use contracts::card::Card;
 use contracts::set::Set;
 use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::types::time::Date;
 use sqlx::{Pool, Row};
 use std::env;
-use sqlx::types::time::Date;
 use uuid::Uuid;
 
 pub struct Postgres {

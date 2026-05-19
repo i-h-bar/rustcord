@@ -2,13 +2,13 @@ use crate::domain::utils::REGEX_COLLECTION;
 use regex::Captures;
 
 pub mod colours;
+pub mod description;
 pub mod embed;
 pub mod emoji;
 pub mod help;
 pub mod message;
 pub mod parse;
 pub mod title;
-pub mod description;
 
 pub fn italicise_reminder_text(text: &str) -> String {
     REGEX_COLLECTION

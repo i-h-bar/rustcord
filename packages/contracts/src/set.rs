@@ -12,7 +12,12 @@ impl Set {
     #[must_use]
     pub fn new(card_id: Uuid, name: String, abbreviation: &str, release_date: Date) -> Self {
         let abbreviation = abbreviation.to_uppercase();
-        Set { card_id, name, abbreviation, release_date }
+        Set {
+            card_id,
+            name,
+            abbreviation,
+            release_date,
+        }
     }
 
     #[must_use]
