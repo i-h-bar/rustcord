@@ -7,6 +7,7 @@ pub mod emoji;
 pub mod help;
 pub mod message;
 pub mod parse;
+pub mod title;
 
 pub fn italicise_reminder_text(text: &str) -> String {
     REGEX_COLLECTION

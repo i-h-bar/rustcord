@@ -232,5 +232,6 @@ from card
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
 where card.normalised_name % $1 and card.oracle_id != $2
-order by card.oracle_id desc;
+order by card.oracle_id desc
+limit 25;
 ";

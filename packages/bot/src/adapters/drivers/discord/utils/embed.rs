@@ -6,6 +6,7 @@ use contracts::card::Card;
 use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use uuid::Uuid;
+use crate::adapters::drivers::discord::utils::title::create_title;
 
 pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
@@ -69,10 +70,7 @@ pub fn create_embed(card: &Card) -> CreateEmbed {
     let oracle_text = italicise_reminder_text(&oracle_text);
 
     let rules_text = format!("{}\n\n{}{}", card.type_line(), oracle_text, stats);
-    let mana_cost = REGEX_COLLECTION
-        .symbols
-        .replace_all(card.mana_cost(), |cap: &Captures| add_emoji(cap));
-    let title = format!("{}        {}", card.name(), mana_cost);
+    let title = create_title(card);
 
     CreateEmbed::default()
         .attachment(format!("{}.png", card.image_id()))
