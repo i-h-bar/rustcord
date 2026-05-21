@@ -3,7 +3,6 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-import aiofiles
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from anyio import Path
 from dotenv import load_dotenv
@@ -41,8 +40,7 @@ async def fetch_image(record: Record, session: ClientSession, pbar: tqdm, direct
             pbar.update()
             return
 
-        async with aiofiles.open(proposed_path, "wb") as f:
-            await f.write(png)
+        await Path(proposed_path).write_bytes(png)
 
     pbar.update()
 
