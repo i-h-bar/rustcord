@@ -7,6 +7,7 @@ import asyncpg
 from db.insert import insert_data
 from dotenv import load_dotenv
 from utils.data import load_scryfall_data
+from utils.emojis import sync_set_symbol_emojis
 from utils.images import download_missing_images
 
 load_dotenv()
@@ -15,9 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    data = await load_scryfall_data()
-    if not data:
+    card_data, set_data = await load_scryfall_data()
+    if not card_data:
         logger.error("Scryfall data could not be loaded.")
+        sys.exit(1)
+
+    if not set_data:
+        logger.error("Setting data could not be loaded.")
         sys.exit(1)
 
     user = os.getenv("POSTGRES_USER")
@@ -26,16 +31,17 @@ async def main() -> None:
     db = os.getenv("POSTGRES_DB")
     uri = f"postgresql://{user}:{password}@{host}/{db}"
     async with asyncpg.create_pool(dsn=uri) as pool:
-        data = tuple(
+        card_data = tuple(
             card
-            for card in data
+            for card in card_data
             if card.get("set_type") != "memorabilia"
             and card.get("image_uris", {}).get("png") != "https://errors.scryfall.com/soon.jpg"
         )
 
-        await insert_data(data, pool)
+        await insert_data(card_data, pool)
 
-        await download_missing_images(pool)
+        await download_missing_images(pool, set_data)
+        await sync_set_symbol_emojis()
 
 
 if __name__ == "__main__":

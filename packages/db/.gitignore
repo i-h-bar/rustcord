@@ -181,6 +181,7 @@ junit.xml
 default-cards*.json
 oracle-cards*.json
 unique-artwork*.json
+sets-*.json
 
 # Random Files
 todo.txt
