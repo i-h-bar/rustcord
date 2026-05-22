@@ -53,6 +53,7 @@ jobs:
         run: |
           kubectl create secret generic app-secrets \
             --from-literal=BOT_TOKEN=${{ secrets.BOT_TOKEN }} \
+            --from-literal=APPLICATION_ID=${{ secrets.APPLICATION_ID }} \
             --from-literal=POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
             --from-literal=POSTGRES_PW=${{ secrets.POSTGRES_PW }} \
             --from-literal=POSTGRES_DB=${{ secrets.POSTGRES_DB }} \
