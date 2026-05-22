@@ -3,6 +3,7 @@ mod commands;
 mod components;
 mod messages;
 mod utils;
+pub mod emoji;
 
 use crate::adapters::drivers::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::drivers::discord::commands::interaction::DiscordCommand;
@@ -25,6 +26,7 @@ use serenity::all::{
 };
 use utils::parse;
 use uuid::Uuid;
+use crate::adapters::drivers::discord::emoji::discord::warmup_emoji;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -77,6 +79,9 @@ where
         } else {
             log::info!("Created give_up command");
         }
+        
+        warmup_emoji().await;
+        log::info!("Emojis toasty warm");
 
         log::info!("Bot ready!");
     }
