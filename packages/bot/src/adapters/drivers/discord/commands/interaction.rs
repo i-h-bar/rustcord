@@ -68,7 +68,7 @@ impl MessageInteraction for DiscordCommand {
             message = message.components(components);
         }
 
-        let front = create_embed(card);
+        let front = create_embed(card).await;
         message = message.add_embed(front);
         self.send_message(message).await?;
 

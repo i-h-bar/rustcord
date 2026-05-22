@@ -1,3 +1,4 @@
+use crate::adapters::drivers::discord::emoji::discord::get_emoji;
 use crate::adapters::drivers::discord::utils::colours::get_colour_identity;
 use crate::adapters::drivers::discord::utils::emoji::add_emoji;
 use crate::adapters::drivers::discord::utils::italicise_reminder_text;
@@ -52,7 +53,7 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
     embed
 }
 
-pub fn create_embed(card: &Card) -> CreateEmbed {
+pub async fn create_embed(card: &Card) -> CreateEmbed {
     let stats = if let Some(power) = card.power() {
         let toughness = card.toughness().unwrap_or("0");
         format!("\n\n{power}/{toughness}")
@@ -69,7 +70,12 @@ pub fn create_embed(card: &Card) -> CreateEmbed {
         .replace_all(card.oracle_text(), |cap: &Captures| add_emoji(cap));
     let oracle_text = italicise_reminder_text(&oracle_text);
 
-    let rules_text = format!("{}\n\n{}{}", card.type_line(), oracle_text, stats);
+    let set_emoji = match get_emoji(card.set_abbreviation()).await {
+        Some(emoji) => format!(" <:{}:{}>", emoji.name, emoji.id),
+        None => String::new(),
+    };
+
+    let rules_text = format!("{}  {}\n\n{}{}", set_emoji, card.type_line(), oracle_text, stats);
     let title = create_title(card);
 
     CreateEmbed::default()

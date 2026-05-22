@@ -51,7 +51,7 @@ impl MessageInteraction for DiscordComponentInteraction {
             message = message.components(components);
         }
 
-        let front = create_embed(card);
+        let front = create_embed(card).await;
         message = message.add_embed(front);
         self.component
             .create_response(&self.ctx, CreateInteractionResponse::UpdateMessage(message))

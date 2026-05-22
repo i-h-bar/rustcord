@@ -69,7 +69,7 @@ impl MessageInteraction for DiscordMessageInteration {
             message = message.components(components);
         }
 
-        let embed = create_embed(card);
+        let embed = create_embed(card).await;
         message = message.add_embed(embed);
         self.send_message(message).await?;
 
