@@ -4,8 +4,10 @@ import os
 import sys
 
 import asyncpg
+from db.insert import insert_data
 from dotenv import load_dotenv
 from utils.data import load_scryfall_data
+from utils.emojis import sync_set_symbol_emojis
 from utils.images import download_missing_images
 
 load_dotenv()
@@ -29,16 +31,17 @@ async def main() -> None:
     db = os.getenv("POSTGRES_DB")
     uri = f"postgresql://{user}:{password}@{host}/{db}"
     async with asyncpg.create_pool(dsn=uri) as pool:
-        # card_data = tuple(
-        #     card
-        #     for card in card_data
-        #     if card.get("set_type") != "memorabilia"
-        #     and card.get("image_uris", {}).get("png") != "https://errors.scryfall.com/soon.jpg"
-        # )
-        #
-        # await insert_data(card_data, pool)
+        card_data = tuple(
+            card
+            for card in card_data
+            if card.get("set_type") != "memorabilia"
+            and card.get("image_uris", {}).get("png") != "https://errors.scryfall.com/soon.jpg"
+        )
+
+        await insert_data(card_data, pool)
 
         await download_missing_images(pool, set_data)
+        await sync_set_symbol_emojis()
 
 
 if __name__ == "__main__":

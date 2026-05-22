@@ -88,7 +88,7 @@ async def download_missing_illustrations(pool: Pool, base_dir: Path) -> None:
 
 
 async def symbol_present(data: dict[str, Any], base_dir: Path) -> bool:
-    if not (identifier := data.get("id")):
+    if not (identifier := data.get("code")):
         return True
 
     return await (base_dir / f"{identifier}.png").exists()
@@ -108,7 +108,7 @@ async def download_and_convert_symbol(
         pbar.update()
         return
 
-    identifier: str | None = data.get("id")
+    identifier: str | None = data.get("code")
     svg_url: str | None = data.get("icon_svg_uri")
 
     if not identifier or not svg_url:
