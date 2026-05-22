@@ -92,7 +92,7 @@ async def download_missing_illustrations(pool: Pool, base_dir: Path) -> None:
 _RARE_GOLD = (194, 161, 75)
 
 
-def _colourize_gold(png_bytes: bytes) -> bytes:
+def _colourise_gold(png_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
     _, _, _, alpha = img.split()
     coloured = ImageOps.colorize(img.convert("L"), black=_RARE_GOLD, white=(255, 255, 255))
@@ -155,7 +155,7 @@ async def download_and_convert_symbol(
     png_bytes = await loop.run_in_executor(
         None, lambda: cairosvg.svg2png(bytestring=svg_bytes, output_width=256, output_height=256)
     )
-    png_bytes = await loop.run_in_executor(None, _colourize_gold, png_bytes)
+    png_bytes = await loop.run_in_executor(None, _colourise_gold, png_bytes)
     await (base_dir / f"{identifier}.png").write_bytes(png_bytes)
     pbar.update()
 
