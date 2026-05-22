@@ -1,3 +1,4 @@
+use std::cmp::max;
 use crate::adapters::drivers::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
 use crate::adapters::drivers::discord::utils::description::{
     create_card_description, create_set_description,
@@ -9,22 +10,24 @@ use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,
 };
+use crate::adapters::drivers::discord::emoji::discord::get_emoji;
 
-pub fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
+pub async fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
         if sets.is_empty() {
             return None;
         }
 
         if sets.len() > 1 {
-            let options: Vec<CreateSelectMenuOption> = sets
-                .iter()
-                .take(25) // Discord's hard limit
-                .map(|s| {
-                    CreateSelectMenuOption::new(s.name(), s.card_id().to_string())
-                        .description(create_set_description(s))
-                })
-                .collect();
+            let mut options = Vec::with_capacity(max(sets.len(), 25));
+            for s in sets.iter().take(25) {
+                let mut option = CreateSelectMenuOption::new(s.name(), s.card_id().to_string())
+                    .description(create_set_description(s));
+                if let Some(emoji) = get_emoji(s.abbreviation()).await {
+                    option = option.emoji(emoji);
+                }
+                options.push(option);
+            }
             let menu =
                 CreateSelectMenu::new(PICK_PRINT_ID, CreateSelectMenuKind::String { options })
                     .placeholder("Select a print...");

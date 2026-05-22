@@ -53,7 +53,7 @@ impl MessageInteraction for DiscordMessageInteration {
         let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
 
         let mut message = CreateMessage::new().add_file(front_image);
-        if let Some(component) = build_set_dropdown(result.printings()) {
+        if let Some(component) = build_set_dropdown(result.printings()).await {
             components.push(component);
         }
 

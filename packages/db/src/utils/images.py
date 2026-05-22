@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import io
 import logging
 import os
 from typing import TYPE_CHECKING, Any
@@ -8,6 +9,7 @@ import cairosvg
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from anyio import Path
 from dotenv import load_dotenv
+from PIL import Image, ImageOps
 from tqdm import tqdm
 
 if TYPE_CHECKING:
@@ -87,6 +89,20 @@ async def download_missing_illustrations(pool: Pool, base_dir: Path) -> None:
                 await fetch_image(record, session, pbar, illustration_dir)
 
 
+_RARE_GOLD = (194, 161, 75)
+
+
+def _colorize_gold(png_bytes: bytes) -> bytes:
+    img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+    _, _, _, alpha = img.split()
+    colored = ImageOps.colorize(img.convert("L"), black=_RARE_GOLD, white=(255, 255, 255))
+    colored = colored.convert("RGBA")
+    colored.putalpha(alpha)
+    output = io.BytesIO()
+    colored.save(output, format="PNG")
+    return output.getvalue()
+
+
 async def symbol_present(data: dict[str, Any], base_dir: Path) -> bool:
     if not (identifier := data.get("code")):
         return True
@@ -139,6 +155,7 @@ async def download_and_convert_symbol(
     png_bytes = await loop.run_in_executor(
         None, lambda: cairosvg.svg2png(bytestring=svg_bytes, output_width=256, output_height=256)
     )
+    png_bytes = await loop.run_in_executor(None, _colorize_gold, png_bytes)
     await (base_dir / f"{identifier}.png").write_bytes(png_bytes)
     pbar.update()
 

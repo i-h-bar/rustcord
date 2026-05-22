@@ -14,6 +14,12 @@ impl DiscordEmojiCache {
     async fn new() -> Self {
         let token = env::var("BOT_TOKEN").expect("Bot token wasn't in env vars");
         let http = Http::new(&token);
+
+        match http.get_current_application_info().await {
+            Ok(info) => http.set_application_id(info.id),
+            Err(why) => log::warn!("Failed to fetch application info: {why}"),
+        }
+
         let cache = RwLock::new(HashMap::with_capacity(1000));
         let obj = Self { cache, http };
         obj.sync().await;
@@ -21,8 +27,12 @@ impl DiscordEmojiCache {
     }
 
     async fn sync(&self) {
-        let Ok(emojis) = self.http.get_application_emojis().await else {
-            return;
+        let emojis = match self.http.get_application_emojis().await {
+            Ok(emoji) => emoji,
+            Err(why) => {
+                log::warn!("Failure to fetch emoji {why}");
+                return;
+            },
         };
 
         let new_emojis: Vec<Emoji> = {
