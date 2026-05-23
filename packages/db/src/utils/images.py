@@ -165,7 +165,7 @@ async def download_missing_set_symbols(base_dir: Path, set_data: list[dict[str, 
     with contextlib.suppress(FileExistsError):
         await base_dir.mkdir(parents=True)
 
-    data = await asyncio.gather(*(filter_existence(data, base_dir) for data in set_data))
+    data = set_data  # await asyncio.gather(*(filter_existence(data, base_dir) for data in set_data))
     with tqdm(total=len(data)) as pbar:
         pbar.set_description("Downloading symbols")
         pbar.refresh()
