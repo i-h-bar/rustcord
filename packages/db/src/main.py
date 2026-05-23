@@ -41,7 +41,7 @@ async def main() -> None:
         await insert_data(card_data, pool)
 
         await download_missing_images(pool, set_data)
-        await sync_set_symbol_emojis()
+        await sync_set_symbol_emojis(replace=True)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ impl MessageInteraction for DiscordCommand {
 
         let mut message = CreateInteractionResponseMessage::new().add_file(front_image);
 
-        if let Some(component) = build_set_dropdown(result.printings()) {
+        if let Some(component) = build_set_dropdown(result.printings()).await {
             components.push(component);
         }
 
@@ -68,7 +68,7 @@ impl MessageInteraction for DiscordCommand {
             message = message.components(components);
         }
 
-        let front = create_embed(card);
+        let front = create_embed(card).await;
         message = message.add_embed(front);
         self.send_message(message).await?;
 

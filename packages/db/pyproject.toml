@@ -16,6 +16,7 @@ dependencies = [
     "greenlet>=3.3.2",
     "anyio==4.13.0",
     "cairosvg>=2.7.0",
+    "pillow>=11.0.0",
 ]
 
 [tool.uv]

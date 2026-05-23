@@ -11,11 +11,10 @@ pub struct Set {
 impl Set {
     #[must_use]
     pub fn new(card_id: Uuid, name: String, abbreviation: &str, release_date: Date) -> Self {
-        let abbreviation = abbreviation.to_uppercase();
         Set {
             card_id,
             name,
-            abbreviation,
+            abbreviation: abbreviation.to_string(),
             release_date,
         }
     }
