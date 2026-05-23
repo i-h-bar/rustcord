@@ -75,7 +75,14 @@ pub async fn create_embed(card: &Card) -> CreateEmbed {
         None => String::new(),
     };
 
-    let rules_text = format!("{}  {}\n\n{}{}", set_emoji, card.type_line(), oracle_text, stats);
+    let rules_text = format!(
+        "{}  {}\n\n{}\n\n{}{}",
+        set_emoji,
+        card.set_name(),
+        card.type_line(),
+        oracle_text,
+        stats
+    );
     let title = create_title(card);
 
     CreateEmbed::default()

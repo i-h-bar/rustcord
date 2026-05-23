@@ -1,9 +1,9 @@
 pub mod client;
 mod commands;
 mod components;
+pub mod emoji;
 mod messages;
 mod utils;
-pub mod emoji;
 
 use crate::adapters::drivers::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::drivers::discord::commands::interaction::DiscordCommand;
@@ -11,6 +11,7 @@ use crate::adapters::drivers::discord::commands::register::{give_up, guess, help
 use crate::adapters::drivers::discord::components::interaction::{
     DiscordComponentInteraction, FLIP, PICK_PRINT_ID, SIMILAR_ID,
 };
+use crate::adapters::drivers::discord::emoji::discord::warmup_emoji;
 use crate::adapters::drivers::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::drivers::discord::utils::help::HELP;
 use crate::domain::app::App;
@@ -26,7 +27,6 @@ use serenity::all::{
 };
 use utils::parse;
 use uuid::Uuid;
-use crate::adapters::drivers::discord::emoji::discord::warmup_emoji;
 
 #[async_trait]
 impl<IS, CS, C> EventHandler for App<IS, CS, C>
@@ -79,7 +79,7 @@ where
         } else {
             log::info!("Created give_up command");
         }
-        
+
         warmup_emoji().await;
         log::info!("Emojis toasty warm");
 

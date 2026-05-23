@@ -1,6 +1,6 @@
+use serenity::all::{Emoji, Http};
 use std::collections::HashMap;
 use std::env;
-use serenity::all::{Emoji, Http};
 use tokio::sync::{OnceCell, RwLock};
 
 static EMOJI_CACHE: OnceCell<DiscordEmojiCache> = OnceCell::const_new();
@@ -32,12 +32,15 @@ impl DiscordEmojiCache {
             Err(why) => {
                 log::warn!("Failure to fetch emoji {why}");
                 return;
-            },
+            }
         };
 
         let new_emojis: Vec<Emoji> = {
             let cache = self.cache.read().await;
-            emojis.into_iter().filter(|e| !cache.contains_key(&e.name)).collect()
+            emojis
+                .into_iter()
+                .filter(|e| !cache.contains_key(&e.name))
+                .collect()
         };
 
         if new_emojis.is_empty() {

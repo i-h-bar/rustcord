@@ -1,5 +1,5 @@
-use std::cmp::max;
 use crate::adapters::drivers::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
+use crate::adapters::drivers::discord::emoji::discord::get_emoji;
 use crate::adapters::drivers::discord::utils::description::{
     create_card_description, create_set_description,
 };
@@ -10,7 +10,7 @@ use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,
 };
-use crate::adapters::drivers::discord::emoji::discord::get_emoji;
+use std::cmp::max;
 
 pub async fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
