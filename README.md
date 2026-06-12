@@ -1,48 +1,75 @@
 
-# A Magic the Gathering Card Fetching Bot
+# Rustcord — Magic: The Gathering Discord Bot
 
-![Tests](https://img.shields.io/badge/tests-60%20passing-brightgreen)
-![Build](https://github.com/i-h-bar/rustcord/workflows/Test%20Coverage/badge.svg)
+![Tests](https://img.shields.io/badge/tests-121%20passing-brightgreen)
+![Build](https://github.com/i-h-bar/rustcord/workflows/PR%20Checks/badge.svg)
 [![Discord](https://img.shields.io/discord/1375617050793349222?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/m9FjpPRAxt)
 
-## Invite:
-https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277025507328&integration_type=0&scope=bot
+A Discord bot for searching Magic: The Gathering cards and playing a card-guessing game. Uses fuzzy matching to handle misspellings and supports searching by name, set, and artist.
 
-## Usage:
+**[Invite the bot](https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277025507328&integration_type=0&scope=bot)** · **[Discord server](https://discord.gg/m9FjpPRAxt)** · **[Report an issue](https://github.com/i-h-bar/rustcord/issues)**
 
-The Guessing Game:  
-To play the guessing game use the /play command. This has two options: the set you want to pull the card from; and the difficulty (Easy, Medium, or Hard) this defaults to Medium.
+---
 
-To guess a card use the /guess command and the bot will tell you if you are correct or not (slight typos are forgiven so no need to be super accurate with spelling).
+## Features
 
-The more you get the card wrong the more of the card is revealed.
+- **Card search** via `/search` or inline `[[card name]]` syntax in any message
+- **Fuzzy matching** — slight misspellings are forgiven
+- **Scoped search** by set name, set code, or artist
+- **Printings dropdown** — browse every printing of a card with set symbols
+- **Similar cards dropdown** — surfaces close matches if the wrong card was returned
+- **Guessing game** with three difficulty levels and progressive clue reveals
 
+---
 
-Searching for cards:  
-You can use the /search command to search a card or do the following.
+## Card Search
 
-To search a card simply put your desired card in double square brackets: [[lightning bolt]]
-Don't worry about slight misspellings as the bot with try and find the best match for what you have put
+Use the `/search` command or wrap a card name in double square brackets anywhere in a message:
 
-To refine your search you can specify artist/set (both set abbreviation and full name): [[lightning bolt | set=m11]] or [[relentless rats | artist = thomas m baxa]]
+```
+[[lightning bolt]]
+```
 
-Additionally, you can put this mid-sentence as to not break your flow, as well as multiple in one message. For example:
-I really love the artwork of [[the gitrog monster | set=bloomburrow commander]] it shows his true chonk, the classic [[gitrog monster | set=soi]] is not as cool.
+Refine by set or artist:
 
+```
+[[lightning bolt | set=m11]]
+[[relentless rats | artist=thomas m baxa]]
+[[gitrog monster | set=shadows over innistrad]]
+```
 
-All Commands:  
-/search - Options: (set, artist) - Fuzzy search for the specified Magic the Gathering Card.  
-/help - Options: () - Show this message.  
-/play - Options: (set, difficulty) - Start a game of guess the Magic the Gathering card.  
-/guess - Options: () - Make a guess for an active guess the card game.  
-/give_up - Options: () - Give up on the current game and return the answer.  
+You can use inline queries mid-sentence and stack multiple in one message:
 
-Having issues or have suggestions?  
-Please raise a ticket here https://github.com/i-h-bar/rustcord/issues
+```
+I really love [[the gitrog monster | set=bloomburrow commander]], the classic [[gitrog monster | set=soi]] is not as cool.
+```
 
-or if you don't want to use github please raise a ticket in this server
-https://discord.gg/m9FjpPRAxt
+Results include a **Select a print** dropdown to browse alternate printings and a **Similar cards** dropdown to navigate to related cards.
 
+---
 
-This will bring images back like the following:  
-![img.png](README_images/img.png)
+## Guessing Game
+
+Start a game with `/play`. Options:
+- **Set** — limit the mystery card to a specific set
+- **Difficulty** — Easy (8 guesses), Medium (6 guesses, default), Hard (4 guesses)
+
+The bot progressively reveals clues — mana cost, type line, rules text, and eventually a cropped illustration. Submit guesses with `/guess` (fuzzy matching applies). Give up with `/give_up` to reveal the answer.
+
+---
+
+## Commands
+
+| Command    | Options               | Description                           |
+|------------|-----------------------|---------------------------------------|
+| `/search`  | `name`, `set`, `artist` | Fuzzy search for a card             |
+| `/play`    | `set`, `difficulty`   | Start a guessing game                 |
+| `/guess`   | `card`                | Submit a guess for the active game    |
+| `/give_up` | -                     | Reveal the answer and end the game    |
+| `/help`    | -                     | Show command reference                |
+
+---
+
+## Demo
+
+![demo](README_images/demo.gif)
