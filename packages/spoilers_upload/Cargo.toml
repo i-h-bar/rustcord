@@ -1,0 +1,17 @@
+[package]
+name = "spoilers_upload"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+local-dev = ["dotenv"]
+
+[dependencies]
+dotenv = { version = "0.15.0", optional = true }
+contracts = { workspace = true }
+async-trait = "0.1.89"
+reqwest = { version = "0.13.4", features = ["json", "query"] }
+serde = { version = "1.0.228", features = ["derive"] }
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
+time = { version = "0.3"}
+uuid = { version = "1.18.0", features = ["v4"] }
