@@ -13,5 +13,5 @@ async-trait = "0.1.89"
 reqwest = { version = "0.13.4", features = ["json", "query"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
-time = { version = "0.3"}
+time = { version = "0.3", features = ["serde", "macros", "formatting", "parsing"] }
 uuid = { version = "1.18.0", features = ["v4"] }

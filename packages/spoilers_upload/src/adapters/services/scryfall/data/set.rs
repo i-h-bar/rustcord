@@ -6,7 +6,7 @@ use uuid::Uuid;
 format_description!(date_format, Date, "[year]-[month]-[day]");
 
 #[derive(Deserialize, Serialize)]
-pub struct Set {
+pub struct ScryfallSet {
     pub id: Uuid,
     pub name: String,
     #[serde(rename = "code")]

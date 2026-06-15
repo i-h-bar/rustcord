@@ -1,4 +1,5 @@
 pub mod card;
+pub mod set;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,5 +13,6 @@ pub enum Object {
 pub struct ScryfallData<T> {
     pub object: Object,
     pub has_more: bool,
+    pub next_page: Option<String>,
     pub data: Vec<T>,
 }

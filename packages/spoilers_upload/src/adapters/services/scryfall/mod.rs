@@ -4,10 +4,16 @@ use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::ports::source::CardSource;
 use async_trait::async_trait;
 use contracts::card::Card;
-use contracts::set::Set;
+use data::set::ScryfallSet;
 use reqwest::Client;
 use std::env;
+use std::time::{Duration, Instant};
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+
+struct ScryfallResponse<T> {
+    scryfall_data: ScryfallData<T>,
+    duration: Duration,
+}
 
 pub struct Scryfall {
     base_url: String,
@@ -27,12 +33,29 @@ impl Scryfall {
         }
     }
 
-    async fn recent_sets(&self) -> Vec<Set> {
+    async fn recent_sets(&self) -> Vec<ScryfallSet> {
         let url = format!("{}/sets", self.base_url);
+        let response = self.get::<ScryfallSet>(&url).await;
 
-        let response: ScryfallData<Set> = self
-            .client
-            .get(&url)
+        let today = time::OffsetDateTime::now_utc().date();
+        let threshold = today - time::Duration::days(7);
+
+        response.scryfall_data.data.into_iter().filter_map(|set| {
+            if set.released_at >= threshold && set.card_count > 0 {
+                Some(set)
+            } else {
+                None
+            }
+        }).collect()
+    }
+
+    async fn get<T>(&self, url: &str) -> ScryfallResponse<T>
+    where T: serde::de::DeserializeOwned
+    {
+        let start = Instant::now();
+
+        let scryfall_data = self.client
+            .get(url)
             .send()
             .await
             .unwrap()
@@ -40,16 +63,7 @@ impl Scryfall {
             .await
             .unwrap();
 
-        let today = time::OffsetDateTime::now_utc().date();
-        let threshold = today - time::Duration::days(7);
-
-        response.data.into_iter().filter_map(|set| {
-            if set.released_at >= threshold && set.card_count > 0 {
-                Some(set)
-            } else {
-                None
-            }
-        }).collect()
+        ScryfallResponse { scryfall_data, duration: start.elapsed() }
     }
 }
 
@@ -60,27 +74,14 @@ impl CardSource for Scryfall {
         let mut cards: Vec<ScryfallCard> = Vec::new();
 
         for set in sets {
-            let mut page_number = 1;
-            let mut has_more = true;
-            while has_more {
-                let url = format!("{}/cards/search", self.base_url);
-                let response: ScryfallData<ScryfallCard> = self.client
-                    .get(&url)
-                    .query(&[("q", format!("e:{}", set.abbreviation)), ("page", page_number.to_string())])
-                    .send()
-                    .await
-                    .unwrap()
-                    .json()
-                    .await
-                    .unwrap();
-
-                cards.extend(response.data);
-
-                if response.has_more {
-                    page_number += 1;
-                } else {
-                    has_more = false;
-                }
+            let mut url = Some(format!("{}/cards/search?q=e:{}", self.base_url, set.abbreviation));
+            while let Some(next_page) = url {
+                let response = self.get(&next_page).await;
+                cards.extend(response.scryfall_data.data);
+                url = response.scryfall_data.next_page;
+                let response_time = response.duration.as_millis();
+                let sleep_time = Duration::from_millis(500).saturating_sub(response.duration);
+                tokio::time::sleep(sleep_time).await;
             }
         }
 
