@@ -8,6 +8,7 @@ use data::set::ScryfallSet;
 use reqwest::Client;
 use std::env;
 use std::time::{Duration, Instant};
+use contracts::set::Set;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
 
 struct ScryfallResponse<T> {
@@ -69,8 +70,11 @@ impl Scryfall {
 
 #[async_trait]
 impl CardSource for Scryfall {
-    async fn get_recent_cards(&self) -> Vec<Card> {
-        let sets = self.recent_sets().await;
+    async fn get_recent_sets(&self) -> Vec<Set> {
+        self.recent_sets().await.into_iter().map(Into::into).collect()
+    }
+
+    async fn get_cards_from_set(&self, sets: &Vec<Set>) -> Vec<Card> {
         let mut cards: Vec<ScryfallCard> = Vec::new();
 
         for set in sets {
@@ -79,7 +83,6 @@ impl CardSource for Scryfall {
                 let response = self.get(&next_page).await;
                 cards.extend(response.scryfall_data.data);
                 url = response.scryfall_data.next_page;
-                let response_time = response.duration.as_millis();
                 let sleep_time = Duration::from_millis(500).saturating_sub(response.duration);
                 tokio::time::sleep(sleep_time).await;
             }

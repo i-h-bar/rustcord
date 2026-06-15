@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use time::Date;
 use time::serde::format_description;
 use uuid::Uuid;
+use contracts::set::Set;
 
 format_description!(date_format, Date, "[year]-[month]-[day]");
 
@@ -15,4 +16,18 @@ pub struct ScryfallSet {
     pub card_count: u32,
     #[serde(with = "date_format")]
     pub released_at: Date,
+}
+
+impl Into<Set> for ScryfallSet {
+    fn into(self) -> Set {
+        let normalised_name = contracts::normalise::normalise(&self.name);
+
+        Set {
+            id: self.id,
+            name: self.name,
+            abbreviation: self.abbreviation,
+            normalised_name,
+            card_count: Some(self.card_count),
+        }
+    }
 }
