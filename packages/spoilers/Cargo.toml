@@ -1,5 +1,5 @@
 [package]
-name = "spoilers_upload"
+name = "spoilers"
 version = "0.1.0"
 edition = "2024"
 
@@ -19,3 +19,4 @@ sqlx = { version = "0.8.6", features = [ "runtime-tokio", "postgres", "uuid", "t
 log = "0.4.27"
 regex = "1.12.2"
 futures = "0.3.32"
+env_logger = "0.11.10"

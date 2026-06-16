@@ -3,7 +3,8 @@ members = [
     "packages/bot",
     "packages/contracts",
     "packages/fuzzy",
-    "packages/named_lock", "packages/spoilers_upload",
+    "packages/named_lock",
+    "packages/spoilers",
 ]
 resolver = "2"
 

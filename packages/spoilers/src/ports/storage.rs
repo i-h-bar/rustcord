@@ -5,7 +5,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait Storage {
     async fn get_set_volumes(&self, sets: Vec<Set>) -> Vec<(Set, u32)>;
-    async fn upsert_cards(&self, cards: Vec<CardInfo>);
+    async fn upsert_cards(&self, cards: &[CardInfo]);
 }
 
 pub struct Set {

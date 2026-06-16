@@ -1,10 +1,13 @@
+use crate::adapters::services::file_system::FileSystem;
 use crate::adapters::services::psql::Postgres;
 use crate::adapters::services::scryfall::Scryfall;
+use crate::ports::image_store::ImageStore;
 use crate::ports::source::CardSource;
 use crate::ports::storage::Storage;
 
 pub mod psql;
 mod scryfall;
+pub mod file_system;
 
 #[must_use]
 pub fn card_source_init() -> impl CardSource {
@@ -14,4 +17,9 @@ pub fn card_source_init() -> impl CardSource {
 #[must_use]
 pub async fn card_storage_init() -> impl Storage {
     Postgres::create().await
+}
+
+#[must_use]
+pub fn image_store_init() -> impl ImageStore {
+    FileSystem::new()
 }

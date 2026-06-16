@@ -33,7 +33,7 @@ impl Postgres {
     }
 
     async fn get_set_volume(&self, set: &Set) -> u32 {
-        match sqlx::query("select count(*) from set where id = $1")
+        match sqlx::query("select count(*) from card join set on set.id = card.set_id where set.id = $1")
             .bind(set.id)
             .fetch_one(&self.pool)
             .await
@@ -277,7 +277,7 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card_info(&self, info: CardInfo) {
+    async fn upsert_card_info(&self, info: &CardInfo) {
         self.upsert_artist(&info.artist).await;
         self.upsert_image(&info.image).await;
         if let Some(ill) = &info.illustration {
@@ -301,7 +301,8 @@ impl Storage for Postgres {
         .await
     }
 
-    async fn upsert_cards(&self, cards: Vec<CardInfo>) {
+    async fn upsert_cards(&self, cards: &[CardInfo]) {
+        log::info!("Upserting {} cards", cards.len());
         future::join_all(
             cards
                 .into_iter()

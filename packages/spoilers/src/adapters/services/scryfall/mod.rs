@@ -4,15 +4,18 @@ pub mod utils;
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::ports::source::CardSource;
-use crate::ports::storage::{CardInfo, Set};
+use crate::ports::storage::{Card, CardInfo, Set};
 use async_trait::async_trait;
 use data::set::ScryfallSet;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use futures::future;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+use crate::ports::image_store::Image;
 
 struct ScryfallResponse<T> {
     scryfall_data: ScryfallData<T>,
@@ -101,9 +104,11 @@ impl CardSource for Scryfall {
 
     async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, u32)]) -> Vec<CardInfo> {
         let mut scryfall_cards: Vec<ScryfallCard> = Vec::new();
+        log::info!("Fetching {} outdated sets", sets.len());
 
         for (set, volume) in sets {
             if *volume == 0 {
+                log::info!("Scryfall set is empty for {}", set.name);
                 continue;
             }
 
@@ -115,16 +120,20 @@ impl CardSource for Scryfall {
                 .is_some_and(|s| s.card_count != *volume);
 
             if !is_outdated {
+                log::info!("Storage is up to date for {}", set.name);
                 continue;
             }
 
+            log::info!("Fetching cards in {}", set.name);
             let mut url = Some(format!(
                 "{}/cards/search?q=e:{}",
                 self.base_url, set.abbreviation
             ));
             while let Some(next_page) = url {
                 let response = self.get(&next_page).await;
+                log::info!("Fetched {} cards for {}", response.scryfall_data.data.len(), set.name);
                 scryfall_cards.extend(response.scryfall_data.data);
+
                 url = response.scryfall_data.next_page;
                 let sleep_time = Duration::from_millis(500).saturating_sub(response.duration);
                 tokio::time::sleep(sleep_time).await;
@@ -136,5 +145,18 @@ impl CardSource for Scryfall {
             .filter_map(ScryfallCard::into_storage_records)
             .flatten()
             .collect()
+    }
+
+    async fn get_image(&self, card: &CardInfo) -> Image {
+        let response = self.client
+            .get(&card.image.scryfall_url)
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap();
+
+        Image(card.image.id, response.into())
     }
 }

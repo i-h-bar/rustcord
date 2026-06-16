@@ -1,5 +1,6 @@
 use crate::ports::storage::{CardInfo, Set};
 use async_trait::async_trait;
+use crate::ports::image_store::Image;
 
 #[async_trait]
 pub trait CardSource {
@@ -9,4 +10,6 @@ pub trait CardSource {
     /// Each entry is a `(Set, u32)` pair where the `u32` is the known card count for that set.
     /// Only sets with a volume mismatch are queried — up-to-date sets are skipped.
     async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, u32)]) -> Vec<CardInfo>;
+
+    async fn get_image(&self, card: &CardInfo) -> Image;
 }
