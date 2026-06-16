@@ -1,6 +1,6 @@
 use crate::card::Card;
-use crate::image::Image;
 use crate::card_set::CardSet;
+use crate::image::Image;
 
 pub struct SearchResultDto {
     card: Card,

@@ -1,6 +1,6 @@
-use crate::ports::storage::Storage;
+use crate::adapters::services::{card_source_init, card_storage_init};
 use crate::ports::source::CardSource;
-use crate::adapters::services::{card_storage_init, card_source_init};
+use crate::ports::storage::Storage;
 #[cfg(feature = "local-dev")]
 use dotenv::dotenv;
 
@@ -16,9 +16,8 @@ async fn main() {
     let storage = card_storage_init().await;
 
     let sets = source.get_recent_sets().await;
-
     let set_volumes = storage.get_set_volumes(sets).await;
+    let cards = source.fetch_cards_for_outdated_sets(&set_volumes).await;
 
-    let _cards = source.fetch_cards_for_outdated_sets(&set_volumes).await;
-    let _ = 9;
+    storage.upsert_cards(cards).await;
 }

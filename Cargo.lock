@@ -2887,6 +2887,7 @@ dependencies = [
  "dotenv",
  "futures",
  "log",
+ "regex",
  "reqwest 0.13.4",
  "serde",
  "sqlx",

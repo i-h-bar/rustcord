@@ -1,8 +1,8 @@
+use crate::ports::storage::Set;
 use serde::{Deserialize, Serialize};
 use time::Date;
 use time::serde::format_description;
 use uuid::Uuid;
-use crate::ports::storage::Set;
 
 format_description!(date_format, Date, "[year]-[month]-[day]");
 
@@ -18,27 +18,27 @@ pub struct ScryfallSet {
     pub released_at: Date,
 }
 
-impl Into<Set> for ScryfallSet {
-    fn into(self) -> Set {
-        let normalised_name = contracts::normalise::normalise(&self.name);
+impl From<ScryfallSet> for Set {
+    fn from(val: ScryfallSet) -> Self {
+        let normalised_name = contracts::normalise::normalise(&val.name);
 
         Set {
-            id: self.id,
-            name: self.name,
-            abbreviation: self.abbreviation,
+            id: val.id,
+            name: val.name,
+            abbreviation: val.abbreviation,
             normalised_name,
         }
     }
 }
 
-impl Into<Set> for &ScryfallSet {
-    fn into(self) -> Set {
-        let normalised_name = contracts::normalise::normalise(&self.name);
+impl From<&ScryfallSet> for Set {
+    fn from(val: &ScryfallSet) -> Self {
+        let normalised_name = contracts::normalise::normalise(&val.name);
 
         Set {
-            id: self.id,
-            name: self.name.clone(),
-            abbreviation: self.abbreviation.clone(),
+            id: val.id,
+            name: val.name.clone(),
+            abbreviation: val.abbreviation.clone(),
             normalised_name,
         }
     }
