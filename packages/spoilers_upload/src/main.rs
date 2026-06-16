@@ -1,5 +1,6 @@
+use crate::ports::storage::Storage;
 use crate::ports::source::CardSource;
-use crate::adapters::services::card_source_init;
+use crate::adapters::services::{card_storage_init, card_source_init};
 #[cfg(feature = "local-dev")]
 use dotenv::dotenv;
 
@@ -11,11 +12,13 @@ async fn main() {
     #[cfg(feature = "local-dev")]
     dotenv().ok();
 
-    let card_source = card_source_init();
-    let sets = card_source.get_recent_sets().await;
+    let source = card_source_init();
+    let storage = card_storage_init().await;
 
-    // TODO! Filter out sets that match number of cards already in database
+    let sets = source.get_recent_sets().await;
 
-    let _cards = card_source.get_cards_from_set(&sets).await;
+    let set_volumes = storage.get_set_volumes(sets).await;
 
+    let _cards = source.fetch_cards_for_outdated_sets(&set_volumes).await;
+    let _ = 9;
 }

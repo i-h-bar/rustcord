@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use time::Date;
 use time::serde::format_description;
 use uuid::Uuid;
-use contracts::set::Set;
+use crate::ports::storage::Set;
 
 format_description!(date_format, Date, "[year]-[month]-[day]");
 
@@ -27,7 +27,19 @@ impl Into<Set> for ScryfallSet {
             name: self.name,
             abbreviation: self.abbreviation,
             normalised_name,
-            card_count: Some(self.card_count),
+        }
+    }
+}
+
+impl Into<Set> for &ScryfallSet {
+    fn into(self) -> Set {
+        let normalised_name = contracts::normalise::normalise(&self.name);
+
+        Set {
+            id: self.id,
+            name: self.name.clone(),
+            abbreviation: self.abbreviation.clone(),
+            normalised_name,
         }
     }
 }

@@ -1,24 +1,29 @@
 mod data;
 
+use std::collections::HashMap;
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::ports::source::CardSource;
 use async_trait::async_trait;
-use contracts::card::Card;
 use data::set::ScryfallSet;
 use reqwest::Client;
 use std::env;
 use std::time::{Duration, Instant};
-use contracts::set::Set;
+use tokio::sync::RwLock;
+use uuid::Uuid;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+use crate::ports::storage::{Card, Set};
 
 struct ScryfallResponse<T> {
     scryfall_data: ScryfallData<T>,
     duration: Duration,
 }
 
+#[derive(Default)]
 pub struct Scryfall {
     base_url: String,
     client: Client,
+    sets: RwLock<HashMap<Uuid, ScryfallSet>>,
+    cards: RwLock<Vec<ScryfallCard>>,
 }
 
 impl Scryfall {
@@ -31,6 +36,7 @@ impl Scryfall {
         Self {
             base_url: "https://api.scryfall.com".into(),
             client,
+            ..Self::default()
         }
     }
 
@@ -71,13 +77,32 @@ impl Scryfall {
 #[async_trait]
 impl CardSource for Scryfall {
     async fn get_recent_sets(&self) -> Vec<Set> {
-        self.recent_sets().await.into_iter().map(Into::into).collect()
+        if !self.sets.read().await.is_empty() {
+            return self.sets.read().await.iter().map(|(_, set)| set.into()).collect();
+        }
+
+        let sets = self.recent_sets().await;
+        self.sets.write().await.extend(sets.into_iter().map(|set| (set.id, set.into())));
+
+        self.sets.read().await.iter().map(|(_, set)| set.into()).collect()
     }
 
-    async fn get_cards_from_set(&self, sets: &Vec<Set>) -> Vec<Card> {
+    async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, u32)]) -> Vec<Card> {
         let mut cards: Vec<ScryfallCard> = Vec::new();
 
-        for set in sets {
+        for (set, volume) in sets {
+            if *volume == 0 {
+                continue;
+            }
+
+            let is_outdated = self.sets.read().await
+                .get(&set.id)
+                .map_or(false, |s| s.card_count != *volume);
+
+            if !is_outdated {
+                continue;
+            }
+
             let mut url = Some(format!("{}/cards/search?q=e:{}", self.base_url, set.abbreviation));
             while let Some(next_page) = url {
                 let response = self.get(&next_page).await;
