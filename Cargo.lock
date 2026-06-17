@@ -2415,7 +2415,6 @@ dependencies = [
  "thiserror 2.0.16",
  "time",
  "tokio",
- "unicode-normalization",
  "uuid",
 ]
 
