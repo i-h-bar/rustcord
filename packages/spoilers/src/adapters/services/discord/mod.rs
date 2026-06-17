@@ -1,6 +1,9 @@
 use crate::domain::emoji::normalise_name;
+use crate::domain::svg;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData, EmojiStore};
 use async_trait::async_trait;
+use base64::{Engine, engine::general_purpose::STANDARD};
+use futures::future;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
@@ -10,9 +13,6 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use futures::future;
-use crate::domain::svg;
-use base64::{Engine, engine::general_purpose::STANDARD};
 
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 
@@ -34,7 +34,6 @@ impl EmojiUpload {
     }
 }
 
-
 impl From<Emoji> for EmojiUpload {
     fn from(emoji: Emoji) -> Self {
         let name = normalise_name(&emoji.name);
@@ -42,7 +41,6 @@ impl From<Emoji> for EmojiUpload {
         EmojiUpload::new(name, emoji.image.0)
     }
 }
-
 
 pub struct Discord {
     client: Client,
@@ -108,20 +106,19 @@ impl EmojiStore for Discord {
     }
 
     async fn upload_set_emojis(&self, emojis: Vec<Emoji>) {
-        future::join_all(
-            emojis.iter().map(|s| async {
-                log::info!("Uploading set symbol {}", s.name);
+        future::join_all(emojis.iter().map(|s| async {
+            log::info!("Uploading set symbol {}", s.name);
 
-                let recoloured = svg::recolour(&s.image.0, "#C9A227");
-                let png = svg::to_png(&recoloured);
+            let recoloured = svg::recolour(&s.image.0, "#C9A227");
+            let png = svg::to_png(&recoloured);
 
-                let emoji = Emoji {
-                    name: s.name.clone(),
-                    image: EmojiImage(STANDARD.encode(&png))
-                };
+            let emoji = Emoji {
+                name: s.name.clone(),
+                image: EmojiImage(STANDARD.encode(&png)),
+            };
 
-                self.upload_emoji(emoji).await;
-            })
-        ).await;
+            self.upload_emoji(emoji).await;
+        }))
+        .await;
     }
 }

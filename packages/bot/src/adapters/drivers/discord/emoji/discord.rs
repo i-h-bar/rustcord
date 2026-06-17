@@ -20,7 +20,7 @@ impl DiscordEmojiCache {
             Err(why) => log::warn!("Failed to fetch application info: {why}"),
         }
 
-        let cache = RwLock::new(HashMap::with_capacity(1000));
+        let cache = RwLock::new(HashMap::with_capacity(2000));
         let obj = Self { cache, http };
         obj.sync().await;
         obj

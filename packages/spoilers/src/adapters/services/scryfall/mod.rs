@@ -3,12 +3,12 @@ pub mod utils;
 
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+use crate::domain::emoji::normalise_name;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
 use crate::ports::image_store::Image;
 use crate::ports::source::CardSource;
 use crate::ports::storage::{Card, CardInfo, Set};
 use async_trait::async_trait;
-use crate::domain::emoji::normalise_name;
 use data::set::ScryfallSet;
 use futures::future;
 use governor::clock::DefaultClock;
@@ -20,10 +20,23 @@ use std::env;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+#[derive(Error, Debug)]
+
+enum ScryfallError {
+    #[error("Http error {0}")]
+    HTTPError(#[from] reqwest::Error),
+    #[error("Rate limited by Scryfall")]
+    RateLimited,
+    #[error("Error parsing response from scryfall")]
+    ParseError,
+}
+
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
+type ScryfallResult<T> = Result<T, ScryfallError>;
 
 pub struct Scryfall {
     base_url: String,
@@ -58,15 +71,15 @@ impl Scryfall {
         }
     }
 
-    async fn recent_sets(&self) -> Vec<ScryfallSet> {
+    async fn recent_sets(&self) -> ScryfallResult<Vec<ScryfallSet>> {
         let url = format!("{}/sets", self.base_url);
-        let response = self.get(&url).await;
+        let response = self.get(&url).await?;
 
         let today = time::OffsetDateTime::now_utc().date();
         let threshold = today - time::Duration::days(7);
 
         self.limiter.until_ready().await;
-        response
+        Ok(response
             .data
             .into_iter()
             .filter_map(|set: ScryfallSet| {
@@ -76,7 +89,7 @@ impl Scryfall {
                     None
                 }
             })
-            .collect()
+            .collect())
     }
 
     async fn get_raw(&self, url: &str) -> String {
@@ -91,19 +104,25 @@ impl Scryfall {
             .unwrap()
     }
 
-    async fn get<T>(&self, url: &str) -> ScryfallData<T>
+    async fn get<T>(&self, url: &str) -> ScryfallResult<ScryfallData<T>>
     where
         T: serde::de::DeserializeOwned,
     {
         self.limiter.until_ready().await;
-        self.client
-            .get(url)
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap()
+        let resp = self.client.get(url).send().await.map_err(|why| {
+            log::warn!("Error getting data from scryfall: {}", why);
+            ScryfallError::HTTPError(why)
+        })?;
+
+        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            log::warn!("Rate limited by Scryfall");
+            return Err(ScryfallError::RateLimited);
+        }
+
+        resp.json().await.map_err(|err| {
+            log::warn!("Error parsing data from scryfall: {}", err);
+            ScryfallError::ParseError
+        })
     }
 }
 
@@ -114,7 +133,10 @@ impl CardSource for Scryfall {
             return self.sets.read().await.values().map(Into::into).collect();
         }
 
-        let sets = self.recent_sets().await;
+        let sets = match self.recent_sets().await {
+            Ok(sets) => sets,
+            Err(_) => return Vec::new(),
+        };
         self.sets
             .write()
             .await
@@ -150,8 +172,18 @@ impl CardSource for Scryfall {
                 "{}/cards/search?q=e:{}",
                 self.base_url, set.abbreviation
             ));
-            while let Some(next_page) = url {
-                let response = self.get(&next_page).await;
+            while let Some(ref next_page) = url {
+                let response = match self.get(next_page).await {
+                    Ok(response) => response,
+                    Err(ScryfallError::RateLimited) => {
+                        return scryfall_cards
+                            .into_iter()
+                            .filter_map(ScryfallCard::into_storage_records)
+                            .flatten()
+                            .collect();
+                    }
+                    Err(_) => continue,
+                };
                 log::info!("Fetched {} cards for {}", response.data.len(), set.name);
                 scryfall_cards.extend(response.data);
 

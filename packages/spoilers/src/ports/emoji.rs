@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Debug)]
 pub struct EmojiImage(pub String);
 
