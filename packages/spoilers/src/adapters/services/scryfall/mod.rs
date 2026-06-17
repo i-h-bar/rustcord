@@ -29,8 +29,6 @@ use uuid::Uuid;
 enum ScryfallError {
     #[error("Http error {0}")]
     HTTPError(#[from] reqwest::Error),
-    #[error("Rate limited by Scryfall")]
-    RateLimited,
     #[error("Error parsing response from scryfall")]
     ParseError,
 }
@@ -101,7 +99,7 @@ impl Scryfall {
 
         if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
             log::warn!("Rate limited by Scryfall");
-            return Err(ScryfallError::RateLimited);
+            std::process::exit(1);
         };
 
         Ok(resp)
@@ -178,13 +176,6 @@ impl CardSource for Scryfall {
             while let Some(ref next_page) = url {
                 let response = match self.get(next_page).await {
                     Ok(response) => response,
-                    Err(ScryfallError::RateLimited) => {
-                        return scryfall_cards
-                            .into_iter()
-                            .filter_map(ScryfallCard::into_storage_records)
-                            .flatten()
-                            .collect();
-                    }
                     Err(_) => continue,
                 };
                 log::info!("Fetched {} cards for {}", response.data.len(), set.name);
@@ -201,18 +192,28 @@ impl CardSource for Scryfall {
             .collect()
     }
 
-    async fn get_image(&self, card: &CardInfo) -> Image {
-        let response = self
-            .client
-            .get(&card.image.scryfall_url)
-            .send()
-            .await
-            .unwrap()
-            .bytes()
-            .await
-            .unwrap();
+    async fn get_image(&self, card: &CardInfo) -> Option<Image> {
+        let resp = self.client.get(&card.image.scryfall_url).send().await.map_err(|why| {
+            log::warn!("Error getting data from scryfall: {}", why);
+            ScryfallError::HTTPError(why)
+        }).ok()?;
 
-        Image(card.image.id, response.into())
+        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            log::warn!("Rate limited by Scryfall");
+            std::process::exit(1);
+        };
+        
+        let image = match resp
+            .bytes()
+            .await {
+            Ok(image) => image,
+            Err(why) => {
+                log::warn!("Error parsing image from scryfall: {why}");
+                return None;
+            },
+        };
+
+        Some(Image(card.image.id, image.into()))
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {

@@ -17,8 +17,17 @@ async fn save_image(
     }
 
     let image = {
-        let _ = sem.acquire().await.unwrap();
-        source.get_image(card).await
+        let Ok(_guard) = sem.acquire().await else {
+            log::error!("Poisoned semaphore");
+            return;
+        };
+        match source.get_image(card).await {
+            Some(image) => image,
+            None => {
+                log::error!("{} image not found", card.card.name);
+                return;
+            },
+        }
     };
 
     image_store.save(image).await;
