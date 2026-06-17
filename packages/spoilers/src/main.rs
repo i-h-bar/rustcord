@@ -29,7 +29,7 @@ async fn main() {
     let sets = source.get_recent_sets().await;
 
     let new_set_symbols = source.fetch_missing_set_symbols(&current_emojis).await;
-    emoji_store.upload_emojis(new_set_symbols).await;
+    emoji_store.upload_set_emojis(new_set_symbols).await;
 
     let set_volumes = storage.get_set_volumes(sets).await;
     let cards = source.fetch_cards_for_outdated_sets(&set_volumes).await;

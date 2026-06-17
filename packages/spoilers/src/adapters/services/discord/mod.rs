@@ -107,7 +107,7 @@ impl EmojiStore for Discord {
         emojis.items
     }
 
-    async fn upload_emojis(&self, emojis: Vec<Emoji>) {
+    async fn upload_set_emojis(&self, emojis: Vec<Emoji>) {
         future::join_all(
             emojis.iter().map(|s| async {
                 log::info!("Uploading set symbol {}", s.name);

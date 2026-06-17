@@ -20,5 +20,5 @@ pub struct Emoji {
 #[async_trait]
 pub trait EmojiStore {
     async fn get_emojis(&self) -> Vec<EmojiMetaData>;
-    async fn upload_emojis(&self, emojis: Vec<Emoji>);
+    async fn upload_set_emojis(&self, emojis: Vec<Emoji>);
 }
