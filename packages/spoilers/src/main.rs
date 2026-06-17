@@ -3,12 +3,11 @@ use crate::adapters::services::{
 };
 use crate::ports::emoji::EmojiStore;
 use crate::ports::source::CardSource;
-use base64::Engine;
-use dotenv::dotenv;
-use crate::domain::emoji;
 use crate::domain::images::save_images;
 use crate::ports::storage::Storage;
+
 #[cfg(feature = "local-dev")]
+use dotenv::dotenv;
 
 pub mod adapters;
 pub mod domain;
@@ -31,14 +30,14 @@ async fn main() {
 
     let new_set_symbols = source.fetch_missing_set_symbols(&current_emojis).await;
     emoji_store.upload_emojis(new_set_symbols).await;
-    
+
     let set_volumes = storage.get_set_volumes(sets).await;
     let cards = source.fetch_cards_for_outdated_sets(&set_volumes).await;
     if cards.is_empty() {
         log::info!("No available cards found");
         return;
     }
-    
+
     storage.upsert_cards(&cards).await;
     save_images(&cards, &image_store, &source).await;
 }
