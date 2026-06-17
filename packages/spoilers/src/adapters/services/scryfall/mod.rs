@@ -5,7 +5,7 @@ use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::domain::emoji::normalise_name;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
-use crate::ports::image_store::Image;
+use crate::ports::image_store::{Illustration, Image};
 use crate::ports::source::CardSource;
 use crate::ports::storage::{Card, CardInfo, Set};
 use async_trait::async_trait;
@@ -23,6 +23,7 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+use crate::adapters::services::scryfall::utils::image::parse_image_id;
 
 #[derive(Error, Debug)]
 
@@ -125,6 +126,33 @@ impl Scryfall {
             ScryfallError::ParseError
         })
     }
+
+    async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
+        let url = card.illustration.as_ref()?.scryfall_url.clone();
+        let resp = self.client.get(&url).send().await.map_err(|why| {
+            log::warn!("Error getting data from scryfall: {}", why);
+            ScryfallError::HTTPError(why)
+        }).ok()?;
+
+        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            log::warn!("Rate limited by Scryfall");
+            std::process::exit(1);
+        };
+
+        let image = match resp
+            .bytes()
+            .await {
+            Ok(image) => image,
+            Err(why) => {
+                log::warn!("Error parsing image from scryfall: {why}");
+                return None;
+            },
+        };
+
+        let id = parse_image_id(&url)?;
+
+        Some(Illustration(id, image.into()))
+    }
 }
 
 #[async_trait]
@@ -192,8 +220,9 @@ impl CardSource for Scryfall {
             .collect()
     }
 
-    async fn get_image(&self, card: &CardInfo) -> Option<Image> {
-        let resp = self.client.get(&card.image.scryfall_url).send().await.map_err(|why| {
+    async fn get_image(&self, card: &CardInfo) -> Option<(Image, Option<Illustration>)> {
+        let url = &card.image.scryfall_url;
+        let resp = self.client.get(url).send().await.map_err(|why| {
             log::warn!("Error getting data from scryfall: {}", why);
             ScryfallError::HTTPError(why)
         }).ok()?;
@@ -202,7 +231,7 @@ impl CardSource for Scryfall {
             log::warn!("Rate limited by Scryfall");
             std::process::exit(1);
         };
-        
+
         let image = match resp
             .bytes()
             .await {
@@ -213,7 +242,9 @@ impl CardSource for Scryfall {
             },
         };
 
-        Some(Image(card.image.id, image.into()))
+        let id = parse_image_id(url)?;
+
+        Some((Image(id, image.into()), self.get_illustration(card).await))
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {

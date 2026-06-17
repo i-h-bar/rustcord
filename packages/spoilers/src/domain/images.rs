@@ -16,7 +16,7 @@ async fn save_image(
         return;
     }
 
-    let image = {
+    let (image, illustration) = {
         let Ok(_guard) = sem.acquire().await else {
             log::error!("Poisoned semaphore");
             return;
@@ -30,7 +30,7 @@ async fn save_image(
         }
     };
 
-    image_store.save(image).await;
+    image_store.save(image, illustration).await;
 }
 
 pub async fn save_images(

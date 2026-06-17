@@ -1,4 +1,4 @@
-use crate::ports::image_store::{Image, ImageStore};
+use crate::ports::image_store::{Image, Illustration, ImageStore};
 use crate::ports::storage::{Card, CardInfo};
 use async_trait::async_trait;
 use std::env;
@@ -27,7 +27,7 @@ impl ImageStore for FileSystem {
         tokio::fs::try_exists(&path).await.unwrap_or_else(|_| false)
     }
 
-    async fn save(&self, image: Image) {
+    async fn save(&self, image: Image, illustration: Option<Illustration>) {
         let Image(id, bytes) = image;
 
         let path = format!("{}/{}.png", self.image_dir, id);
