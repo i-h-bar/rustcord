@@ -33,10 +33,12 @@ impl Postgres {
     }
 
     async fn get_set_volume(&self, set: &Set) -> u32 {
-        match sqlx::query("select count(*) from card join set on set.id = card.set_id where set.id = $1")
-            .bind(set.id)
-            .fetch_one(&self.pool)
-            .await
+        match sqlx::query(
+            "select count(*) from card join set on set.id = card.set_id where set.id = $1",
+        )
+        .bind(set.id)
+        .fetch_one(&self.pool)
+        .await
         {
             Ok(result) => {
                 u32::try_from(result.try_get::<i64, &str>("count").unwrap_or(0)).unwrap_or(0)

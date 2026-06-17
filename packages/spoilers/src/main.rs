@@ -1,14 +1,16 @@
+use crate::adapters::services::{
+    card_source_init, card_storage_init, emoji_store_init, image_store_init,
+};
+use crate::domain::images::save_images;
 use crate::ports::emoji::EmojiStore;
-use crate::adapters::services::{card_source_init, card_storage_init, emoji_store_init, image_store_init};
 use crate::ports::source::CardSource;
 use crate::ports::storage::Storage;
 #[cfg(feature = "local-dev")]
 use dotenv::dotenv;
-use crate::domain::images::save_images;
 
 pub mod adapters;
-pub mod ports;
 pub mod domain;
+pub mod ports;
 
 #[tokio::main]
 async fn main() {

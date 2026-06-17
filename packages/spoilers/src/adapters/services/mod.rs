@@ -7,10 +7,10 @@ use crate::ports::image_store::ImageStore;
 use crate::ports::source::CardSource;
 use crate::ports::storage::Storage;
 
+pub mod discord;
+pub mod file_system;
 pub mod psql;
 mod scryfall;
-pub mod file_system;
-pub mod discord;
 
 #[must_use]
 pub fn card_source_init() -> impl CardSource {

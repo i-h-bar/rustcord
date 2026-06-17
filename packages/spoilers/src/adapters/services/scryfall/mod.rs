@@ -3,19 +3,19 @@ pub mod utils;
 
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+use crate::ports::image_store::Image;
 use crate::ports::source::CardSource;
 use crate::ports::storage::{Card, CardInfo, Set};
 use async_trait::async_trait;
 use data::set::ScryfallSet;
+use futures::future;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use futures::future;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use crate::ports::image_store::Image;
 
 struct ScryfallResponse<T> {
     scryfall_data: ScryfallData<T>,
@@ -131,7 +131,11 @@ impl CardSource for Scryfall {
             ));
             while let Some(next_page) = url {
                 let response = self.get(&next_page).await;
-                log::info!("Fetched {} cards for {}", response.scryfall_data.data.len(), set.name);
+                log::info!(
+                    "Fetched {} cards for {}",
+                    response.scryfall_data.data.len(),
+                    set.name
+                );
                 scryfall_cards.extend(response.scryfall_data.data);
 
                 url = response.scryfall_data.next_page;
@@ -148,7 +152,8 @@ impl CardSource for Scryfall {
     }
 
     async fn get_image(&self, card: &CardInfo) -> Image {
-        let response = self.client
+        let response = self
+            .client
             .get(&card.image.scryfall_url)
             .send()
             .await

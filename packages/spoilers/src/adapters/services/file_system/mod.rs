@@ -1,8 +1,8 @@
-use std::env;
-use std::hash::Hash;
-use async_trait::async_trait;
 use crate::ports::image_store::{Image, ImageStore};
 use crate::ports::storage::{Card, CardInfo};
+use async_trait::async_trait;
+use std::env;
+use std::hash::Hash;
 
 pub struct FileSystem {
     image_dir: String,
@@ -19,7 +19,6 @@ impl FileSystem {
     }
 }
 
-
 #[async_trait]
 impl ImageStore for FileSystem {
     async fn exists(&self, card: &CardInfo) -> bool {
@@ -32,7 +31,7 @@ impl ImageStore for FileSystem {
         let Image(id, bytes) = image;
 
         let path = format!("{}/{}.png", self.image_dir, id);
-        
+
         if let Err(why) = tokio::fs::write(&path, bytes).await {
             log::error!("Failed to save file: {}", why);
         };

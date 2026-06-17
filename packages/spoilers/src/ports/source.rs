@@ -1,6 +1,6 @@
+use crate::ports::image_store::Image;
 use crate::ports::storage::{CardInfo, Set};
 use async_trait::async_trait;
-use crate::ports::image_store::Image;
 
 #[async_trait]
 pub trait CardSource {
