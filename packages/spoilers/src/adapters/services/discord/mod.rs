@@ -1,4 +1,5 @@
-use crate::ports::emoji::{Emoji, EmojiMetaData, EmojiStore};
+use crate::domain::emoji::normalise_name;
+use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData, EmojiStore};
 use async_trait::async_trait;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
@@ -9,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use futures::future;
+use crate::domain::svg;
+use base64::{Engine, engine::general_purpose::STANDARD};
 
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 
@@ -16,6 +20,29 @@ type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 struct DiscordEmojiList {
     items: Vec<EmojiMetaData>,
 }
+
+#[derive(Serialize, Deserialize)]
+struct EmojiUpload {
+    name: String,
+    image: String,
+}
+
+impl EmojiUpload {
+    pub fn new(name: String, image: String) -> Self {
+        let image = format!("data:image/png;base64,{image}");
+        Self { name, image }
+    }
+}
+
+
+impl From<Emoji> for EmojiUpload {
+    fn from(emoji: Emoji) -> Self {
+        let name = normalise_name(&emoji.name);
+
+        EmojiUpload::new(name, emoji.image.0)
+    }
+}
+
 
 pub struct Discord {
     client: Client,
@@ -53,6 +80,18 @@ impl Discord {
             limiter,
         }
     }
+
+    async fn upload_emoji(&self, emoji: Emoji) {
+        let url = format!("{}/applications/{}/emojis", self.base_url, self.app_id);
+        self.limiter.until_ready().await;
+
+        self.client
+            .post(&url)
+            .json(&EmojiUpload::from(emoji))
+            .send()
+            .await
+            .unwrap();
+    }
 }
 
 #[async_trait]
@@ -69,6 +108,20 @@ impl EmojiStore for Discord {
     }
 
     async fn upload_emojis(&self, emojis: Vec<Emoji>) {
-        todo!()
+        future::join_all(
+            emojis.iter().map(|s| async {
+                log::info!("Uploading set symbol {}", s.name);
+
+                let recoloured = svg::recolour(&s.image.0, "#C9A227");
+                let png = svg::to_png(&recoloured);
+
+                let emoji = Emoji {
+                    name: s.name.clone(),
+                    image: EmojiImage(STANDARD.encode(&png))
+                };
+
+                self.upload_emoji(emoji).await;
+            })
+        ).await;
     }
 }

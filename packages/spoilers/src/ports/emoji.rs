@@ -1,18 +1,20 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-pub struct EmojiImage(String);
+
+#[derive(Debug)]
+pub struct EmojiImage(pub String);
 
 #[derive(Serialize, Deserialize)]
 pub struct EmojiMetaData {
-    id: String,
-    name: String,
+    pub id: String,
+    pub name: String,
 }
 
+#[derive(Debug)]
 pub struct Emoji {
-    id: String,
-    name: String,
-    image: EmojiImage,
+    pub name: String,
+    pub image: EmojiImage,
 }
 
 #[async_trait]

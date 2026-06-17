@@ -3,30 +3,45 @@ pub mod utils;
 
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
 use crate::ports::image_store::Image;
 use crate::ports::source::CardSource;
 use crate::ports::storage::{Card, CardInfo, Set};
 use async_trait::async_trait;
+use crate::domain::emoji::normalise_name;
 use data::set::ScryfallSet;
 use futures::future;
+use governor::clock::DefaultClock;
+use governor::state::{InMemoryState, NotKeyed};
+use governor::{Quota, RateLimiter};
 use reqwest::Client;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-struct ScryfallResponse<T> {
-    scryfall_data: ScryfallData<T>,
-    duration: Duration,
-}
+type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 
-#[derive(Default)]
 pub struct Scryfall {
     base_url: String,
     client: Client,
     sets: RwLock<HashMap<Uuid, ScryfallSet>>,
+    limiter: Arc<Limiter>,
+}
+
+impl Default for Scryfall {
+    fn default() -> Self {
+        let quota = Quota::per_second(NonZeroU32::new(2).unwrap());
+        Self {
+            base_url: String::default(),
+            client: Client::default(),
+            sets: RwLock::default(),
+            limiter: Arc::new(RateLimiter::direct(quota)),
+        }
+    }
 }
 
 impl Scryfall {
@@ -45,16 +60,16 @@ impl Scryfall {
 
     async fn recent_sets(&self) -> Vec<ScryfallSet> {
         let url = format!("{}/sets", self.base_url);
-        let response = self.get::<ScryfallSet>(&url).await;
+        let response = self.get(&url).await;
 
         let today = time::OffsetDateTime::now_utc().date();
         let threshold = today - time::Duration::days(7);
 
+        self.limiter.until_ready().await;
         response
-            .scryfall_data
             .data
             .into_iter()
-            .filter_map(|set| {
+            .filter_map(|set: ScryfallSet| {
                 if set.released_at >= threshold && set.card_count > 0 {
                     Some(set)
                 } else {
@@ -64,25 +79,31 @@ impl Scryfall {
             .collect()
     }
 
-    async fn get<T>(&self, url: &str) -> ScryfallResponse<T>
+    async fn get_raw(&self, url: &str) -> String {
+        self.limiter.until_ready().await;
+        self.client
+            .get(url)
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap()
+    }
+
+    async fn get<T>(&self, url: &str) -> ScryfallData<T>
     where
         T: serde::de::DeserializeOwned,
     {
-        let start = Instant::now();
-        let scryfall_data = self
-            .client
+        self.limiter.until_ready().await;
+        self.client
             .get(url)
             .send()
             .await
             .unwrap()
             .json()
             .await
-            .unwrap();
-
-        ScryfallResponse {
-            scryfall_data,
-            duration: start.elapsed(),
-        }
+            .unwrap()
     }
 }
 
@@ -131,16 +152,10 @@ impl CardSource for Scryfall {
             ));
             while let Some(next_page) = url {
                 let response = self.get(&next_page).await;
-                log::info!(
-                    "Fetched {} cards for {}",
-                    response.scryfall_data.data.len(),
-                    set.name
-                );
-                scryfall_cards.extend(response.scryfall_data.data);
+                log::info!("Fetched {} cards for {}", response.data.len(), set.name);
+                scryfall_cards.extend(response.data);
 
-                url = response.scryfall_data.next_page;
-                let sleep_time = Duration::from_millis(500).saturating_sub(response.duration);
-                tokio::time::sleep(sleep_time).await;
+                url = response.next_page;
             }
         }
 
@@ -163,5 +178,38 @@ impl CardSource for Scryfall {
             .unwrap();
 
         Image(card.image.id, response.into())
+    }
+
+    async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {
+        if current.len() == self.sets.read().await.len() {
+            return vec![];
+        }
+
+        let current_sets: HashSet<&str> = current.iter().map(|e| e.name.as_str()).collect();
+
+        future::join_all(
+            self.sets
+                .read()
+                .await
+                .values()
+                .filter_map(|s| {
+                    if !current_sets.contains(normalise_name(&s.abbreviation).as_str()) {
+                        Some(s)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<&ScryfallSet>>()
+                .iter()
+                .map(|s| async {
+                    let data = self.get_raw(&s.icon_svg_uri).await;
+
+                    Emoji {
+                        name: s.abbreviation.clone(),
+                        image: EmojiImage(data),
+                    }
+                }),
+        )
+        .await
     }
 }
