@@ -92,22 +92,7 @@ impl Scryfall {
             .collect())
     }
 
-    async fn get_raw(&self, url: &str) -> String {
-        self.limiter.until_ready().await;
-        self.client
-            .get(url)
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap()
-    }
-
-    async fn get<T>(&self, url: &str) -> ScryfallResult<ScryfallData<T>>
-    where
-        T: serde::de::DeserializeOwned,
-    {
+    async fn get_resp(&self, url: &str) -> ScryfallResult<reqwest::Response> {
         self.limiter.until_ready().await;
         let resp = self.client.get(url).send().await.map_err(|why| {
             log::warn!("Error getting data from scryfall: {}", why);
@@ -117,7 +102,25 @@ impl Scryfall {
         if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
             log::warn!("Rate limited by Scryfall");
             return Err(ScryfallError::RateLimited);
-        }
+        };
+
+        Ok(resp)
+    }
+
+    async fn get_raw(&self, url: &str) -> ScryfallResult<String> {
+        let resp = self.get_resp(url).await?;
+
+        resp.text().await.map_err(|err| {
+            log::warn!("Error parsing data from scryfall: {}", err);
+            ScryfallError::ParseError
+        })
+    }
+
+    async fn get<T>(&self, url: &str) -> ScryfallResult<ScryfallData<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let resp = self.get_resp(url).await?;
 
         resp.json().await.map_err(|err| {
             log::warn!("Error parsing data from scryfall: {}", err);
@@ -234,14 +237,17 @@ impl CardSource for Scryfall {
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()
                 .map(|s| async {
-                    let data = self.get_raw(&s.icon_svg_uri).await;
+                    let data = self.get_raw(&s.icon_svg_uri).await.ok()?;
 
-                    Emoji {
+                    Some(Emoji {
                         name: s.abbreviation.clone(),
                         image: EmojiImage(data),
-                    }
+                    })
                 }),
         )
         .await
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
