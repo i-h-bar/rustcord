@@ -1,32 +1,37 @@
 mod data;
 pub mod utils;
 
-use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+use crate::adapters::services::scryfall::data::ScryfallData;
+use crate::adapters::services::scryfall::utils::image::parse_image_id;
 use crate::domain::emoji::normalise_name;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
 use crate::ports::image_store::{Illustration, Image};
 use crate::ports::source::CardSource;
-use crate::ports::storage::{Card, CardInfo, Set};
+use crate::ports::storage::{CardInfo, Set};
 use async_trait::async_trait;
 use data::set::ScryfallSet;
 use futures::future;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
-use reqwest::Client;
+use reqwest::{Client, Response};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use crate::adapters::services::scryfall::utils::image::parse_image_id;
+
+fn check_if_rate_limited(resp: &Response) {
+    if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        log::warn!("Rate limited by Scryfall");
+        std::process::exit(1);
+    }
+}
 
 #[derive(Error, Debug)]
-
 enum ScryfallError {
     #[error("Http error {0}")]
     HTTPError(#[from] reqwest::Error),
@@ -91,17 +96,14 @@ impl Scryfall {
             .collect())
     }
 
-    async fn get_resp(&self, url: &str) -> ScryfallResult<reqwest::Response> {
+    async fn get_resp(&self, url: &str) -> ScryfallResult<Response> {
         self.limiter.until_ready().await;
         let resp = self.client.get(url).send().await.map_err(|why| {
-            log::warn!("Error getting data from scryfall: {}", why);
+            log::warn!("Error getting data from scryfall: {why}");
             ScryfallError::HTTPError(why)
         })?;
 
-        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            log::warn!("Rate limited by Scryfall");
-            std::process::exit(1);
-        };
+        check_if_rate_limited(&resp);
 
         Ok(resp)
     }
@@ -109,8 +111,10 @@ impl Scryfall {
     async fn get_raw(&self, url: &str) -> ScryfallResult<String> {
         let resp = self.get_resp(url).await?;
 
+        check_if_rate_limited(&resp);
+
         resp.text().await.map_err(|err| {
-            log::warn!("Error parsing data from scryfall: {}", err);
+            log::warn!("Error parsing data from scryfall: {err}");
             ScryfallError::ParseError
         })
     }
@@ -121,8 +125,10 @@ impl Scryfall {
     {
         let resp = self.get_resp(url).await?;
 
+        check_if_rate_limited(&resp);
+
         resp.json().await.map_err(|err| {
-            log::warn!("Error parsing data from scryfall: {}", err);
+            log::warn!("Error parsing data from scryfall: {err}");
             ScryfallError::ParseError
         })
     }
@@ -135,9 +141,8 @@ impl CardSource for Scryfall {
             return self.sets.read().await.values().map(Into::into).collect();
         }
 
-        let sets = match self.recent_sets().await {
-            Ok(sets) => sets,
-            Err(_) => return Vec::new(),
+        let Ok(sets) = self.recent_sets().await else {
+            return Vec::new();
         };
         self.sets
             .write()
@@ -175,9 +180,8 @@ impl CardSource for Scryfall {
                 self.base_url, set.abbreviation
             ));
             while let Some(ref next_page) = url {
-                let response = match self.get(next_page).await {
-                    Ok(response) => response,
-                    Err(_) => continue,
+                let Ok(response) = self.get(next_page).await else {
+                    continue;
                 };
                 log::info!("Fetched {} cards for {}", response.data.len(), set.name);
                 scryfall_cards.extend(response.data);
@@ -192,59 +196,61 @@ impl CardSource for Scryfall {
             .flatten()
             .collect()
     }
-    
-    async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
-        let url = card.illustration.as_ref()?.scryfall_url.clone();
-        let resp = self.client.get(&url).send().await.map_err(|why| {
-            log::warn!("Error getting data from scryfall: {}", why);
-            ScryfallError::HTTPError(why)
-        }).ok()?;
-
-        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            log::warn!("Rate limited by Scryfall");
-            std::process::exit(1);
-        };
-
-        let image = match resp
-            .bytes()
-            .await {
-            Ok(image) => image,
-            Err(why) => {
-                log::warn!("Error parsing image from scryfall: {why}");
-                return None;
-            },
-        };
-
-        let id = parse_image_id(&url)?;
-
-        Some(Illustration(id, image.into()))
-    }
 
     async fn get_image(&self, card: &CardInfo) -> Option<Image> {
         let url = &card.image.scryfall_url;
-        let resp = self.client.get(url).send().await.map_err(|why| {
-            log::warn!("Error getting data from scryfall: {}", why);
-            ScryfallError::HTTPError(why)
-        }).ok()?;
+        let resp = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|why| {
+                log::warn!("Error getting data from scryfall: {why}");
+                ScryfallError::HTTPError(why)
+            })
+            .ok()?;
 
-        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            log::warn!("Rate limited by Scryfall");
-            std::process::exit(1);
-        };
+        check_if_rate_limited(&resp);
 
-        let image = match resp
-            .bytes()
-            .await {
+        let image = match resp.bytes().await {
             Ok(image) => image,
             Err(why) => {
                 log::warn!("Error parsing image from scryfall: {why}");
                 return None;
-            },
+            }
         };
 
         let id = parse_image_id(url)?;
 
         Some(Image(id, image.into()))
+    }
+
+    async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
+        let url = card.illustration.as_ref()?.scryfall_url.clone();
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|why| {
+                log::warn!("Error getting data from scryfall: {why}");
+                ScryfallError::HTTPError(why)
+            })
+            .ok()?;
+
+        check_if_rate_limited(&resp);
+
+        let image = match resp.bytes().await {
+            Ok(image) => image,
+            Err(why) => {
+                log::warn!("Error parsing image from scryfall: {why}");
+                return None;
+            }
+        };
+
+        let id = parse_image_id(&url)?;
+
+        Some(Illustration(id, image.into()))
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {
@@ -259,13 +265,7 @@ impl CardSource for Scryfall {
                 .read()
                 .await
                 .values()
-                .filter_map(|s| {
-                    if !current_sets.contains(normalise_name(&s.abbreviation).as_str()) {
-                        Some(s)
-                    } else {
-                        None
-                    }
-                })
+                .filter(|s| !current_sets.contains(normalise_name(&s.abbreviation).as_str()))
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()
                 .map(|s| async {

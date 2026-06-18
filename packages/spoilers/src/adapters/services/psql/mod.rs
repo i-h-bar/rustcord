@@ -307,7 +307,7 @@ impl Storage for Postgres {
         log::info!("Upserting {} cards", cards.len());
         future::join_all(
             cards
-                .into_iter()
+                .iter()
                 .map(|card_info| self.upsert_card_info(card_info)),
         )
         .await;

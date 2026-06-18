@@ -4,9 +4,11 @@ use std::sync::OnceLock;
 static FILL_RE: OnceLock<Regex> = OnceLock::new();
 static STROKE_RE: OnceLock<Regex> = OnceLock::new();
 
+/// # Panics
+/// Panics if the internal fill or stroke regex patterns fail to compile (unreachable in practice).
 pub fn recolour(svg: &str, colour: &str) -> String {
-    let fill = FILL_RE.get_or_init(|| Regex::new(r#"fill="[^"]*""#).unwrap());
-    let stroke = STROKE_RE.get_or_init(|| Regex::new(r#"stroke="[^"]*""#).unwrap());
+    let fill = FILL_RE.get_or_init(|| Regex::new(r#"fill="[^"]*""#).expect("Invalid regex"));
+    let stroke = STROKE_RE.get_or_init(|| Regex::new(r#"stroke="[^"]*""#).expect("Invalid regex"));
 
     let svg = svg.replacen(
         "<svg ",
@@ -21,16 +23,31 @@ pub fn recolour(svg: &str, colour: &str) -> String {
     recoloured.into_owned()
 }
 
-pub fn to_png(svg: &str) -> Vec<u8> {
+/// # Panics
+/// Panics if the parsed SVG has zero-width or zero-height dimensions, causing a division by zero
+/// when computing the scale. Valid SVGs parsed by `usvg` will not have zero dimensions.
+#[must_use]
+#[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+pub fn to_png(svg: &str) -> Option<Vec<u8>> {
     let options = usvg::Options::default();
-    let tree = usvg::Tree::from_str(svg, &options).unwrap();
+    let tree = match usvg::Tree::from_str(svg, &options) {
+        Ok(tree) => tree,
+        Err(why) => {
+            log::error!("{why}");
+            return None;
+        }
+    };
 
     let size = tree.size().to_int_size();
-    let scale = 128.0 / size.width().max(size.height()) as f32;
+    let max_dim = size.width().max(size.height());
+    let w = size.width() * 128 / max_dim;
+    let h = size.height() * 128 / max_dim;
+    let scale = 128.0_f32 / max_dim as f32;
 
-    let w = (size.width() as f32 * scale) as u32;
-    let h = (size.height() as f32 * scale) as u32;
-    let mut pixmap = tiny_skia::Pixmap::new(w, h).unwrap();
+    let Some(mut pixmap) = tiny_skia::Pixmap::new(w, h) else {
+        log::error!("Failed to create pixmap");
+        return None;
+    };
 
     resvg::render(
         &tree,
@@ -38,5 +55,13 @@ pub fn to_png(svg: &str) -> Vec<u8> {
         &mut pixmap.as_mut(),
     );
 
-    pixmap.encode_png().unwrap()
+    let png = match pixmap.encode_png() {
+        Ok(png) => png,
+        Err(why) => {
+            log::error!("Failed to encode png: {why}");
+            return None;
+        }
+    };
+
+    Some(png)
 }

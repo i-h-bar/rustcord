@@ -28,7 +28,7 @@ struct EmojiUpload {
 }
 
 impl EmojiUpload {
-    pub fn new(name: String, image: String) -> Self {
+    pub fn new(name: String, image: &str) -> Self {
         let image = format!("data:image/png;base64,{image}");
         Self { name, image }
     }
@@ -38,7 +38,7 @@ impl From<Emoji> for EmojiUpload {
     fn from(emoji: Emoji) -> Self {
         let name = normalise_name(&emoji.name);
 
-        EmojiUpload::new(name, emoji.image.0)
+        EmojiUpload::new(name, &emoji.image.0)
     }
 }
 
@@ -49,7 +49,17 @@ pub struct Discord {
     limiter: Arc<Limiter>,
 }
 
+impl Default for Discord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Discord {
+    /// # Panics
+    /// Panics if any of the required environment variables are not set (`BOT_TOKEN`, `USER_AGENT`,
+    /// `APPLICATION_ID`), if `BOT_TOKEN` contains characters invalid for an HTTP header value, or
+    /// if the reqwest client fails to build.
     pub fn new() -> Self {
         let token = env::var("BOT_TOKEN").expect("BOT_TOKEN is not env vars");
         let app_id = env::var("APPLICATION_ID").expect("APPLICATION_ID is not env vars");
@@ -110,7 +120,9 @@ impl EmojiStore for Discord {
             log::info!("Uploading set symbol {}", s.name);
 
             let recoloured = svg::recolour(&s.image.0, "#C9A227");
-            let png = svg::to_png(&recoloured);
+            let Some(png) = svg::to_png(&recoloured) else {
+                return;
+            };
 
             let emoji = Emoji {
                 name: s.name.clone(),
