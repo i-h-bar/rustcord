@@ -1,0 +1,44 @@
+use crate::adapters::services::{
+    card_source_init, card_storage_init, emoji_store_init, image_store_init,
+};
+use crate::ports::emoji::EmojiStore;
+use crate::ports::source::CardSource;
+use crate::ports::storage::Storage;
+use domain::utils::images::save_images;
+
+#[cfg(feature = "local-dev")]
+use dotenv::dotenv;
+
+pub mod adapters;
+pub mod domain;
+pub mod ports;
+
+#[tokio::main]
+async fn main() {
+    #[cfg(feature = "local-dev")]
+    dotenv().ok();
+
+    env_logger::init();
+
+    let source = card_source_init();
+    let storage = card_storage_init().await;
+    let image_store = image_store_init();
+    let emoji_store = emoji_store_init();
+
+    let current_emojis = emoji_store.get_emojis().await;
+
+    let sets = source.get_recent_sets().await;
+
+    let new_set_symbols = source.fetch_missing_set_symbols(&current_emojis).await;
+    emoji_store.upload_set_emojis(new_set_symbols).await;
+
+    let set_volumes = storage.get_set_volumes(sets).await;
+    let cards = source.fetch_cards_for_outdated_sets(&set_volumes).await;
+    if cards.is_empty() {
+        log::info!("No available cards found");
+        return;
+    }
+
+    storage.upsert_cards(&cards).await;
+    save_images(&cards, &image_store, &source).await;
+}

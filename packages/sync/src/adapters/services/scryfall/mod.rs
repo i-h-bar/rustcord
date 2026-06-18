@@ -1,10 +1,10 @@
 mod data;
 pub mod utils;
 
-use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::adapters::services::scryfall::data::ScryfallData;
+use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::adapters::services::scryfall::utils::image::parse_image_id;
-use crate::domain::emoji::normalise_name;
+use crate::domain::utils::emoji::normalise_name;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
 use crate::ports::image_store::{Illustration, Image};
 use crate::ports::source::CardSource;

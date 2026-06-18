@@ -1,29 +1,15 @@
-use crate::adapters::services::{
-    card_source_init, card_storage_init, emoji_store_init, image_store_init,
-};
-use crate::domain::images::save_images;
+use crate::domain::utils::images::save_images;
 use crate::ports::emoji::EmojiStore;
+use crate::ports::image_store::ImageStore;
 use crate::ports::source::CardSource;
 use crate::ports::storage::Storage;
 
-#[cfg(feature = "local-dev")]
-use dotenv::dotenv;
-
-pub mod adapters;
-pub mod domain;
-pub mod ports;
-
-#[tokio::main]
-async fn main() {
-    #[cfg(feature = "local-dev")]
-    dotenv().ok();
-
-    env_logger::init();
-
-    let source = card_source_init();
-    let storage = card_storage_init().await;
-    let image_store = image_store_init();
-    let emoji_store = emoji_store_init();
+async fn sync(
+    source: impl CardSource,
+    storage: impl Storage,
+    image_store: impl ImageStore,
+    emoji_store: impl EmojiStore,
+) {
     let current_emojis = emoji_store.get_emojis().await;
 
     let sets = source.get_recent_sets().await;

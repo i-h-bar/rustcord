@@ -3234,31 +3234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spoilers"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "contracts",
- "dotenv",
- "env_logger",
- "futures",
- "governor",
- "log",
- "regex",
- "reqwest 0.13.4",
- "resvg",
- "serde",
- "sqlx",
- "thiserror 2.0.16",
- "time",
- "tiny-skia",
- "tokio",
- "usvg",
- "uuid",
-]
-
-[[package]]
 name = "sqlx"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3522,6 +3497,31 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sync"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "contracts",
+ "dotenv",
+ "env_logger",
+ "futures",
+ "governor",
+ "log",
+ "regex",
+ "reqwest 0.13.4",
+ "resvg",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.16",
+ "time",
+ "tiny-skia",
+ "tokio",
+ "usvg",
+ "uuid",
 ]
 
 [[package]]

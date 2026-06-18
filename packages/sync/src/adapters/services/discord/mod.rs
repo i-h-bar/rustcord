@@ -1,5 +1,5 @@
-use crate::domain::emoji::normalise_name;
-use crate::domain::svg;
+use crate::domain::utils::emoji::normalise_name;
+use crate::domain::utils::svg;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData, EmojiStore};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
