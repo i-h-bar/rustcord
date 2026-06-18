@@ -1,8 +1,9 @@
 use crate::ports::storage::{
-    Artist, Card, CardInfo, Illustration, Image, Legality, Price, Rule, Set, Storage,
+    Artist, Card, CardInfo, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule, Set,
+    Storage,
 };
 use async_trait::async_trait;
-use futures::future;
+use futures::future::{self, Either};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Row};
 use std::env;
@@ -279,6 +280,36 @@ impl Postgres {
         }
     }
 
+    async fn upsert_combo(&self, combo: &Combo) {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO combo (id, card_id, combo_card_id) VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(combo.id)
+        .bind(combo.card_id)
+        .bind(combo.combo_card_id)
+        .execute(&self.pool)
+        .await
+        {
+            log::warn!("Failed to upsert combo {}: {}", combo.id, e);
+        }
+    }
+
+    async fn upsert_related_token(&self, token: &RelatedToken) {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO related_token (id, card_id, token_id) VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(token.id)
+        .bind(token.card_id)
+        .bind(token.token_id)
+        .execute(&self.pool)
+        .await
+        {
+            log::warn!("Failed to upsert related_token {}: {}", token.id, e);
+        }
+    }
+
     async fn upsert_card_info(&self, info: &CardInfo) {
         self.upsert_artist(&info.artist).await;
         self.upsert_image(&info.image).await;
@@ -305,11 +336,15 @@ impl Storage for Postgres {
 
     async fn upsert_cards(&self, cards: &[CardInfo]) {
         log::info!("Upserting {} cards", cards.len());
-        future::join_all(
-            cards
-                .iter()
-                .map(|card_info| self.upsert_card_info(card_info)),
-        )
-        .await;
+        future::join_all(cards.iter().map(|info| self.upsert_card_info(info))).await;
+
+        let futs: Vec<_> = cards.iter()
+            .flat_map(|info| {
+                let combos = info.combos.iter().map(|c| Either::Left(self.upsert_combo(c)));
+                let tokens = info.related_tokens.iter().map(|t| Either::Right(self.upsert_related_token(t)));
+                combos.chain(tokens)
+            })
+            .collect();
+        future::join_all(futs).await;
     }
 }

@@ -102,6 +102,18 @@ pub struct Price {
     pub updated_time: OffsetDateTime,
 }
 
+pub struct Combo {
+    pub id: Uuid,
+    pub card_id: Uuid,
+    pub combo_card_id: Uuid,
+}
+
+pub struct RelatedToken {
+    pub id: Uuid,
+    pub card_id: Uuid,
+    pub token_id: Uuid,
+}
+
 pub struct CardInfo {
     pub card: Card,
     pub artist: Artist,
@@ -111,4 +123,6 @@ pub struct CardInfo {
     pub rule: Rule,
     pub legality: Legality,
     pub price: Price,
+    pub combos: Vec<Combo>,
+    pub related_tokens: Vec<RelatedToken>,
 }

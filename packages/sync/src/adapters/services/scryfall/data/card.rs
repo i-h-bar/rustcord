@@ -1,7 +1,7 @@
 use crate::adapters::services::scryfall::utils::image::parse_image_id;
 use crate::adapters::services::scryfall::utils::uuid::increment_uuid;
 use crate::ports::storage::{
-    Artist, Card, CardInfo, Illustration, Image, Legality, Price, Rule, Set,
+    Artist, Card, CardInfo, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule, Set,
 };
 use serde::{Deserialize, Serialize};
 use time::serde::format_description;
@@ -74,6 +74,23 @@ pub struct CardFace {
     pub produced_mana: Option<Vec<String>>,
 }
 
+#[derive(Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Component {
+    Token,
+    ComboPiece,
+    MeldPart,
+    MeldResult,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RelatedCardPart {
+    pub id: Uuid,
+    pub component: Component,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ScryfallCard {
     pub id: Uuid,
@@ -110,6 +127,7 @@ pub struct ScryfallCard {
     pub rulings_uri: Option<String>,
     pub prices: Prices,
     pub card_faces: Option<Vec<CardFace>>,
+    pub all_parts: Option<Vec<RelatedCardPart>>,
 }
 
 impl ScryfallCard {
@@ -133,6 +151,32 @@ impl ScryfallCard {
         } else {
             Self::produce_dual_face_records(front, back, &self)
         }
+    }
+
+    fn extract_combos_for(&self, card_id: Uuid) -> Vec<Combo> {
+        self.all_parts
+            .iter()
+            .flatten()
+            .filter(|p| p.component == Component::ComboPiece)
+            .map(|p| Combo {
+                id: Uuid::new_v4(),
+                card_id,
+                combo_card_id: p.id,
+            })
+            .collect()
+    }
+
+    fn extract_related_tokens_for(&self, card_id: Uuid) -> Vec<RelatedToken> {
+        self.all_parts
+            .iter()
+            .flatten()
+            .filter(|p| p.component == Component::Token)
+            .map(|p| RelatedToken {
+                id: Uuid::new_v4(),
+                card_id,
+                token_id: p.id,
+            })
+            .collect()
     }
 
     fn build_legality(&self, id: Uuid) -> Legality {
@@ -190,6 +234,9 @@ impl ScryfallCard {
     }
 
     fn into_single_face_record(self) -> Option<CardInfo> {
+        let combos = self.extract_combos_for(self.id);
+        let related_tokens = self.extract_related_tokens_for(self.id);
+
         let image_uris = self.image_uris.as_ref()?;
         let png_url = image_uris.png.as_deref()?;
         let image_id = parse_image_id(png_url)?;
@@ -268,6 +315,8 @@ impl ScryfallCard {
         };
 
         Some(CardInfo {
+            combos,
+            related_tokens,
             card,
             artist,
             image,
@@ -366,6 +415,8 @@ impl ScryfallCard {
             rule,
             legality,
             price,
+            combos: card.extract_combos_for(card_id),
+            related_tokens: card.extract_related_tokens_for(card_id),
         })
     }
 
@@ -380,7 +431,8 @@ impl ScryfallCard {
 
         let front_record =
             Self::produce_face_record(front, card, card.id, front_oracle_id, back_id)?;
-        let back_record = Self::produce_face_record(back, card, back_id, back_oracle_id, card.id)?;
+        let back_record =
+            Self::produce_face_record(back, card, back_id, back_oracle_id, card.id)?;
 
         Some(vec![front_record, back_record])
     }
@@ -483,6 +535,7 @@ mod tests {
             rulings_uri: Some("https://api.scryfall.com/cards/0000419b-0bba-4488-8f7a-6194544ce91e/rulings".to_string()),
             prices: make_prices(),
             card_faces: None,
+            all_parts: None,
         }
     }
 
