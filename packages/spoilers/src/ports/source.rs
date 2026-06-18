@@ -12,7 +12,8 @@ pub trait CardSource {
     /// Only sets with a volume mismatch are queried — up-to-date sets are skipped.
     async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, u32)]) -> Vec<CardInfo>;
 
-    async fn get_image(&self, card: &CardInfo) -> Option<(Image, Option<Illustration>)>;
+    async fn get_image(&self, card: &CardInfo) -> Option<Image>;
+    async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration>;
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji>;
 }

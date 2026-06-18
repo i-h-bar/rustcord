@@ -126,33 +126,6 @@ impl Scryfall {
             ScryfallError::ParseError
         })
     }
-
-    async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
-        let url = card.illustration.as_ref()?.scryfall_url.clone();
-        let resp = self.client.get(&url).send().await.map_err(|why| {
-            log::warn!("Error getting data from scryfall: {}", why);
-            ScryfallError::HTTPError(why)
-        }).ok()?;
-
-        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            log::warn!("Rate limited by Scryfall");
-            std::process::exit(1);
-        };
-
-        let image = match resp
-            .bytes()
-            .await {
-            Ok(image) => image,
-            Err(why) => {
-                log::warn!("Error parsing image from scryfall: {why}");
-                return None;
-            },
-        };
-
-        let id = parse_image_id(&url)?;
-
-        Some(Illustration(id, image.into()))
-    }
 }
 
 #[async_trait]
@@ -219,8 +192,35 @@ impl CardSource for Scryfall {
             .flatten()
             .collect()
     }
+    
+    async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
+        let url = card.illustration.as_ref()?.scryfall_url.clone();
+        let resp = self.client.get(&url).send().await.map_err(|why| {
+            log::warn!("Error getting data from scryfall: {}", why);
+            ScryfallError::HTTPError(why)
+        }).ok()?;
 
-    async fn get_image(&self, card: &CardInfo) -> Option<(Image, Option<Illustration>)> {
+        if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            log::warn!("Rate limited by Scryfall");
+            std::process::exit(1);
+        };
+
+        let image = match resp
+            .bytes()
+            .await {
+            Ok(image) => image,
+            Err(why) => {
+                log::warn!("Error parsing image from scryfall: {why}");
+                return None;
+            },
+        };
+
+        let id = parse_image_id(&url)?;
+
+        Some(Illustration(id, image.into()))
+    }
+
+    async fn get_image(&self, card: &CardInfo) -> Option<Image> {
         let url = &card.image.scryfall_url;
         let resp = self.client.get(url).send().await.map_err(|why| {
             log::warn!("Error getting data from scryfall: {}", why);
@@ -244,7 +244,7 @@ impl CardSource for Scryfall {
 
         let id = parse_image_id(url)?;
 
-        Some((Image(id, image.into()), self.get_illustration(card).await))
+        Some(Image(id, image.into()))
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {
