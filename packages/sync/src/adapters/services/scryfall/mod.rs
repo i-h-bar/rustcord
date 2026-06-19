@@ -149,10 +149,7 @@ impl CardSource for Scryfall {
         self.sets.read().await.values().map(Into::into).collect()
     }
 
-    async fn fetch_cards_for_outdated_sets(
-        &self,
-        sets: &[(Set, HashSet<Uuid>)],
-    ) -> Vec<CardInfo> {
+    async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, HashSet<Uuid>)]) -> Vec<CardInfo> {
         let mut scryfall_cards: Vec<ScryfallCard> = Vec::new();
         log::info!("Fetching {} sets", sets.len());
 
