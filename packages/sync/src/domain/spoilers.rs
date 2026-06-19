@@ -5,10 +5,10 @@ use crate::ports::source::CardSource;
 use crate::ports::storage::Storage;
 
 pub async fn sync(
-    source: &impl CardSource,
-    storage: &impl Storage,
-    image_store: &impl ImageStore,
-    emoji_store: &impl EmojiStore,
+    source: impl CardSource,
+    storage: impl Storage,
+    image_store: impl ImageStore,
+    emoji_store: impl EmojiStore,
 ) {
     let current_emojis = emoji_store.get_emojis().await;
 
@@ -25,5 +25,7 @@ pub async fn sync(
     }
 
     storage.upsert_cards(&cards).await;
-    save_images(&cards, image_store, source).await;
+    drop(storage);
+    
+    save_images(&cards, &image_store, &source).await;
 }

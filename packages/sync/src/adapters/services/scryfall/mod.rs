@@ -23,9 +23,12 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+#[cfg(feature = "local-dev")]
+use crate::domain::utils::bulk_cache;
+
 fn check_if_rate_limited(resp: &Response) {
     if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        log::warn!("Rate limited by Scryfall");
+        log::error!("Rate limited by Scryfall");
         std::process::exit(1);
     }
 }
@@ -40,6 +43,13 @@ enum ScryfallError {
 
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 type ScryfallResult<T> = Result<T, ScryfallError>;
+
+#[derive(serde::Deserialize)]
+struct BulkDataEntry {
+    #[serde(rename = "type")]
+    data_type: String,
+    download_uri: String,
+}
 
 pub struct Scryfall {
     base_url: String,
@@ -77,24 +87,58 @@ impl Scryfall {
         }
     }
 
-    async fn recent_sets(&self) -> ScryfallResult<Vec<ScryfallSet>> {
+    async fn fetch_sets_from_api(&self) -> ScryfallResult<Vec<ScryfallSet>> {
         let url = format!("{}/sets", self.base_url);
-        let response = self.get(&url).await?;
+        let response = self.get::<ScryfallSet>(&url).await?;
+        Ok(response.data)
+    }
 
+    async fn recent_sets(&self) -> ScryfallResult<Vec<ScryfallSet>> {
         let today = time::OffsetDateTime::now_utc().date();
         let threshold = today - time::Duration::days(7);
 
-        Ok(response
+        self.fetch_sets_from_api().await.map(|sets| {
+            sets.into_iter()
+                .filter(|s| s.released_at >= threshold && s.card_count > 0)
+                .collect()
+        })
+    }
+
+    async fn fetch_bulk_cards(&self) -> ScryfallResult<Vec<ScryfallCard>> {
+        #[cfg(feature = "local-dev")]
+        if let Some(path) = bulk_cache::find_cached() {
+            if let Some(bytes) = bulk_cache::load(&path).await {
+                return serde_json::from_slice(&bytes).map_err(|e| {
+                    log::warn!("Failed to parse cached bulk data: {e}");
+                    ScryfallError::ParseError
+                });
+            }
+        }
+
+        let url = format!("{}/bulk-data", self.base_url);
+        let manifest = self.get::<BulkDataEntry>(&url).await?;
+
+        let entry = manifest
             .data
             .into_iter()
-            .filter_map(|set: ScryfallSet| {
-                if set.released_at >= threshold && set.card_count > 0 {
-                    Some(set)
-                } else {
-                    None
-                }
-            })
-            .collect())
+            .find(|e| e.data_type == "default_cards")
+            .ok_or(ScryfallError::ParseError)?;
+
+        log::info!("Downloading bulk card data");
+        let resp = self.get_resp(&entry.download_uri, &self.low_limiter).await?;
+
+        let bytes = resp.bytes().await.map_err(|e| {
+            log::warn!("Failed to download bulk data: {e}");
+            ScryfallError::ParseError
+        })?;
+
+        #[cfg(feature = "local-dev")]
+        bulk_cache::save(&bytes).await;
+
+        serde_json::from_slice(&bytes).map_err(|e| {
+            log::warn!("Failed to parse bulk card data: {e}");
+            ScryfallError::ParseError
+        })
     }
 
     async fn get_resp(&self, url: &str, limiter: &Limiter) -> ScryfallResult<Response> {
@@ -147,6 +191,35 @@ impl CardSource for Scryfall {
             .extend(sets.into_iter().map(|set| (set.id, set)));
 
         self.sets.read().await.values().map(Into::into).collect()
+    }
+
+    async fn get_all_sets(&self) -> Vec<Set> {
+        let Ok(sets) = self.fetch_sets_from_api().await else {
+            return Vec::new();
+        };
+        self.sets
+            .write()
+            .await
+            .extend(sets.into_iter().map(|set| (set.id, set)));
+
+        self.sets.read().await.values().map(Into::into).collect()
+    }
+
+    async fn fetch_all_cards(&self) -> Vec<CardInfo> {
+        match self.fetch_bulk_cards().await {
+            Ok(cards) => {
+                log::info!("Processing {} bulk cards", cards.len());
+                cards
+                    .into_iter()
+                    .filter_map(ScryfallCard::into_storage_records)
+                    .flatten()
+                    .collect()
+            }
+            Err(e) => {
+                log::error!("Failed to fetch bulk cards: {e}");
+                vec![]
+            }
+        }
     }
 
     async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, HashSet<Uuid>)]) -> Vec<CardInfo> {

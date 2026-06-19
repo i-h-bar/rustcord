@@ -38,7 +38,7 @@ async fn main() {
     let emoji_store = emoji_store_init();
 
     match cli.command {
-        Command::Spoilers => spoilers::sync(&source, &storage, &image_store, &emoji_store).await,
-        Command::Bulk => bulk::sync(&source, &storage, &image_store, &emoji_store).await,
+        Command::Spoilers => spoilers::sync(source, storage, image_store, emoji_store).await,
+        Command::Bulk => bulk::sync(source, storage, image_store, emoji_store).await,
     }
 }

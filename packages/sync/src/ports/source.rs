@@ -8,8 +8,10 @@ use uuid::Uuid;
 #[async_trait]
 pub trait CardSource {
     async fn get_recent_sets(&self) -> Vec<Set>;
+    async fn get_all_sets(&self) -> Vec<Set>;
 
     async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, HashSet<Uuid>)]) -> Vec<CardInfo>;
+    async fn fetch_all_cards(&self) -> Vec<CardInfo>;
 
     async fn get_image(&self, card: &CardInfo) -> Option<Image>;
     async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration>;

@@ -1,16 +1,24 @@
+#[cfg(feature = "local-dev")]
+use indicatif::{ProgressBar, ProgressStyle};
+
 use crate::ports::storage::{
     Artist, Card, CardInfo, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule, Set,
     Storage,
 };
 use async_trait::async_trait;
 use futures::future::{self, Either};
+use futures::StreamExt;
 use sqlx::{Pool, Row, error::DatabaseError, postgres::PgPoolOptions};
 use std::collections::HashSet;
 use std::env;
 use uuid::Uuid;
 
+const BOT_RESERVE: usize = 5;
+const FALLBACK_POOL_SIZE: usize = 5;
+
 pub struct Postgres {
     pool: Pool<sqlx::Postgres>,
+    pool_size: usize,
 }
 
 impl Postgres {
@@ -25,13 +33,43 @@ impl Postgres {
         let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost:5432".to_string());
         let uri = format!("postgresql://{user}:{password}@{host}/{db}");
 
+        let pool_size = Self::compute_pool_size(&uri).await;
+        log::info!("Using Postgres pool size: {pool_size}");
+
         let pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(pool_size as u32)
             .connect(&uri)
             .await
             .expect("Failed Postgres connection");
 
-        Self { pool }
+        Self { pool, pool_size }
+    }
+
+    async fn compute_pool_size(uri: &str) -> usize {
+        let probe = match PgPoolOptions::new().max_connections(1).connect(uri).await {
+            Ok(p) => p,
+            Err(_) => return FALLBACK_POOL_SIZE,
+        };
+
+        let max: String = sqlx::query_scalar("SHOW max_connections")
+            .fetch_one(&probe)
+            .await
+            .unwrap_or_else(|_| FALLBACK_POOL_SIZE.to_string());
+        let max: usize = max.trim().parse().unwrap_or(FALLBACK_POOL_SIZE);
+
+        let in_use: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE pid != pg_backend_pid()")
+                .fetch_one(&probe)
+                .await
+                .unwrap_or(0);
+
+        probe.close().await;
+
+        let pool_size = max.saturating_sub(in_use as usize)
+            .saturating_sub(BOT_RESERVE)
+            .max(1);
+
+        pool_size
     }
 
     async fn get_card_ids_for_set(&self, set: &Set) -> HashSet<Uuid> {
@@ -344,15 +382,36 @@ impl Storage for Postgres {
 
     async fn upsert_cards(&self, cards: &[CardInfo]) {
         log::info!("Upserting {} cards", cards.len());
-        future::join_all(cards.iter().map(|info| self.upsert_card_info(info))).await;
 
-        let futs: Vec<_> = cards
+        #[cfg(feature = "local-dev")]
+        let pb = {
+            let bar = ProgressBar::new(cards.len() as u64);
+            bar.set_style(
+                ProgressStyle::with_template(
+                    "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} cards ({eta})",
+                )
+                .unwrap()
+                .progress_chars("=>-"),
+            );
+            bar
+        };
+
+        let card_futs: Vec<_> = cards.iter().map(|info| self.upsert_card_info(info)).collect();
+        futures::stream::iter(card_futs)
+            .buffer_unordered(self.pool_size)
+            .for_each(|_| async {
+                #[cfg(feature = "local-dev")]
+                pb.inc(1);
+            })
+            .await;
+
+        #[cfg(feature = "local-dev")]
+        pb.finish_with_message("done");
+
+        let relation_futs: Vec<_> = cards
             .iter()
             .flat_map(|info| {
-                let combos = info
-                    .combos
-                    .iter()
-                    .map(|c| Either::Left(self.upsert_combo(c)));
+                let combos = info.combos.iter().map(|c| Either::Left(self.upsert_combo(c)));
                 let tokens = info
                     .related_tokens
                     .iter()
@@ -360,6 +419,9 @@ impl Storage for Postgres {
                 combos.chain(tokens)
             })
             .collect();
-        future::join_all(futs).await;
+        futures::stream::iter(relation_futs)
+            .buffer_unordered(self.pool_size)
+            .collect::<Vec<_>>()
+            .await;
     }
 }
