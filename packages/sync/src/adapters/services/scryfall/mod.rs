@@ -202,14 +202,12 @@ impl CardSource for Scryfall {
             }
         };
 
-        let id = parse_image_id(url)?;
-
-        Some(Image(id, image.into()))
+        Some(Image(card.image.id, image.into()))
     }
 
     async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
-        let url = card.illustration.as_ref()?.scryfall_url.clone();
-        let resp = self.get_resp(&url, &self.high_limiter).await.ok()?;
+        let illustration = card.illustration.as_ref()?;
+        let resp = self.get_resp(&illustration.scryfall_url, &self.high_limiter).await.ok()?;
 
         let image = match resp.bytes().await {
             Ok(image) => image,
@@ -219,9 +217,7 @@ impl CardSource for Scryfall {
             }
         };
 
-        let id = parse_image_id(&url)?;
-
-        Some(Illustration(id, image.into()))
+        Some(Illustration(illustration.id, image.into()))
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {

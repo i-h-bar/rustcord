@@ -36,7 +36,7 @@ impl FileSystem {
 #[async_trait]
 impl ImageStore for FileSystem {
     async fn card_image_exists(&self, card: &CardInfo) -> bool {
-        let path = format!("{}/{}.png", self.image_dir, card.image.id);
+        let path = format!("{}{}.png", self.image_dir, card.image.id);
 
         tokio::fs::try_exists(&path).await.unwrap_or(false)
     }
@@ -46,7 +46,7 @@ impl ImageStore for FileSystem {
             return true;
         };
 
-        let path = format!("{}/{}.png", self.illustration_dir, illustration.id);
+        let path = format!("{}{}.png", self.illustration_dir, illustration.id);
 
         tokio::fs::try_exists(&path).await.unwrap_or(false)
     }
@@ -54,7 +54,7 @@ impl ImageStore for FileSystem {
     async fn save_image(&self, image: Image) {
         let Image(id, bytes) = image;
 
-        let path = format!("{}/{}.png", self.image_dir, id);
+        let path = format!("{}{}.png", self.image_dir, id);
 
         self.save(&path, bytes).await;
     }
@@ -62,7 +62,7 @@ impl ImageStore for FileSystem {
     async fn save_illustration(&self, illustration: Illustration) {
         let Illustration(id, bytes) = illustration;
 
-        let path = format!("{}/{}.png", self.image_dir, id);
+        let path = format!("{}{}.png", self.illustration_dir, id);
 
         self.save(&path, bytes).await;
     }
