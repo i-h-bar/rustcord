@@ -1,7 +1,7 @@
-use clap::{Subcommand, Parser};
 use crate::adapters::services::{
     card_source_init, card_storage_init, emoji_store_init, image_store_init,
 };
+use clap::{Parser, Subcommand};
 
 use crate::domain::{bulk, spoilers};
 #[cfg(feature = "local-dev")]
@@ -14,7 +14,7 @@ pub mod ports;
 #[derive(Parser)]
 struct Cli {
     #[clap(subcommand)]
-    command: Command
+    command: Command,
 }
 
 #[derive(Subcommand)]

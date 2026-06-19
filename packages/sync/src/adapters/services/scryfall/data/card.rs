@@ -315,8 +315,6 @@ impl ScryfallCard {
         };
 
         Some(CardInfo {
-            combos,
-            related_tokens,
             card,
             artist,
             image,
@@ -325,6 +323,8 @@ impl ScryfallCard {
             rule,
             legality,
             price,
+            combos,
+            related_tokens,
         })
     }
 
@@ -431,8 +431,7 @@ impl ScryfallCard {
 
         let front_record =
             Self::produce_face_record(front, card, card.id, front_oracle_id, back_id)?;
-        let back_record =
-            Self::produce_face_record(back, card, back_id, back_oracle_id, card.id)?;
+        let back_record = Self::produce_face_record(back, card, back_id, back_oracle_id, card.id)?;
 
         Some(vec![front_record, back_record])
     }

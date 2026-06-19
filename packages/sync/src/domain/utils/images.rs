@@ -3,11 +3,7 @@ use crate::ports::source::CardSource;
 use crate::ports::storage::CardInfo;
 use futures::future;
 
-async fn save_card(
-    card: &CardInfo,
-    image_store: &impl ImageStore,
-    source: &impl CardSource,
-) {
+async fn save_card(card: &CardInfo, image_store: &impl ImageStore, source: &impl CardSource) {
     if !image_store.card_image_exists(card).await
         && let Some(image) = source.get_image(card).await
     {

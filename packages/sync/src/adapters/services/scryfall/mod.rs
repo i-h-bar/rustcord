@@ -160,7 +160,7 @@ impl CardSource for Scryfall {
                 .read()
                 .await
                 .get(&set.id)
-                .is_some_and(|s| s.card_count != *volume);
+                .is_some_and(|s| *volume < s.card_count);
 
             if !is_outdated {
                 log::info!("Storage is up to date for {}", set.name);
@@ -192,7 +192,7 @@ impl CardSource for Scryfall {
 
     async fn get_image(&self, card: &CardInfo) -> Option<Image> {
         let url = &card.image.scryfall_url;
-        let resp = self.get_resp(&url, &self.high_limiter).await.ok()?;
+        let resp = self.get_resp(url, &self.high_limiter).await.ok()?;
 
         let image = match resp.bytes().await {
             Ok(image) => image,
@@ -225,7 +225,7 @@ impl CardSource for Scryfall {
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {
-        if current.len() == self.sets.read().await.len() {
+        if current.len() >= self.sets.read().await.len() {
             return vec![];
         }
 
@@ -240,7 +240,10 @@ impl CardSource for Scryfall {
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()
                 .map(|s| async {
-                    let data = self.get_text(&s.icon_svg_uri, &self.high_limiter).await.ok()?;
+                    let data = self
+                        .get_text(&s.icon_svg_uri, &self.high_limiter)
+                        .await
+                        .ok()?;
 
                     Some(Emoji {
                         name: s.abbreviation.clone(),

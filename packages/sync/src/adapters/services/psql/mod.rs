@@ -4,8 +4,7 @@ use crate::ports::storage::{
 };
 use async_trait::async_trait;
 use futures::future::{self, Either};
-use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Row};
+use sqlx::{Pool, Row, error::DatabaseError, postgres::PgPoolOptions};
 use std::env;
 
 pub struct Postgres {
@@ -35,7 +34,7 @@ impl Postgres {
 
     async fn get_set_volume(&self, set: &Set) -> u32 {
         match sqlx::query(
-            "select count(*) from card join set on set.id = card.set_id where set.id = $1",
+            "select count(*) - count(backside_id) / 2 as count from card where set_id = $1",
         )
         .bind(set.id)
         .fetch_one(&self.pool)
@@ -290,10 +289,12 @@ impl Postgres {
         .bind(combo.combo_card_id)
         .execute(&self.pool)
         .await
+            && e.as_database_error()
+                .and_then(DatabaseError::code)
+                .as_deref()
+                != Some("23503")
         {
-            if e.as_database_error().and_then(|e| e.code()).as_deref() != Some("23503") {
-                log::warn!("Failed to upsert combo {}: {}", combo.id, e);
-            }
+            log::warn!("Failed to upsert combo {}: {}", combo.id, e);
         }
     }
 
@@ -307,10 +308,12 @@ impl Postgres {
         .bind(token.token_id)
         .execute(&self.pool)
         .await
+            && e.as_database_error()
+                .and_then(DatabaseError::code)
+                .as_deref()
+                != Some("23503")
         {
-            if e.as_database_error().and_then(|e| e.code()).as_deref() != Some("23503") {
-                log::warn!("Failed to upsert related_token {}: {}", token.id, e);
-            }
+            log::warn!("Failed to upsert related_token {}: {}", token.id, e);
         }
     }
 
@@ -342,10 +345,17 @@ impl Storage for Postgres {
         log::info!("Upserting {} cards", cards.len());
         future::join_all(cards.iter().map(|info| self.upsert_card_info(info))).await;
 
-        let futs: Vec<_> = cards.iter()
+        let futs: Vec<_> = cards
+            .iter()
             .flat_map(|info| {
-                let combos = info.combos.iter().map(|c| Either::Left(self.upsert_combo(c)));
-                let tokens = info.related_tokens.iter().map(|t| Either::Right(self.upsert_related_token(t)));
+                let combos = info
+                    .combos
+                    .iter()
+                    .map(|c| Either::Left(self.upsert_combo(c)));
+                let tokens = info
+                    .related_tokens
+                    .iter()
+                    .map(|t| Either::Right(self.upsert_related_token(t)));
                 combos.chain(tokens)
             })
             .collect();
