@@ -1,10 +1,11 @@
 use async_trait::async_trait;
+use std::collections::HashSet;
 use time::{Date, OffsetDateTime};
 use uuid::Uuid;
 
 #[async_trait]
 pub trait Storage {
-    async fn get_set_volumes(&self, sets: Vec<Set>) -> Vec<(Set, u32)>;
+    async fn get_existing_card_ids(&self, sets: Vec<Set>) -> Vec<(Set, HashSet<Uuid>)>;
     async fn upsert_cards(&self, cards: &[CardInfo]);
 }
 

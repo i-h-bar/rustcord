@@ -5,7 +5,9 @@ use crate::ports::storage::{
 use async_trait::async_trait;
 use futures::future::{self, Either};
 use sqlx::{Pool, Row, error::DatabaseError, postgres::PgPoolOptions};
+use std::collections::HashSet;
 use std::env;
+use uuid::Uuid;
 
 pub struct Postgres {
     pool: Pool<sqlx::Postgres>,
@@ -32,20 +34,19 @@ impl Postgres {
         Self { pool }
     }
 
-    async fn get_set_volume(&self, set: &Set) -> u32 {
-        match sqlx::query(
-            "select count(*) - count(backside_id) / 2 as count from card where set_id = $1",
-        )
-        .bind(set.id)
-        .fetch_one(&self.pool)
-        .await
+    async fn get_card_ids_for_set(&self, set: &Set) -> HashSet<Uuid> {
+        match sqlx::query("SELECT id FROM card WHERE set_id = $1")
+            .bind(set.id)
+            .fetch_all(&self.pool)
+            .await
         {
-            Ok(result) => {
-                u32::try_from(result.try_get::<i64, &str>("count").unwrap_or(0)).unwrap_or(0)
-            }
+            Ok(rows) => rows
+                .iter()
+                .filter_map(|r| r.try_get::<Uuid, &str>("id").ok())
+                .collect(),
             Err(why) => {
-                log::warn!("Failed to fetch volume: {why}");
-                0
+                log::warn!("Failed to fetch card ids for set {}: {why}", set.id);
+                HashSet::new()
             }
         }
     }
@@ -333,10 +334,10 @@ impl Postgres {
 
 #[async_trait]
 impl Storage for Postgres {
-    async fn get_set_volumes(&self, sets: Vec<Set>) -> Vec<(Set, u32)> {
+    async fn get_existing_card_ids(&self, sets: Vec<Set>) -> Vec<(Set, HashSet<Uuid>)> {
         future::join_all(sets.into_iter().map(|set| async {
-            let volume = self.get_set_volume(&set).await;
-            (set, volume)
+            let ids = self.get_card_ids_for_set(&set).await;
+            (set, ids)
         }))
         .await
     }

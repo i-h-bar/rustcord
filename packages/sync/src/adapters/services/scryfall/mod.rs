@@ -3,7 +3,6 @@ pub mod utils;
 
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
-use crate::adapters::services::scryfall::utils::image::parse_image_id;
 use crate::domain::utils::emoji::normalise_name;
 use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
 use crate::ports::image_store::{Illustration, Image};
@@ -150,36 +149,37 @@ impl CardSource for Scryfall {
         self.sets.read().await.values().map(Into::into).collect()
     }
 
-    async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, u32)]) -> Vec<CardInfo> {
+    async fn fetch_cards_for_outdated_sets(
+        &self,
+        sets: &[(Set, HashSet<Uuid>)],
+    ) -> Vec<CardInfo> {
         let mut scryfall_cards: Vec<ScryfallCard> = Vec::new();
-        log::info!("Fetching {} outdated sets", sets.len());
+        log::info!("Fetching {} sets", sets.len());
 
-        for (set, volume) in sets {
-            let is_outdated = self
-                .sets
-                .read()
-                .await
-                .get(&set.id)
-                .is_some_and(|s| *volume < s.card_count);
-
-            if !is_outdated {
-                log::info!("Storage is up to date for {}", set.name);
-                continue;
-            }
-
-            log::info!("Fetching cards in {}", set.name);
+        'set: for (set, existing_ids) in sets {
+            log::info!(
+                "Fetching cards in {} ({} already stored)",
+                set.name,
+                existing_ids.len()
+            );
             let mut url = Some(format!(
                 "{}/cards/search?q=e:{}",
                 self.base_url, set.abbreviation
             ));
+
+            let mut set_cards = Vec::new();
             while let Some(ref next_page) = url {
                 let Ok(response) = self.get(next_page).await else {
-                    continue;
+                    continue 'set;
                 };
-                log::info!("Fetched {} cards for {}", response.data.len(), set.name);
-                scryfall_cards.extend(response.data);
-
+                set_cards.extend(response.data);
                 url = response.next_page;
+            }
+
+            set_cards.retain(|c: &ScryfallCard| !existing_ids.contains(&c.id));
+            if !set_cards.is_empty() {
+                log::info!("Found {} new cards for {}", set_cards.len(), set.name);
+                scryfall_cards.extend(set_cards);
             }
         }
 
@@ -207,7 +207,10 @@ impl CardSource for Scryfall {
 
     async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
         let illustration = card.illustration.as_ref()?;
-        let resp = self.get_resp(&illustration.scryfall_url, &self.high_limiter).await.ok()?;
+        let resp = self
+            .get_resp(&illustration.scryfall_url, &self.high_limiter)
+            .await
+            .ok()?;
 
         let image = match resp.bytes().await {
             Ok(image) => image,
