@@ -46,17 +46,20 @@ pub struct Scryfall {
     base_url: String,
     client: Client,
     sets: RwLock<HashMap<Uuid, ScryfallSet>>,
-    limiter: Arc<Limiter>,
+    low_limiter: Arc<Limiter>,
+    high_limiter: Arc<Limiter>,
 }
 
 impl Default for Scryfall {
     fn default() -> Self {
-        let quota = Quota::per_second(NonZeroU32::new(2).unwrap());
+        let low_quota = Quota::per_second(NonZeroU32::new(2).unwrap());
+        let high_quota = Quota::per_second(NonZeroU32::new(10).unwrap());
         Self {
             base_url: String::default(),
             client: Client::default(),
             sets: RwLock::default(),
-            limiter: Arc::new(RateLimiter::direct(quota)),
+            low_limiter: Arc::new(RateLimiter::direct(low_quota)),
+            high_limiter: Arc::new(RateLimiter::direct(high_quota)),
         }
     }
 }
@@ -82,7 +85,6 @@ impl Scryfall {
         let today = time::OffsetDateTime::now_utc().date();
         let threshold = today - time::Duration::days(7);
 
-        self.limiter.until_ready().await;
         Ok(response
             .data
             .into_iter()
@@ -96,8 +98,8 @@ impl Scryfall {
             .collect())
     }
 
-    async fn get_resp(&self, url: &str) -> ScryfallResult<Response> {
-        self.limiter.until_ready().await;
+    async fn get_resp(&self, url: &str, limiter: &Limiter) -> ScryfallResult<Response> {
+        limiter.until_ready().await;
         let resp = self.client.get(url).send().await.map_err(|why| {
             log::warn!("Error getting data from scryfall: {why}");
             ScryfallError::HTTPError(why)
@@ -108,10 +110,8 @@ impl Scryfall {
         Ok(resp)
     }
 
-    async fn get_raw(&self, url: &str) -> ScryfallResult<String> {
-        let resp = self.get_resp(url).await?;
-
-        check_if_rate_limited(&resp);
+    async fn get_text(&self, url: &str, limiter: &Limiter) -> ScryfallResult<String> {
+        let resp = self.get_resp(url, limiter).await?;
 
         resp.text().await.map_err(|err| {
             log::warn!("Error parsing data from scryfall: {err}");
@@ -123,9 +123,7 @@ impl Scryfall {
     where
         T: serde::de::DeserializeOwned,
     {
-        let resp = self.get_resp(url).await?;
-
-        check_if_rate_limited(&resp);
+        let resp = self.get_resp(url, &self.low_limiter).await?;
 
         resp.json().await.map_err(|err| {
             log::warn!("Error parsing data from scryfall: {err}");
@@ -157,11 +155,6 @@ impl CardSource for Scryfall {
         log::info!("Fetching {} outdated sets", sets.len());
 
         for (set, volume) in sets {
-            if *volume == 0 {
-                log::info!("Scryfall set is empty for {}", set.name);
-                continue;
-            }
-
             let is_outdated = self
                 .sets
                 .read()
@@ -199,18 +192,7 @@ impl CardSource for Scryfall {
 
     async fn get_image(&self, card: &CardInfo) -> Option<Image> {
         let url = &card.image.scryfall_url;
-        let resp = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|why| {
-                log::warn!("Error getting data from scryfall: {why}");
-                ScryfallError::HTTPError(why)
-            })
-            .ok()?;
-
-        check_if_rate_limited(&resp);
+        let resp = self.get_resp(&url, &self.high_limiter).await.ok()?;
 
         let image = match resp.bytes().await {
             Ok(image) => image,
@@ -227,18 +209,7 @@ impl CardSource for Scryfall {
 
     async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration> {
         let url = card.illustration.as_ref()?.scryfall_url.clone();
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|why| {
-                log::warn!("Error getting data from scryfall: {why}");
-                ScryfallError::HTTPError(why)
-            })
-            .ok()?;
-
-        check_if_rate_limited(&resp);
+        let resp = self.get_resp(&url, &self.high_limiter).await.ok()?;
 
         let image = match resp.bytes().await {
             Ok(image) => image,
@@ -269,7 +240,7 @@ impl CardSource for Scryfall {
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()
                 .map(|s| async {
-                    let data = self.get_raw(&s.icon_svg_uri).await.ok()?;
+                    let data = self.get_text(&s.icon_svg_uri, &self.high_limiter).await.ok()?;
 
                     Some(Emoji {
                         name: s.abbreviation.clone(),
