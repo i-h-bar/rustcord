@@ -291,7 +291,9 @@ impl Postgres {
         .execute(&self.pool)
         .await
         {
-            log::warn!("Failed to upsert combo {}: {}", combo.id, e);
+            if e.as_database_error().and_then(|e| e.code()).as_deref() != Some("23503") {
+                log::warn!("Failed to upsert combo {}: {}", combo.id, e);
+            }
         }
     }
 
@@ -306,7 +308,9 @@ impl Postgres {
         .execute(&self.pool)
         .await
         {
-            log::warn!("Failed to upsert related_token {}: {}", token.id, e);
+            if e.as_database_error().and_then(|e| e.code()).as_deref() != Some("23503") {
+                log::warn!("Failed to upsert related_token {}: {}", token.id, e);
+            }
         }
     }
 
