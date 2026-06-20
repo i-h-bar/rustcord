@@ -4,7 +4,7 @@ pub mod utils;
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::domain::utils::emoji::normalise_name;
-use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData};
+use crate::ports::emoji::{SetEmoji, EmojiImage, EmojiMetaData, SymbolEmoji};
 use crate::ports::image_store::{Illustration, Image};
 use crate::ports::source::CardSource;
 use crate::ports::storage::{CardInfo, Set};
@@ -22,7 +22,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-
+use crate::adapters::services::scryfall::data::symbols::ScryfallSymbol;
 #[cfg(feature = "local-dev")]
 use crate::domain::utils::bulk_cache;
 
@@ -293,7 +293,7 @@ impl CardSource for Scryfall {
         Some(Illustration(illustration.id, image.into()))
     }
 
-    async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji> {
+    async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<SetEmoji> {
         if current.len() >= self.sets.read().await.len() {
             return vec![];
         }
@@ -314,7 +314,7 @@ impl CardSource for Scryfall {
                         .await
                         .ok()?;
 
-                    Some(Emoji {
+                    Some(SetEmoji {
                         name: s.abbreviation.clone(),
                         image: EmojiImage(data),
                     })
@@ -324,5 +324,31 @@ impl CardSource for Scryfall {
         .into_iter()
         .flatten()
         .collect()
+    }
+
+    async fn fetch_missing_card_symbols(&self, current: &[EmojiMetaData]) -> Vec<SymbolEmoji> {
+        let current_symbols: HashSet<&str> = current.iter().map(|e| e.name.as_str()).collect();
+        let Ok(response) = self.get::<ScryfallSymbol>(&format!("{}/symbology", self.base_url)).await else { return vec![] };
+
+        future::join_all(
+            response
+                .data
+                .into_iter()
+                .filter(|s| !current_symbols.contains(normalise_name(&s.symbol).as_str()))
+                .collect::<Vec<ScryfallSymbol>>()
+                .iter()
+                .map(|s| async {
+                    let data = self
+                        .get_text(&s.svg_uri, &self.high_limiter)
+                        .await
+                        .ok()?;
+
+                    Some(SymbolEmoji::new(&s.symbol, EmojiImage(data)))
+                }),
+        )
+            .await
+            .into_iter()
+            .flatten()
+            .collect()
     }
 }

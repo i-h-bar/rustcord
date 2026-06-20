@@ -1,5 +1,6 @@
 pub mod card;
 pub mod set;
+pub mod symbols;
 
 use serde::{Deserialize, Serialize};
 

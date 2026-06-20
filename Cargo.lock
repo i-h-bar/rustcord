@@ -3575,6 +3575,7 @@ dependencies = [
  "time",
  "tiny-skia",
  "tokio",
+ "unicode-normalization",
  "usvg",
  "uuid",
 ]

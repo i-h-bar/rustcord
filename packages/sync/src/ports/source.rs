@@ -1,4 +1,4 @@
-use crate::ports::emoji::{Emoji, EmojiMetaData};
+use crate::ports::emoji::{SetEmoji, EmojiMetaData, SymbolEmoji};
 use crate::ports::image_store::{Illustration, Image};
 use crate::ports::storage::{CardInfo, Set};
 use async_trait::async_trait;
@@ -16,5 +16,6 @@ pub trait CardSource {
     async fn get_image(&self, card: &CardInfo) -> Option<Image>;
     async fn get_illustration(&self, card: &CardInfo) -> Option<Illustration>;
 
-    async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<Emoji>;
+    async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<SetEmoji>;
+    async fn fetch_missing_card_symbols(&self, current: &[EmojiMetaData]) -> Vec<SymbolEmoji>;
 }

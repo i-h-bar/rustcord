@@ -1,6 +1,6 @@
 use crate::domain::utils::emoji::normalise_name;
 use crate::domain::utils::svg;
-use crate::ports::emoji::{Emoji, EmojiImage, EmojiMetaData, EmojiStore};
+use crate::ports::emoji::{SetEmoji, EmojiImage, EmojiMetaData, EmojiStore, SymbolEmoji, EmojiName};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use futures::future;
@@ -34,8 +34,16 @@ impl EmojiUpload {
     }
 }
 
-impl From<Emoji> for EmojiUpload {
-    fn from(emoji: Emoji) -> Self {
+impl From<SetEmoji> for EmojiUpload {
+    fn from(emoji: SetEmoji) -> Self {
+        let name = normalise_name(&emoji.name);
+
+        EmojiUpload::new(name, &emoji.image.0)
+    }
+}
+
+impl From<SymbolEmoji> for EmojiUpload {
+    fn from(emoji: SymbolEmoji) -> Self {
         let name = normalise_name(&emoji.name);
 
         EmojiUpload::new(name, &emoji.image.0)
@@ -78,7 +86,7 @@ impl Discord {
             .build()
             .expect("Failure to creating reqwest client for discord");
 
-        let quota = Quota::per_second(NonZeroU32::new(50).expect("50 quota is unavailable"));
+        let quota = Quota::per_second(NonZeroU32::new(5).expect("5 quota is unavailable"));
         let limiter = Arc::new(RateLimiter::direct(quota));
 
         Self {
@@ -89,16 +97,30 @@ impl Discord {
         }
     }
 
-    async fn upload_emoji(&self, emoji: Emoji) {
+    async fn upload_emoji(&self, emoji: impl Into<EmojiUpload> + EmojiName) {
         let url = format!("{}/applications/{}/emojis", self.base_url, self.app_id);
+        let name = emoji.clone_name();
         self.limiter.until_ready().await;
 
-        self.client
+        let resp = match self.client
             .post(&url)
-            .json(&EmojiUpload::from(emoji))
+            .json::<EmojiUpload>(&emoji.into())
             .send()
-            .await
-            .unwrap();
+            .await {
+            Ok(resp) => resp,
+            Err(why) => {
+                log::warn!("Unable to upload emoji {}: {:?}", name, why);
+                return;
+            },
+        };
+
+        if !resp.status().is_success() {
+            let status_code = resp.status();
+            log::warn!("None success status code for emoji {}: {}", name, status_code);
+            if status_code == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                std::process::exit(1);
+            }
+        }
     }
 }
 
@@ -115,16 +137,19 @@ impl EmojiStore for Discord {
         emojis.items
     }
 
-    async fn upload_set_emojis(&self, emojis: Vec<Emoji>) {
-        future::join_all(emojis.iter().map(|s| async {
-            log::info!("Uploading set symbol {}", s.name);
+    async fn upload_set_symbols(&self, emojis: Vec<SetEmoji>) {
+        if emojis.is_empty() {
+            return;
+        }
 
+        log::info!("Uploading Set Symbols");
+        future::join_all(emojis.iter().map(|s| async {
             let recoloured = svg::recolour(&s.image.0, "#C9A227");
             let Some(png) = svg::to_png(&recoloured) else {
                 return;
             };
 
-            let emoji = Emoji {
+            let emoji = SetEmoji {
                 name: s.name.clone(),
                 image: EmojiImage(STANDARD.encode(&png)),
             };
@@ -132,5 +157,26 @@ impl EmojiStore for Discord {
             self.upload_emoji(emoji).await;
         }))
         .await;
+    }
+
+    async fn upload_symbol_emojis(&self, emojis: Vec<SymbolEmoji>) {
+        if emojis.is_empty() {
+            return;
+        }
+
+        log::info!("Uploading Emojis");
+        future::join_all(emojis.iter().map(|emoji| async {
+            let Some(png) = svg::to_png(&emoji.image.0) else {
+                return;
+            };
+
+            let emoji = SetEmoji {
+                name: emoji.name.clone(),
+                image: EmojiImage(STANDARD.encode(&png)),
+            };
+
+            self.upload_emoji(emoji).await;
+        }))
+            .await;
     }
 }

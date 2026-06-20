@@ -14,8 +14,11 @@ pub async fn sync(
 
     source.get_all_sets().await;
 
+    let card_symbols = source.fetch_missing_card_symbols(&current_emojis).await;
+    emoji_store.upload_symbol_emojis(card_symbols).await;
+
     let new_set_symbols = source.fetch_missing_set_symbols(&current_emojis).await;
-    emoji_store.upload_set_emojis(new_set_symbols).await;
+    emoji_store.upload_set_symbols(new_set_symbols).await;
 
     let cards = source.fetch_all_cards().await;
     if cards.is_empty() {
