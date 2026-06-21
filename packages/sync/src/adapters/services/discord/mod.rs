@@ -1,6 +1,8 @@
 use crate::domain::utils::emoji::normalise_name;
 use crate::domain::utils::svg;
-use crate::ports::emoji::{SetEmoji, EmojiImage, EmojiMetaData, EmojiStore, SymbolEmoji, EmojiName};
+use crate::ports::emoji::{
+    EmojiImage, EmojiMetaData, EmojiName, EmojiStore, SetEmoji, SymbolEmoji,
+};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use futures::future;
@@ -102,21 +104,27 @@ impl Discord {
         let name = emoji.clone_name();
         self.limiter.until_ready().await;
 
-        let resp = match self.client
+        let resp = match self
+            .client
             .post(&url)
             .json::<EmojiUpload>(&emoji.into())
             .send()
-            .await {
+            .await
+        {
             Ok(resp) => resp,
             Err(why) => {
                 log::warn!("Unable to upload emoji {}: {:?}", name, why);
                 return;
-            },
+            }
         };
 
         if !resp.status().is_success() {
             let status_code = resp.status();
-            log::warn!("None success status code for emoji {}: {}", name, status_code);
+            log::warn!(
+                "None success status code for emoji {}: {}",
+                name,
+                status_code
+            );
             if status_code == reqwest::StatusCode::TOO_MANY_REQUESTS {
                 std::process::exit(1);
             }
@@ -177,6 +185,6 @@ impl EmojiStore for Discord {
 
             self.upload_emoji(emoji).await;
         }))
-            .await;
+        .await;
     }
 }

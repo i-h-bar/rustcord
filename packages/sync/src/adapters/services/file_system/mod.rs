@@ -2,6 +2,7 @@ use crate::ports::image_store::{Illustration, Image, ImageStore};
 use crate::ports::storage::CardInfo;
 use async_trait::async_trait;
 use std::env;
+use uuid::Uuid;
 
 pub struct FileSystem {
     image_dir: String,
@@ -65,5 +66,19 @@ impl ImageStore for FileSystem {
         let path = format!("{}{}.png", self.illustration_dir, id);
 
         self.save(&path, bytes).await;
+    }
+
+    async fn delete_image(&self, id: Uuid) {
+        let path = format!("{}{}.png", self.image_dir, id);
+        if let Err(why) = tokio::fs::remove_file(&path).await {
+            log::warn!("Failed to delete orphaned image {id}: {why}");
+        }
+    }
+
+    async fn delete_illustration(&self, id: Uuid) {
+        let path = format!("{}{}.png", self.illustration_dir, id);
+        if let Err(why) = tokio::fs::remove_file(&path).await {
+            log::warn!("Failed to delete orphaned illustration {id}: {why}");
+        }
     }
 }

@@ -13,7 +13,7 @@ pub async fn sync(
     let current_emojis = emoji_store.get_emojis().await;
     let card_symbols = source.fetch_missing_card_symbols(&current_emojis).await;
     emoji_store.upload_symbol_emojis(card_symbols).await;
-    
+
     let sets = source.get_recent_sets().await;
 
     let new_set_symbols = source.fetch_missing_set_symbols(&current_emojis).await;
@@ -26,8 +26,27 @@ pub async fn sync(
         return;
     }
 
-    storage.upsert_cards(&cards).await;
-    drop(storage);
-    
-    save_images(&cards, &image_store, &source).await;
+    let upsert_result = storage.upsert_cards(&cards).await;
+
+    save_images(
+        &upsert_result.changed_images,
+        &upsert_result.changed_illustrations,
+        &cards,
+        &image_store,
+        &source,
+    )
+    .await;
+
+    for &id in &upsert_result.orphaned_images {
+        image_store.delete_image(id).await;
+    }
+    for &id in &upsert_result.orphaned_illustrations {
+        image_store.delete_illustration(id).await;
+    }
+    storage
+        .delete_orphaned_images(&upsert_result.orphaned_images)
+        .await;
+    storage
+        .delete_orphaned_illustrations(&upsert_result.orphaned_illustrations)
+        .await;
 }

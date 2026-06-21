@@ -26,8 +26,27 @@ pub async fn sync(
         return;
     }
 
-    storage.upsert_cards(&cards).await;
-    drop(storage);
+    let upsert_result = storage.upsert_cards(&cards).await;
 
-    save_images(&cards, &image_store, &source).await;
+    save_images(
+        &upsert_result.changed_images,
+        &upsert_result.changed_illustrations,
+        &cards,
+        &image_store,
+        &source,
+    )
+    .await;
+
+    for &id in &upsert_result.orphaned_images {
+        image_store.delete_image(id).await;
+    }
+    for &id in &upsert_result.orphaned_illustrations {
+        image_store.delete_illustration(id).await;
+    }
+    storage
+        .delete_orphaned_images(&upsert_result.orphaned_images)
+        .await;
+    storage
+        .delete_orphaned_illustrations(&upsert_result.orphaned_illustrations)
+        .await;
 }

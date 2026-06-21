@@ -31,7 +31,10 @@ pub fn find_cached() -> Option<PathBuf> {
 
 pub async fn load(path: &Path) -> Option<Vec<u8>> {
     log::info!("Loading bulk data from cache: {}", path.display());
-    tokio::fs::read(path).await.map_err(|e| log::warn!("Failed to read cache: {e}")).ok()
+    tokio::fs::read(path)
+        .await
+        .map_err(|e| log::warn!("Failed to read cache: {e}"))
+        .ok()
 }
 
 pub async fn save(bytes: &[u8]) {

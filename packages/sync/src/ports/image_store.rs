@@ -11,4 +11,6 @@ pub trait ImageStore {
     async fn card_illustration_exists(&self, card: &CardInfo) -> bool;
     async fn save_image(&self, image: Image);
     async fn save_illustration(&self, illustration: Illustration);
+    async fn delete_image(&self, id: Uuid);
+    async fn delete_illustration(&self, id: Uuid);
 }

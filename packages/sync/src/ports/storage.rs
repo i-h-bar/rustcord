@@ -1,12 +1,21 @@
 use async_trait::async_trait;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use time::{Date, OffsetDateTime};
 use uuid::Uuid;
+
+pub struct UpsertResult {
+    pub changed_images: HashMap<Uuid, String>,
+    pub changed_illustrations: HashMap<Uuid, String>,
+    pub orphaned_images: Vec<Uuid>,
+    pub orphaned_illustrations: Vec<Uuid>,
+}
 
 #[async_trait]
 pub trait Storage {
     async fn get_existing_card_ids(&self, sets: Vec<Set>) -> Vec<(Set, HashSet<Uuid>)>;
-    async fn upsert_cards(&self, cards: &[CardInfo]);
+    async fn upsert_cards(&self, cards: &[CardInfo]) -> UpsertResult;
+    async fn delete_orphaned_images(&self, ids: &[Uuid]);
+    async fn delete_orphaned_illustrations(&self, ids: &[Uuid]);
 }
 
 pub struct Set {

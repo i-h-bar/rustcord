@@ -8,7 +8,7 @@ pub fn normalise_name(name: &str) -> String {
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
-    
+
     if noramlised.len() < 2 {
         format!("{}_", noramlised)
     } else {

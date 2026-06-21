@@ -3,8 +3,11 @@ pub mod utils;
 
 use crate::adapters::services::scryfall::data::ScryfallData;
 use crate::adapters::services::scryfall::data::card::ScryfallCard;
+use crate::adapters::services::scryfall::data::symbols::ScryfallSymbol;
+#[cfg(feature = "local-dev")]
+use crate::domain::utils::bulk_cache;
 use crate::domain::utils::emoji::normalise_name;
-use crate::ports::emoji::{SetEmoji, EmojiImage, EmojiMetaData, SymbolEmoji};
+use crate::ports::emoji::{EmojiImage, EmojiMetaData, SetEmoji, SymbolEmoji};
 use crate::ports::image_store::{Illustration, Image};
 use crate::ports::source::CardSource;
 use crate::ports::storage::{CardInfo, Set};
@@ -22,9 +25,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use crate::adapters::services::scryfall::data::symbols::ScryfallSymbol;
-#[cfg(feature = "local-dev")]
-use crate::domain::utils::bulk_cache;
 
 fn check_if_rate_limited(resp: &Response) {
     if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
@@ -125,7 +125,9 @@ impl Scryfall {
             .ok_or(ScryfallError::ParseError)?;
 
         log::info!("Downloading bulk card data");
-        let resp = self.get_resp(&entry.download_uri, &self.low_limiter).await?;
+        let resp = self
+            .get_resp(&entry.download_uri, &self.low_limiter)
+            .await?;
 
         let bytes = resp.bytes().await.map_err(|e| {
             log::warn!("Failed to download bulk data: {e}");
@@ -236,20 +238,12 @@ impl CardSource for Scryfall {
                 "{}/cards/search?q=e:{}",
                 self.base_url, set.abbreviation
             ));
-
-            let mut set_cards = Vec::new();
             while let Some(ref next_page) = url {
                 let Ok(response) = self.get(next_page).await else {
                     continue 'set;
                 };
-                set_cards.extend(response.data);
+                scryfall_cards.extend(response.data);
                 url = response.next_page;
-            }
-
-            set_cards.retain(|c: &ScryfallCard| !existing_ids.contains(&c.id));
-            if !set_cards.is_empty() {
-                log::info!("Found {} new cards for {}", set_cards.len(), set.name);
-                scryfall_cards.extend(set_cards);
             }
         }
 
@@ -326,9 +320,26 @@ impl CardSource for Scryfall {
         .collect()
     }
 
+    async fn download_image(&self, url: &str) -> Option<Vec<u8>> {
+        let resp = self.get_resp(url, &self.high_limiter).await.ok()?;
+
+        match resp.bytes().await {
+            Ok(bytes) => Some(bytes.into()),
+            Err(why) => {
+                log::warn!("Error downloading image from {url}: {why}");
+                None
+            }
+        }
+    }
+
     async fn fetch_missing_card_symbols(&self, current: &[EmojiMetaData]) -> Vec<SymbolEmoji> {
         let current_symbols: HashSet<&str> = current.iter().map(|e| e.name.as_str()).collect();
-        let Ok(response) = self.get::<ScryfallSymbol>(&format!("{}/symbology", self.base_url)).await else { return vec![] };
+        let Ok(response) = self
+            .get::<ScryfallSymbol>(&format!("{}/symbology", self.base_url))
+            .await
+        else {
+            return vec![];
+        };
 
         future::join_all(
             response
@@ -338,17 +349,14 @@ impl CardSource for Scryfall {
                 .collect::<Vec<ScryfallSymbol>>()
                 .iter()
                 .map(|s| async {
-                    let data = self
-                        .get_text(&s.svg_uri, &self.high_limiter)
-                        .await
-                        .ok()?;
+                    let data = self.get_text(&s.svg_uri, &self.high_limiter).await.ok()?;
 
                     Some(SymbolEmoji::new(&s.symbol, EmojiImage(data)))
                 }),
         )
-            .await
-            .into_iter()
-            .flatten()
-            .collect()
+        .await
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }

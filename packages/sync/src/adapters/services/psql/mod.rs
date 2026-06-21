@@ -3,12 +3,13 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::ports::storage::{
     Artist, Card, CardInfo, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule, Set,
-    Storage,
+    Storage, UpsertResult,
 };
 use async_trait::async_trait;
-use futures::future::{self, Either};
 use futures::StreamExt;
+use futures::future::{self, Either};
 use sqlx::{Pool, Row, error::DatabaseError, postgres::PgPoolOptions};
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
 use uuid::Uuid;
@@ -57,15 +58,17 @@ impl Postgres {
             .unwrap_or_else(|_| FALLBACK_POOL_SIZE.to_string());
         let max: usize = max.trim().parse().unwrap_or(FALLBACK_POOL_SIZE);
 
-        let in_use: i64 =
-            sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE pid != pg_backend_pid()")
-                .fetch_one(&probe)
-                .await
-                .unwrap_or(0);
+        let in_use: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM pg_stat_activity WHERE pid != pg_backend_pid()",
+        )
+        .fetch_one(&probe)
+        .await
+        .unwrap_or(0);
 
         probe.close().await;
 
-        let pool_size = max.saturating_sub(in_use as usize)
+        let pool_size = max
+            .saturating_sub(in_use as usize)
             .saturating_sub(BOT_RESERVE)
             .max(1);
 
@@ -104,32 +107,43 @@ impl Postgres {
         }
     }
 
-    async fn upsert_image(&self, image: &Image) {
-        if let Err(e) = sqlx::query(
+    async fn upsert_image(&self, image: &Image) -> Option<(Uuid, String)> {
+        match sqlx::query_as::<_, (Uuid, String)>(
             "INSERT INTO image (id, scryfall_url) VALUES ($1, $2)
              ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url
-             WHERE image.scryfall_url IS DISTINCT FROM EXCLUDED.scryfall_url",
+             WHERE image.scryfall_url IS DISTINCT FROM EXCLUDED.scryfall_url
+             RETURNING id, scryfall_url",
         )
         .bind(image.id)
         .bind(&image.scryfall_url)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         {
-            log::warn!("Failed to upsert image {}: {}", image.id, e);
+            Ok(row) => row,
+            Err(e) => {
+                log::warn!("Failed to upsert image {}: {}", image.id, e);
+                None
+            }
         }
     }
 
-    async fn upsert_illustration(&self, illustration: &Illustration) {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO illustration (id, scryfall_url)
-             VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    async fn upsert_illustration(&self, illustration: &Illustration) -> Option<(Uuid, String)> {
+        match sqlx::query_as::<_, (Uuid, String)>(
+            "INSERT INTO illustration (id, scryfall_url) VALUES ($1, $2)
+             ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url
+             WHERE illustration.scryfall_url IS DISTINCT FROM EXCLUDED.scryfall_url
+             RETURNING id, scryfall_url",
         )
         .bind(illustration.id)
         .bind(&illustration.scryfall_url)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         {
-            log::warn!("Failed to upsert illustration {}: {}", illustration.id, e);
+            Ok(row) => row,
+            Err(e) => {
+                log::warn!("Failed to upsert illustration {}: {}", illustration.id, e);
+                None
+            }
         }
     }
 
@@ -253,9 +267,12 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card(&self, card: &Card) {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO card
+    async fn upsert_card(&self, card: &Card) -> (Option<Uuid>, Option<Uuid>) {
+        match sqlx::query_as::<_, (Option<Uuid>, Option<Uuid>)>(
+            "WITH prev AS (
+                SELECT image_id, illustration_id FROM card WHERE id = $1
+            )
+            INSERT INTO card
              (id, oracle_id, name, normalised_name, scryfall_url, flavour_text, release_date,
               reserved, rarity, artist_id, image_id, illustration_id, set_id, backside_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
@@ -263,11 +280,18 @@ impl Postgres {
                normalised_name = EXCLUDED.normalised_name,
                scryfall_url    = EXCLUDED.scryfall_url,
                reserved        = EXCLUDED.reserved,
-               oracle_id       = EXCLUDED.oracle_id
-             WHERE (card.normalised_name IS DISTINCT FROM EXCLUDED.normalised_name OR
-                    card.scryfall_url    IS DISTINCT FROM EXCLUDED.scryfall_url    OR
-                    card.reserved        IS DISTINCT FROM EXCLUDED.reserved        OR
-                    card.oracle_id       IS DISTINCT FROM EXCLUDED.oracle_id)",
+               oracle_id       = EXCLUDED.oracle_id,
+               image_id        = EXCLUDED.image_id,
+               illustration_id = EXCLUDED.illustration_id
+             WHERE (card.normalised_name IS DISTINCT FROM EXCLUDED.normalised_name  OR
+                    card.scryfall_url     IS DISTINCT FROM EXCLUDED.scryfall_url     OR
+                    card.reserved         IS DISTINCT FROM EXCLUDED.reserved         OR
+                    card.oracle_id        IS DISTINCT FROM EXCLUDED.oracle_id        OR
+                    card.image_id         IS DISTINCT FROM EXCLUDED.image_id         OR
+                    card.illustration_id  IS DISTINCT FROM EXCLUDED.illustration_id)
+             RETURNING
+               (SELECT image_id FROM prev) AS prev_image_id,
+               (SELECT illustration_id FROM prev) AS prev_illustration_id",
         )
         .bind(card.id)
         .bind(card.oracle_id)
@@ -283,10 +307,19 @@ impl Postgres {
         .bind(card.illustration_id)
         .bind(card.set_id)
         .bind(card.backside_id)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         {
-            log::warn!("Failed to upsert card {}: {}", card.id, e);
+            Ok(Some((prev_img, prev_ill))) => {
+                let orphaned_img = prev_img.filter(|&old| old != card.image_id);
+                let orphaned_ill = prev_ill.filter(|old| Some(*old) != card.illustration_id);
+                (orphaned_img, orphaned_ill)
+            }
+            Ok(None) => (None, None),
+            Err(e) => {
+                log::warn!("Failed to upsert card {}: {}", card.id, e);
+                (None, None)
+            }
         }
     }
 
@@ -356,17 +389,33 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card_info(&self, info: &CardInfo) {
+    async fn upsert_card_info(
+        &self,
+        info: &CardInfo,
+    ) -> (
+        Option<(Uuid, String)>,
+        Option<(Uuid, String)>,
+        Option<Uuid>,
+        Option<Uuid>,
+    ) {
         self.upsert_artist(&info.artist).await;
-        self.upsert_image(&info.image).await;
-        if let Some(ill) = &info.illustration {
-            self.upsert_illustration(ill).await;
-        }
+        let changed_image = self.upsert_image(&info.image).await;
+        let changed_illustration = match &info.illustration {
+            Some(ill) => self.upsert_illustration(ill).await,
+            None => None,
+        };
         self.upsert_set(&info.set).await;
         self.upsert_rule(&info.rule).await;
         self.upsert_legality(&info.legality).await;
-        self.upsert_card(&info.card).await;
+        let (orphaned_img, orphaned_ill) = self.upsert_card(&info.card).await;
         self.upsert_price(&info.price).await;
+
+        (
+            changed_image,
+            changed_illustration,
+            orphaned_img,
+            orphaned_ill,
+        )
     }
 }
 
@@ -380,7 +429,7 @@ impl Storage for Postgres {
         .await
     }
 
-    async fn upsert_cards(&self, cards: &[CardInfo]) {
+    async fn upsert_cards(&self, cards: &[CardInfo]) -> UpsertResult {
         log::info!("Upserting {} cards", cards.len());
 
         #[cfg(feature = "local-dev")]
@@ -396,14 +445,38 @@ impl Storage for Postgres {
             bar
         };
 
-        let card_futs: Vec<_> = cards.iter().map(|info| self.upsert_card_info(info)).collect();
-        futures::stream::iter(card_futs)
+        let mut changed_images: HashMap<Uuid, String> = HashMap::new();
+        let mut changed_illustrations: HashMap<Uuid, String> = HashMap::new();
+        let mut orphaned_images: Vec<Uuid> = Vec::new();
+        let mut orphaned_illustrations: Vec<Uuid> = Vec::new();
+
+        let card_futs: Vec<_> = cards
+            .iter()
+            .map(|info| self.upsert_card_info(info))
+            .collect();
+        let results: Vec<_> = futures::stream::iter(card_futs)
             .buffer_unordered(self.pool_size)
-            .for_each(|_| async {
+            .inspect(|_| {
                 #[cfg(feature = "local-dev")]
                 pb.inc(1);
             })
+            .collect()
             .await;
+
+        for (changed_img, changed_ill, orphaned_img, orphaned_ill) in results {
+            if let Some((id, url)) = changed_img {
+                changed_images.insert(id, url);
+            }
+            if let Some((id, url)) = changed_ill {
+                changed_illustrations.insert(id, url);
+            }
+            if let Some(id) = orphaned_img {
+                orphaned_images.push(id);
+            }
+            if let Some(id) = orphaned_ill {
+                orphaned_illustrations.push(id);
+            }
+        }
 
         #[cfg(feature = "local-dev")]
         pb.finish_with_message("done");
@@ -411,7 +484,10 @@ impl Storage for Postgres {
         let relation_futs: Vec<_> = cards
             .iter()
             .flat_map(|info| {
-                let combos = info.combos.iter().map(|c| Either::Left(self.upsert_combo(c)));
+                let combos = info
+                    .combos
+                    .iter()
+                    .map(|c| Either::Left(self.upsert_combo(c)));
                 let tokens = info
                     .related_tokens
                     .iter()
@@ -423,5 +499,42 @@ impl Storage for Postgres {
             .buffer_unordered(self.pool_size)
             .collect::<Vec<_>>()
             .await;
+
+        UpsertResult {
+            changed_images,
+            changed_illustrations,
+            orphaned_images,
+            orphaned_illustrations,
+        }
+    }
+
+    async fn delete_orphaned_images(&self, ids: &[Uuid]) {
+        for id in ids {
+            if let Err(e) = sqlx::query(
+                "DELETE FROM image WHERE id = $1
+                 AND NOT EXISTS (SELECT 1 FROM card WHERE image_id = $1)",
+            )
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            {
+                log::warn!("Failed to delete orphaned image {id}: {e}");
+            }
+        }
+    }
+
+    async fn delete_orphaned_illustrations(&self, ids: &[Uuid]) {
+        for id in ids {
+            if let Err(e) = sqlx::query(
+                "DELETE FROM illustration WHERE id = $1
+                 AND NOT EXISTS (SELECT 1 FROM card WHERE illustration_id = $1)",
+            )
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            {
+                log::warn!("Failed to delete orphaned illustration {id}: {e}");
+            }
+        }
     }
 }
