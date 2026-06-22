@@ -61,6 +61,7 @@ jobs:
             --from-literal=IMAGES_DIR=${{ secrets.IMAGES_DIR }} \
             --from-literal=REDIS_URL=${{ secrets.REDIS_URL }} \
             --from-literal=USER_AGENT=${{ secrets.USER_AGENT }} \
+            --from-literal=DISCORD_SERVER_URL=${{ secrets.DISCORD_SERVER_URL }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply
