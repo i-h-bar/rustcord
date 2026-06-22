@@ -128,24 +128,17 @@ impl Postgres {
         }
     }
 
-    async fn upsert_illustration(&self, illustration: &Illustration) -> Option<(Uuid, String)> {
-        match sqlx::query_as::<_, (Uuid, String)>(
+    async fn upsert_illustration(&self, illustration: &Illustration) {
+        if let Err(e) = sqlx::query(
             "INSERT INTO illustration (id, scryfall_url) VALUES ($1, $2)
-             ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url
-             WHERE split_part(illustration.scryfall_url, '?', 1)
-                IS DISTINCT FROM split_part(EXCLUDED.scryfall_url, '?', 1)
-             RETURNING id, scryfall_url",
+             ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url",
         )
         .bind(illustration.id)
         .bind(&illustration.scryfall_url)
-        .fetch_optional(&self.pool)
+        .execute(&self.pool)
         .await
         {
-            Ok(row) => row,
-            Err(e) => {
-                log::warn!("Failed to upsert illustration {}: {}", illustration.id, e);
-                None
-            }
+            log::warn!("Failed to upsert illustration {}: {}", illustration.id, e);
         }
     }
 
@@ -394,30 +387,19 @@ impl Postgres {
     async fn upsert_card_info(
         &self,
         info: &CardInfo,
-    ) -> (
-        Option<(Uuid, String)>,
-        Option<(Uuid, String)>,
-        Option<Uuid>,
-        Option<Uuid>,
-    ) {
+    ) -> (Option<(Uuid, String)>, Option<Uuid>, Option<Uuid>) {
         self.upsert_artist(&info.artist).await;
         let changed_image = self.upsert_image(&info.image).await;
-        let changed_illustration = match &info.illustration {
-            Some(ill) => self.upsert_illustration(ill).await,
-            None => None,
-        };
+        if let Some(ill) = &info.illustration {
+            self.upsert_illustration(ill).await;
+        }
         self.upsert_set(&info.set).await;
         self.upsert_rule(&info.rule).await;
         self.upsert_legality(&info.legality).await;
         let (orphaned_img, orphaned_ill) = self.upsert_card(&info.card).await;
         self.upsert_price(&info.price).await;
 
-        (
-            changed_image,
-            changed_illustration,
-            orphaned_img,
-            orphaned_ill,
-        )
+        (changed_image, orphaned_img, orphaned_ill)
     }
 }
 
@@ -448,7 +430,7 @@ impl Storage for Postgres {
         };
 
         let mut changed_images: HashMap<Uuid, String> = HashMap::new();
-        let mut changed_illustrations: HashMap<Uuid, String> = HashMap::new();
+        let changed_illustrations: HashMap<Uuid, String> = HashMap::new();
         let mut orphaned_images: Vec<Uuid> = Vec::new();
         let mut orphaned_illustrations: Vec<Uuid> = Vec::new();
 
@@ -465,12 +447,9 @@ impl Storage for Postgres {
             .collect()
             .await;
 
-        for (changed_img, changed_ill, orphaned_img, orphaned_ill) in results {
+        for (changed_img, orphaned_img, orphaned_ill) in results {
             if let Some((id, url)) = changed_img {
                 changed_images.insert(id, url);
-            }
-            if let Some((id, url)) = changed_ill {
-                changed_illustrations.insert(id, url);
             }
             if let Some(id) = orphaned_img {
                 orphaned_images.push(id);
@@ -511,6 +490,8 @@ impl Storage for Postgres {
     }
 
     async fn delete_orphaned_images(&self, ids: &[Uuid]) {
+        log::info!("Deleting {} orphaned images", ids.len());
+
         for id in ids {
             if let Err(e) = sqlx::query(
                 "DELETE FROM image WHERE id = $1
@@ -526,6 +507,8 @@ impl Storage for Postgres {
     }
 
     async fn delete_orphaned_illustrations(&self, ids: &[Uuid]) {
+        log::info!("Deleting {} orphaned illustrations", ids.len());
+
         for id in ids {
             if let Err(e) = sqlx::query(
                 "DELETE FROM illustration WHERE id = $1
