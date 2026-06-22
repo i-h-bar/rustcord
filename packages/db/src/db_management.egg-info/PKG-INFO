@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: db-management
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.14
+Description-Content-Type: text/markdown
+Requires-Dist: aiofiles>=24.1.0
+Requires-Dist: aiohttp>=3.13.3
+Requires-Dist: asyncpg>=0.31.0
+Requires-Dist: pydantic>=2.12.5
+Requires-Dist: python-dotenv>=1.1.1
+Requires-Dist: tqdm>=4.67.1
+Requires-Dist: unidecode>=1.4.0
+Requires-Dist: alembic<2.0.0,>=1.16.4
+Requires-Dist: anyio<5,>=4.12.1
+Requires-Dist: greenlet>=3.3.2
