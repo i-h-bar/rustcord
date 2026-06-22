@@ -130,15 +130,25 @@ impl Discord {
 
 #[async_trait]
 impl EmojiStore for Discord {
-    async fn get_emojis(&self) -> Vec<EmojiMetaData> {
+    async fn get_emojis(&self) -> Option<Vec<EmojiMetaData>> {
         let url = format!("{}/applications/{}/emojis", self.base_url, self.app_id);
 
         self.limiter.until_ready().await;
-        let resp = self.client.get(url).send().await.unwrap();
+        let resp = match self.client.get(url).send().await {
+            Ok(resp) => resp,
+            Err(why) => {
+                log::warn!("Failed to fetch emojis: {why}");
+                return None;
+            }
+        };
 
-        let emojis: DiscordEmojiList = resp.json().await.unwrap();
-
-        emojis.items
+        match resp.json::<DiscordEmojiList>().await {
+            Ok(emojis) => Some(emojis.items),
+            Err(why) => {
+                log::warn!("Failed to parse emoji response: {why}");
+                None
+            }
+        }
     }
 
     async fn upload_set_symbols(&self, emojis: Vec<SetEmoji>) {
@@ -174,10 +184,7 @@ impl EmojiStore for Discord {
                 return;
             };
 
-            let emoji = SetEmoji {
-                name: emoji.name.clone(),
-                image: EmojiImage(STANDARD.encode(&png)),
-            };
+            let emoji = SymbolEmoji::new(&emoji.name, EmojiImage(STANDARD.encode(&png)));
 
             self.upload_emoji(emoji).await;
         }))

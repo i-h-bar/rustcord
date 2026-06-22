@@ -48,7 +48,7 @@ pub trait EmojiName {
 
 #[async_trait]
 pub trait EmojiStore {
-    async fn get_emojis(&self) -> Vec<EmojiMetaData>;
+    async fn get_emojis(&self) -> Option<Vec<EmojiMetaData>>;
     async fn upload_set_symbols(&self, emojis: Vec<SetEmoji>);
 
     async fn upload_symbol_emojis(&self, emojis: Vec<SymbolEmoji>);

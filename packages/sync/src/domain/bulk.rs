@@ -1,3 +1,4 @@
+use crate::domain::utils::emoji;
 use crate::domain::utils::images::save_images;
 use crate::ports::emoji::EmojiStore;
 use crate::ports::image_store::ImageStore;
@@ -10,15 +11,8 @@ pub async fn sync(
     image_store: impl ImageStore,
     emoji_store: impl EmojiStore,
 ) {
-    let current_emojis = emoji_store.get_emojis().await;
-
     source.get_all_sets().await;
-
-    let card_symbols = source.fetch_missing_card_symbols(&current_emojis).await;
-    emoji_store.upload_symbol_emojis(card_symbols).await;
-
-    let new_set_symbols = source.fetch_missing_set_symbols(&current_emojis).await;
-    emoji_store.upload_set_symbols(new_set_symbols).await;
+    emoji::sync(&source, &emoji_store).await;
 
     let cards = source.fetch_all_cards().await;
     if cards.is_empty() {
@@ -28,25 +22,19 @@ pub async fn sync(
 
     let upsert_result = storage.upsert_cards(&cards).await;
 
-    save_images(
-        &upsert_result.changed_images,
-        &upsert_result.changed_illustrations,
-        &cards,
-        &image_store,
-        &source,
-    )
-    .await;
+    save_images(&cards, &image_store, &source).await;
 
-    for &id in &upsert_result.orphaned_images {
-        image_store.delete_image(id).await;
-    }
-    for &id in &upsert_result.orphaned_illustrations {
-        image_store.delete_illustration(id).await;
-    }
-    storage
+    let deleted_images = storage
         .delete_orphaned_images(&upsert_result.orphaned_images)
         .await;
-    storage
+    let deleted_illustrations = storage
         .delete_orphaned_illustrations(&upsert_result.orphaned_illustrations)
         .await;
+
+    for id in deleted_images {
+        image_store.delete_image(id).await;
+    }
+    for id in deleted_illustrations {
+        image_store.delete_illustration(id).await;
+    }
 }

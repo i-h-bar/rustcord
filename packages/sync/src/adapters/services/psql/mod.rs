@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures::future::Either;
 use sqlx::{Pool, error::DatabaseError, postgres::PgPoolOptions};
-use std::collections::HashMap;
 use std::env;
 use uuid::Uuid;
 
@@ -393,8 +392,6 @@ impl Storage for Postgres {
             bar
         };
 
-        let changed_images: HashMap<Uuid, String> = HashMap::new();
-        let changed_illustrations: HashMap<Uuid, String> = HashMap::new();
         let mut orphaned_images: Vec<Uuid> = Vec::new();
         let mut orphaned_illustrations: Vec<Uuid> = Vec::new();
 
@@ -443,18 +440,15 @@ impl Storage for Postgres {
             .await;
 
         UpsertResult {
-            changed_images,
-            changed_illustrations,
             orphaned_images,
             orphaned_illustrations,
         }
     }
 
-    async fn delete_orphaned_images(&self, ids: &[Uuid]) {
-        log::info!("Deleting {} orphaned images", ids.len());
-
+    async fn delete_orphaned_images(&self, ids: &[Uuid]) -> Vec<Uuid> {
+        let mut deleted = Vec::new();
         for id in ids {
-            if let Err(e) = sqlx::query(
+            match sqlx::query(
                 "DELETE FROM image WHERE id = $1
                  AND NOT EXISTS (SELECT 1 FROM card WHERE image_id = $1)",
             )
@@ -462,16 +456,18 @@ impl Storage for Postgres {
             .execute(&self.pool)
             .await
             {
-                log::warn!("Failed to delete orphaned image {id}: {e}");
+                Ok(result) if result.rows_affected() > 0 => deleted.push(*id),
+                Ok(_) => {}
+                Err(e) => log::warn!("Failed to delete orphaned image {id}: {e}"),
             }
         }
+        deleted
     }
 
-    async fn delete_orphaned_illustrations(&self, ids: &[Uuid]) {
-        log::info!("Deleting {} orphaned illustrations", ids.len());
-
+    async fn delete_orphaned_illustrations(&self, ids: &[Uuid]) -> Vec<Uuid> {
+        let mut deleted = Vec::new();
         for id in ids {
-            if let Err(e) = sqlx::query(
+            match sqlx::query(
                 "DELETE FROM illustration WHERE id = $1
                  AND NOT EXISTS (SELECT 1 FROM card WHERE illustration_id = $1)",
             )
@@ -479,8 +475,11 @@ impl Storage for Postgres {
             .execute(&self.pool)
             .await
             {
-                log::warn!("Failed to delete orphaned illustration {id}: {e}");
+                Ok(result) if result.rows_affected() > 0 => deleted.push(*id),
+                Ok(_) => {}
+                Err(e) => log::warn!("Failed to delete orphaned illustration {id}: {e}"),
             }
         }
+        deleted
     }
 }
