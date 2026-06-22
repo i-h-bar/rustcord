@@ -1,14 +1,14 @@
-name: insert-cards
+name: bulk-sync
 
 on:
   workflow_dispatch:
 
 jobs:
-  insert:
+  bulk-sync:
     runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Trigger card-insert job
-        run: kubectl create job --from=cronjob/card-insert card-insert-manual
+      - name: Trigger bulk-sync job
+        run: kubectl create job --from=cronjob/bulk-sync bulk-sync-manual
