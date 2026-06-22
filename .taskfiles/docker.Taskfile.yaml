@@ -1,12 +1,12 @@
 version: '3'
 
 tasks:
-  build-db: docker build -f packages/db/Dockerfile -t gitfrog/rustcord-db-management .
-  push-db:
+  build-sync: docker build -f packages/sync/Dockerfile -t gitfrog/rustcord-sync .
+  push-sync:
     deps:
-      - build-db
+      - build-sync
     cmds:
-      - docker push gitfrog/rustcord-db-management:latest
+      - docker push gitfrog/rustcord-sync:latest
 
   build-discord-bot: docker build -f packages/bot/Dockerfile -t gitfrog/rustcord .
   push-discord-bot:
