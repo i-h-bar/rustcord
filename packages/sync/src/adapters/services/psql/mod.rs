@@ -7,10 +7,9 @@ use crate::ports::storage::{
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use futures::future::{self, Either};
-use sqlx::{Pool, Row, error::DatabaseError, postgres::PgPoolOptions};
+use futures::future::Either;
+use sqlx::{Pool, error::DatabaseError, postgres::PgPoolOptions};
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::env;
 use uuid::Uuid;
 
@@ -37,19 +36,21 @@ impl Postgres {
         let pool_size = Self::compute_pool_size(&uri).await;
         log::info!("Using Postgres pool size: {pool_size}");
 
-        let pool = PgPoolOptions::new()
-            .max_connections(pool_size as u32)
-            .connect(&uri)
-            .await
-            .expect("Failed Postgres connection");
+        let pool =
+            PgPoolOptions::new()
+                .max_connections(u32::try_from(pool_size).unwrap_or(
+                    u32::try_from(FALLBACK_POOL_SIZE).expect("FALLBACK_POOL_SIZE exceeded"),
+                ))
+                .connect(&uri)
+                .await
+                .expect("Failed Postgres connection");
 
         Self { pool, pool_size }
     }
 
     async fn compute_pool_size(uri: &str) -> usize {
-        let probe = match PgPoolOptions::new().max_connections(1).connect(uri).await {
-            Ok(p) => p,
-            Err(_) => return FALLBACK_POOL_SIZE,
+        let Ok(probe) = PgPoolOptions::new().max_connections(1).connect(uri).await else {
+            return FALLBACK_POOL_SIZE;
         };
 
         let max: String = sqlx::query_scalar("SHOW max_connections")
@@ -67,29 +68,9 @@ impl Postgres {
 
         probe.close().await;
 
-        let pool_size = max
-            .saturating_sub(in_use as usize)
+        max.saturating_sub(usize::try_from(in_use).unwrap_or(FALLBACK_POOL_SIZE))
             .saturating_sub(BOT_RESERVE)
-            .max(1);
-
-        pool_size
-    }
-
-    async fn get_card_ids_for_set(&self, set: &Set) -> HashSet<Uuid> {
-        match sqlx::query("SELECT id FROM card WHERE set_id = $1")
-            .bind(set.id)
-            .fetch_all(&self.pool)
-            .await
-        {
-            Ok(rows) => rows
-                .iter()
-                .filter_map(|r| r.try_get::<Uuid, &str>("id").ok())
-                .collect(),
-            Err(why) => {
-                log::warn!("Failed to fetch card ids for set {}: {why}", set.id);
-                HashSet::new()
-            }
-        }
+            .max(1)
     }
 
     async fn upsert_artist(&self, artist: &Artist) {
@@ -395,14 +376,6 @@ impl Postgres {
 
 #[async_trait]
 impl Storage for Postgres {
-    async fn get_existing_card_ids(&self, sets: Vec<Set>) -> Vec<(Set, HashSet<Uuid>)> {
-        future::join_all(sets.into_iter().map(|set| async {
-            let ids = self.get_card_ids_for_set(&set).await;
-            (set, ids)
-        }))
-        .await
-    }
-
     async fn upsert_cards(&self, cards: &[CardInfo]) -> UpsertResult {
         log::info!("Upserting {} cards", cards.len());
 

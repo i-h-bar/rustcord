@@ -27,3 +27,6 @@ named_lock = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.13.1"
+
+[lints]
+workspace = true

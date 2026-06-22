@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+const MAX_AGE: Duration = Duration::from_hours(168);
 
+#[must_use]
 pub fn find_cached() -> Option<PathBuf> {
     let mut found = None;
 
@@ -10,19 +11,22 @@ pub fn find_cached() -> Option<PathBuf> {
         let path = entry.path();
         let name = path.file_name()?.to_string_lossy().into_owned();
 
-        if !name.starts_with("default-cards-") || !name.ends_with(".json") {
+        if !name.starts_with("default-cards-")
+            || !Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+        {
             continue;
         }
 
-        match std::fs::metadata(&path).and_then(|m| m.modified()) {
-            Ok(modified) => match modified.elapsed() {
+        if let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) {
+            match modified.elapsed() {
                 Ok(age) if age < MAX_AGE => found = Some(path),
                 _ => {
                     log::info!("Deleting stale bulk cache: {name}");
                     std::fs::remove_file(&path).ok();
                 }
-            },
-            Err(_) => continue,
+            }
         }
     }
 

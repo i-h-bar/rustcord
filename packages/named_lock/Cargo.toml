@@ -7,3 +7,6 @@ edition = "2024"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
 async-dropper = { version = "0.3", features = [ "tokio", "simple" ] }
 async-trait = "0.1.89"
+
+[lints]
+workspace = true

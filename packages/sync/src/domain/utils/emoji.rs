@@ -2,16 +2,16 @@ use unicode_normalization::UnicodeNormalization;
 
 #[must_use]
 pub fn normalise_name(name: &str) -> String {
-    let noramlised: String = name
+    let normalised: String = name
         .nfkc()
         .collect::<String>()
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
 
-    if noramlised.len() < 2 {
-        format!("{}_", noramlised)
+    if normalised.len() < 2 {
+        format!("{normalised}_")
     } else {
-        noramlised
+        normalised
     }
 }

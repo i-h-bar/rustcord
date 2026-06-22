@@ -247,16 +247,12 @@ impl CardSource for Scryfall {
         }
     }
 
-    async fn fetch_cards_for_outdated_sets(&self, sets: &[(Set, HashSet<Uuid>)]) -> Vec<CardInfo> {
+    async fn fetch_cards_for_sets(&self, sets: &[Set]) -> Vec<CardInfo> {
         let mut scryfall_cards: Vec<ScryfallCard> = Vec::new();
         log::info!("Fetching {} sets", sets.len());
 
-        'set: for (set, existing_ids) in sets {
-            log::info!(
-                "Fetching cards in {} ({} already stored)",
-                set.name,
-                existing_ids.len()
-            );
+        'set: for set in sets {
+            log::info!("Fetching cards in {}", set.name);
             let mut url = Some(format!(
                 "{}/cards/search?q=e:{}",
                 self.base_url, set.abbreviation

@@ -113,18 +113,14 @@ impl Discord {
         {
             Ok(resp) => resp,
             Err(why) => {
-                log::warn!("Unable to upload emoji {}: {:?}", name, why);
+                log::warn!("Unable to upload emoji {name}: {why}");
                 return;
             }
         };
 
         if !resp.status().is_success() {
             let status_code = resp.status();
-            log::warn!(
-                "None success status code for emoji {}: {}",
-                name,
-                status_code
-            );
+            log::warn!("None success status code for emoji {name}: {status_code}");
             if status_code == reqwest::StatusCode::TOO_MANY_REQUESTS {
                 std::process::exit(1);
             }
