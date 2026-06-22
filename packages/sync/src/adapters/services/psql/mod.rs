@@ -111,8 +111,7 @@ impl Postgres {
         match sqlx::query_as::<_, (Uuid, String)>(
             "INSERT INTO image (id, scryfall_url) VALUES ($1, $2)
              ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url
-             WHERE split_part(image.scryfall_url, '?', 1)
-                IS DISTINCT FROM split_part(EXCLUDED.scryfall_url, '?', 1)
+             WHERE image.scryfall_url IS DISTINCT FROM EXCLUDED.scryfall_url
              RETURNING id, scryfall_url",
         )
         .bind(image.id)
