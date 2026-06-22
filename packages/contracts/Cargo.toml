@@ -8,8 +8,8 @@ uuid = { version = "1.18.0", features = ["v4", "serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
 time = { version = "0.3", features = ["serde"] }
 fuzzy = { workspace = true }
-regex = "1.11.1"
-unicode-normalization = "0.1.24"
+unicode-normalization = "0.1.25"
+regex = "1.12.4"
 
 [lints]
 workspace = true
