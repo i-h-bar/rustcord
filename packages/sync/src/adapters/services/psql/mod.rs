@@ -25,7 +25,8 @@ impl Postgres {
     /// # Panics
     ///
     /// Panics if `POSTGRES_USER`, `POSTGRES_PW`, or `POSTGRES_DB` env vars are not set,
-    /// or if the connection to Postgres cannot be established.
+    /// or if the connection to Postgres cannot be established,
+    /// or if `FALLBACK_POOL_SIZE` exceeds a u32.
     pub async fn create() -> Self {
         let user = env::var("POSTGRES_USER").expect("POSTGRES_USER wasn't in env vars");
         let password = env::var("POSTGRES_PW").expect("POSTGRES_PW wasn't in env vars");
