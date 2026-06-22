@@ -211,11 +211,34 @@ impl CardSource for Scryfall {
         match self.fetch_bulk_cards().await {
             Ok(cards) => {
                 log::info!("Processing {} bulk cards", cards.len());
-                cards
+
+                #[cfg(feature = "local-dev")]
+                let pb = {
+                    let bar = indicatif::ProgressBar::new(cards.len() as u64);
+                    bar.set_style(
+                        indicatif::ProgressStyle::with_template(
+                            "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} processed ({eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("=>-"),
+                    );
+                    bar
+                };
+
+                let result: Vec<CardInfo> = cards
                     .into_iter()
+                    .inspect(|_| {
+                        #[cfg(feature = "local-dev")]
+                        pb.inc(1);
+                    })
                     .filter_map(ScryfallCard::into_storage_records)
                     .flatten()
-                    .collect()
+                    .collect();
+
+                #[cfg(feature = "local-dev")]
+                pb.finish_with_message("done");
+
+                result
             }
             Err(e) => {
                 log::error!("Failed to fetch bulk cards: {e}");

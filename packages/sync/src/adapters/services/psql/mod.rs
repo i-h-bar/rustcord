@@ -107,23 +107,17 @@ impl Postgres {
         }
     }
 
-    async fn upsert_image(&self, image: &Image) -> Option<(Uuid, String)> {
-        match sqlx::query_as::<_, (Uuid, String)>(
+    async fn upsert_image(&self, image: &Image) {
+        if let Err(e) = sqlx::query(
             "INSERT INTO image (id, scryfall_url) VALUES ($1, $2)
-             ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url
-             WHERE image.scryfall_url IS DISTINCT FROM EXCLUDED.scryfall_url
-             RETURNING id, scryfall_url",
+             ON CONFLICT (id) DO UPDATE SET scryfall_url = EXCLUDED.scryfall_url",
         )
         .bind(image.id)
         .bind(&image.scryfall_url)
-        .fetch_optional(&self.pool)
+        .execute(&self.pool)
         .await
         {
-            Ok(row) => row,
-            Err(e) => {
-                log::warn!("Failed to upsert image {}: {}", image.id, e);
-                None
-            }
+            log::warn!("Failed to upsert image {}: {}", image.id, e);
         }
     }
 
@@ -383,12 +377,9 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card_info(
-        &self,
-        info: &CardInfo,
-    ) -> (Option<(Uuid, String)>, Option<Uuid>, Option<Uuid>) {
+    async fn upsert_card_info(&self, info: &CardInfo) -> (Option<Uuid>, Option<Uuid>) {
         self.upsert_artist(&info.artist).await;
-        let changed_image = self.upsert_image(&info.image).await;
+        self.upsert_image(&info.image).await;
         if let Some(ill) = &info.illustration {
             self.upsert_illustration(ill).await;
         }
@@ -398,7 +389,7 @@ impl Postgres {
         let (orphaned_img, orphaned_ill) = self.upsert_card(&info.card).await;
         self.upsert_price(&info.price).await;
 
-        (changed_image, orphaned_img, orphaned_ill)
+        (orphaned_img, orphaned_ill)
     }
 }
 
@@ -428,7 +419,7 @@ impl Storage for Postgres {
             bar
         };
 
-        let mut changed_images: HashMap<Uuid, String> = HashMap::new();
+        let changed_images: HashMap<Uuid, String> = HashMap::new();
         let changed_illustrations: HashMap<Uuid, String> = HashMap::new();
         let mut orphaned_images: Vec<Uuid> = Vec::new();
         let mut orphaned_illustrations: Vec<Uuid> = Vec::new();
@@ -446,10 +437,7 @@ impl Storage for Postgres {
             .collect()
             .await;
 
-        for (changed_img, orphaned_img, orphaned_ill) in results {
-            if let Some((id, url)) = changed_img {
-                changed_images.insert(id, url);
-            }
+        for (orphaned_img, orphaned_ill) in results {
             if let Some(id) = orphaned_img {
                 orphaned_images.push(id);
             }
