@@ -4,11 +4,10 @@
 ![Tests](https://img.shields.io/badge/tests-121%20passing-brightgreen)
 ![Build](https://github.com/i-h-bar/rustcord/workflows/PR%20Checks/badge.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Discord](https://img.shields.io/discord/1375617050793349222?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/m9FjpPRAxt)
 
 A Discord bot for searching Magic: The Gathering cards and playing a card-guessing game. Uses fuzzy matching to handle misspellings and supports searching by name, set, and artist.
 
-**[Invite the bot](https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277025507328&integration_type=0&scope=bot)** · **[Discord server](https://discord.gg/m9FjpPRAxt)** · **[Report an issue](https://github.com/i-h-bar/rustcord/issues)** · **[Privacy Policy](docs/PRIVACY_POLICY.md)** · **[Terms of Service](docs/TERMS_OF_SERVICE.md)**
+**[Invite the bot](https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277025507328&integration_type=0&scope=bot)** · **[Report an issue](https://github.com/i-h-bar/rustcord/issues)** · **[Privacy Policy](docs/PRIVACY_POLICY.md)** · **[Terms of Service](docs/TERMS_OF_SERVICE.md)**
 
 ---
 
