@@ -43,6 +43,8 @@ enum ScryfallError {
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 type ScryfallResult<T> = Result<T, ScryfallError>;
 
+const DEFAULT_SET_ICON_URL: &str = "https://svgs.scryfall.io/sets/default.svg";
+
 #[derive(serde::Deserialize)]
 struct BulkDataEntry {
     #[serde(rename = "type")]
@@ -273,17 +275,14 @@ impl CardSource for Scryfall {
     }
 
     async fn fetch_missing_set_symbols(&self, current: &[EmojiMetaData]) -> Vec<SetEmoji> {
-        if current.len() >= self.sets.read().await.len() {
-            return vec![];
-        }
-
         let current_sets: HashSet<&str> = current.iter().map(|e| e.name.as_str()).collect();
 
-        future::join_all(
+        let mut emojis: Vec<SetEmoji> = future::join_all(
             self.sets
                 .read()
                 .await
                 .values()
+                .filter(|s| !s.icon_svg_uri.split('?').next().unwrap_or_default().ends_with("default.svg"))
                 .filter(|s| !current_sets.contains(normalise_name(&s.abbreviation).as_str()))
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()
@@ -302,7 +301,21 @@ impl CardSource for Scryfall {
         .await
         .into_iter()
         .flatten()
-        .collect()
+        .collect();
+
+        if !current_sets.contains("default") {
+            if let Ok(data) = self
+                .get_text(DEFAULT_SET_ICON_URL, &self.high_limiter)
+                .await
+            {
+                emojis.push(SetEmoji {
+                    name: "default".to_string(),
+                    image: EmojiImage(data),
+                });
+            }
+        }
+
+        emojis
     }
 
     async fn download_image(&self, url: &str) -> Option<Vec<u8>> {

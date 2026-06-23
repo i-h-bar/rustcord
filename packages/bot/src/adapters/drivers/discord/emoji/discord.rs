@@ -1,12 +1,16 @@
 use serenity::all::{Emoji, Http};
 use std::collections::HashMap;
 use std::env;
+use std::time::{Duration, Instant};
 use tokio::sync::{OnceCell, RwLock};
+
+const SYNC_COOLDOWN: Duration = Duration::from_hours(4);
 
 static EMOJI_CACHE: OnceCell<DiscordEmojiCache> = OnceCell::const_new();
 
 struct DiscordEmojiCache {
     cache: RwLock<HashMap<String, Emoji>>,
+    last_sync: RwLock<Instant>,
     http: Http,
 }
 
@@ -21,12 +25,21 @@ impl DiscordEmojiCache {
         }
 
         let cache = RwLock::new(HashMap::with_capacity(2000));
-        let obj = Self { cache, http };
+        let last_sync = RwLock::new(Instant::now() - SYNC_COOLDOWN - Duration::from_secs(60));
+        let obj = Self {
+            cache,
+            last_sync,
+            http,
+        };
         obj.sync().await;
         obj
     }
 
     async fn sync(&self) {
+        if self.last_sync.read().await.elapsed() < SYNC_COOLDOWN {
+            return;
+        }
+
         let emojis = match self.http.get_application_emojis().await {
             Ok(emoji) => emoji,
             Err(why) => {
@@ -44,6 +57,7 @@ impl DiscordEmojiCache {
         };
 
         if new_emojis.is_empty() {
+            *self.last_sync.write().await = Instant::now();
             return;
         }
 
@@ -51,6 +65,8 @@ impl DiscordEmojiCache {
         for emoji in new_emojis {
             cache.insert(emoji.name.clone(), emoji);
         }
+
+        *self.last_sync.write().await = Instant::now();
     }
 
     async fn get(&self, name: &str) -> Option<Emoji> {
@@ -60,7 +76,10 @@ impl DiscordEmojiCache {
 
         self.sync().await;
 
-        self.cache.read().await.get(name).cloned()
+        let cache = self.cache.read().await;
+        Some(cache
+            .get(name)
+            .unwrap_or(cache.get("default")?).clone())
     }
 }
 
