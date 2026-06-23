@@ -54,6 +54,11 @@ spec:
                   key: REDIS_URL
             - name: IMAGES_DIR
               value: /var/mtg_cards
+            - name: DISCORD_SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DISCORD_SERVER_URL
             - name: RUST_LOG
               value: warn,rustcord=info
           volumeMounts:

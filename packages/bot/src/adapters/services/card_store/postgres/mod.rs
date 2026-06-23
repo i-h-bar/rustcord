@@ -8,7 +8,7 @@ use crate::adapters::services::card_store::postgres::queries::{
 use crate::ports::services::card_store::CardStore;
 use async_trait::async_trait;
 use contracts::card::Card;
-use contracts::set::Set;
+use contracts::card_set::CardSet;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::types::time::Date;
 use sqlx::{Pool, Row};
@@ -133,7 +133,7 @@ impl CardStore for Postgres {
         }
     }
 
-    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<Set>> {
+    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<CardSet>> {
         match sqlx::query(ALL_PRINTS)
             .bind(oracle_id)
             .fetch_all(&self.pool)
@@ -177,8 +177,8 @@ impl CardStore for Postgres {
     }
 }
 
-fn set_from(row: &PgRow) -> Set {
-    Set::new(
+fn set_from(row: &PgRow) -> CardSet {
+    CardSet::new(
         row.get::<Uuid, &str>("card_id"),
         row.get::<String, &str>("set_name"),
         row.get::<&str, &str>("set_abbreviation"),

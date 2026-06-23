@@ -4,3 +4,7 @@
 .env
 todo.txt
 *.env
+
+# Bulk data
+default-cards*.json
+docs/superpowers/*

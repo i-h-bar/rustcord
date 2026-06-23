@@ -5,14 +5,14 @@ use crate::adapters::drivers::discord::utils::description::{
 };
 use crate::adapters::drivers::discord::utils::emoji::colour_id_emoji;
 use contracts::card::Card;
-use contracts::set::Set;
+use contracts::card_set::CardSet;
 use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,
 };
 use std::cmp::max;
 
-pub async fn build_set_dropdown(sets: Option<&Vec<Set>>) -> Option<CreateActionRow> {
+pub async fn build_set_dropdown(sets: Option<&Vec<CardSet>>) -> Option<CreateActionRow> {
     if let Some(sets) = sets {
         if sets.is_empty() {
             return None;

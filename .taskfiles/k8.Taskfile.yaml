@@ -2,12 +2,20 @@ version: '3'
 
 tasks:
   update-secrets: kubectl create secret generic app-secrets --from-env-file=.kube.env --dry-run=client -o yaml | kubectl apply -f -
-  insert-cards:
+
+  bulk-sync:
     cmds:
-      - kubectl delete job card-insert-manual --ignore-not-found
-      - kubectl create job card-insert-manual --from=cronjob/card-insert
-      - kubectl wait pod -l job-name=card-insert-manual --for=condition=Ready --timeout=60s
-      - kubectl logs -l job-name=card-insert-manual -f
+      - kubectl delete job bulk-sync-manual --ignore-not-found
+      - kubectl create job bulk-sync-manual --from=cronjob/bulk-sync
+      - kubectl wait pod -l job-name=bulk-sync-manual --for=condition=Ready --timeout=60s
+      - kubectl logs -l job-name=bulk-sync-manual -f
+
+  spoiler-sync:
+    cmds:
+      - kubectl delete job spoiler-sync-manual --ignore-not-found
+      - kubectl create job spoiler-sync-manual --from=cronjob/spoiler-sync
+      - kubectl wait pod -l job-name=spoiler-sync-manual --for=condition=Ready --timeout=60s
+      - kubectl logs -l job-name=spoiler-sync-manual -f
 
   migrate:
     cmds:

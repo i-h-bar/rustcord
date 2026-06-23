@@ -1,11 +1,11 @@
 use crate::card::Card;
+use crate::card_set::CardSet;
 use crate::image::Image;
-use crate::set::Set;
 
 pub struct SearchResultDto {
     card: Card,
     image: Image,
-    printings: Option<Vec<Set>>,
+    printings: Option<Vec<CardSet>>,
     similar_cards: Option<Vec<Card>>,
 }
 
@@ -21,7 +21,7 @@ impl SearchResultDto {
     }
 
     #[must_use]
-    pub fn add_printings(mut self, set: Option<Vec<Set>>) -> Self {
+    pub fn add_printings(mut self, set: Option<Vec<CardSet>>) -> Self {
         self.printings = set;
 
         self
@@ -44,7 +44,7 @@ impl SearchResultDto {
     }
 
     #[must_use]
-    pub fn printings(&self) -> Option<&Vec<Set>> {
+    pub fn printings(&self) -> Option<&Vec<CardSet>> {
         self.printings.as_ref()
     }
 
@@ -89,7 +89,7 @@ mod tests {
         let image = Image::new(vec![]);
         let card = create_test_card();
         let similar_cards = vec![create_test_card()];
-        let printings = vec![Set::new(
+        let printings = vec![CardSet::new(
             Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             String::from("Alpha"),
             &String::from("ALP"),

@@ -40,7 +40,7 @@ where
             return;
         } else if msg.content == "!help" {
             let interaction = DiscordMessageInteration::new(ctx, msg);
-            functions::help::run(&interaction, HELP).await;
+            functions::help::run(&interaction, &HELP).await;
         } else {
             let interaction = DiscordMessageInteration::new(ctx, msg);
             for result in self.parse_message(interaction.content()).await {
@@ -102,7 +102,7 @@ where
                 match command.data.name.as_str() {
                     "help" => {
                         let interaction = DiscordCommand::new(ctx, command);
-                        functions::help::run(&interaction, HELP).await;
+                        functions::help::run(&interaction, &HELP).await;
                     }
                     "search" => {
                         let query_params =

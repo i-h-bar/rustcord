@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use contracts::card::Card;
-use contracts::set::Set;
+use contracts::card_set::CardSet;
 use uuid::Uuid;
 
 #[cfg(test)]
@@ -17,7 +17,7 @@ pub trait CardStore {
     async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String>;
     async fn random_card(&self) -> Option<Card>;
     async fn random_card_from_set(&self, set_name: &str) -> Option<Card>;
-    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<Set>>;
+    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<CardSet>>;
     async fn fetch_card_by_id(&self, id: &Uuid) -> Option<Card>;
     async fn similar_cards(&self, card: &Card) -> Option<Vec<Card>>;
 }

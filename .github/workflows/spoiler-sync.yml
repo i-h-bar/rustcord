@@ -1,0 +1,14 @@
+name: spoiler-sync
+
+on:
+  workflow_dispatch:
+
+jobs:
+  spoiler-sync:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Trigger spoiler-sync job
+        run: kubectl create job --from=cronjob/spoiler-sync spoiler-sync-manual

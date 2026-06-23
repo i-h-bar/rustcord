@@ -1,0 +1,35 @@
+[package]
+name = "sync"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[features]
+local-dev = ["dotenv", "indicatif"]
+
+[dependencies]
+dotenv = { version = "0.15.0", optional = true }
+indicatif = { version = "0.18.4", optional = true }
+contracts = { workspace = true }
+async-trait = "0.1.89"
+reqwest = { version = "0.13.4", features = ["json", "query"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
+time = { version = "0.3", features = ["serde", "macros", "formatting", "parsing"] }
+uuid = { version = "1.18.0", features = ["v4"] }
+sqlx = { version = "0.8.6", features = [ "runtime-tokio", "postgres", "uuid", "time" ] }
+log = "0.4.27"
+regex = "1.12.2"
+futures = "0.3.32"
+env_logger = "0.11.10"
+governor = "0.10.4"
+usvg = "0.47.0"
+tiny-skia = "0.12.0"
+resvg = "0.47.0"
+base64 = "0.22.1"
+thiserror = "2.0.16"
+clap = { version = "4.6.1", features = ["derive"] }
+unicode-normalization = "0.1.24"

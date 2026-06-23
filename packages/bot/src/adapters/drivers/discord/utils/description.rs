@@ -1,5 +1,5 @@
 use contracts::card::Card;
-use contracts::set::Set;
+use contracts::card_set::CardSet;
 
 const LAND_TYPE_MAP: [(&str, &str); 5] = [
     ("Mountain", "⛰️"),
@@ -53,6 +53,6 @@ pub fn create_card_description(card: &Card) -> String {
     format!("{}{}{}", card.type_line(), cost, stat)
 }
 
-pub fn create_set_description(set: &Set) -> String {
+pub fn create_set_description(set: &CardSet) -> String {
     format!("{} • {}", set.abbreviation(), set.release_date())
 }
