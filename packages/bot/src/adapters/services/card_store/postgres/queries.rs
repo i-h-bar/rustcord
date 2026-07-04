@@ -53,7 +53,7 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
                                      artist.name               as artist,
                                      set.name                  as set_name,
                                      set.abbreviation          as set_abbreviation,
-                                     card.release_date         as release_date
+                                     card.release_date         as release_date,
 
                                      similarity(set.normalised_name, $2) as set_sml
 from card
@@ -88,7 +88,7 @@ select distinct on (card.oracle_id)  card.id                   as front_id,
                                      artist.name               as artist,
                                      set.name                  as set_name,
                                      set.abbreviation          as set_abbreviation,
-                                     card.release_date         as release_date
+                                     card.release_date         as release_date,
 
                                      similarity(artist.normalised_name, $2) as artist_sml
 from card

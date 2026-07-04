@@ -48,21 +48,9 @@ impl DiscordEmojiCache {
             }
         };
 
-        let new_emojis: Vec<Emoji> = {
-            let cache = self.cache.read().await;
-            emojis
-                .into_iter()
-                .filter(|e| !cache.contains_key(&e.name))
-                .collect()
-        };
-
-        if new_emojis.is_empty() {
-            *self.last_sync.write().await = Instant::now();
-            return;
-        }
-
+        // Replace all entries so stale IDs (from deleted/re-uploaded emojis) are corrected.
         let mut cache = self.cache.write().await;
-        for emoji in new_emojis {
+        for emoji in emojis {
             cache.insert(emoji.name.clone(), emoji);
         }
 
@@ -76,10 +64,7 @@ impl DiscordEmojiCache {
 
         self.sync().await;
 
-        let cache = self.cache.read().await;
-        Some(cache
-            .get(name)
-            .unwrap_or(cache.get("default")?).clone())
+        self.cache.read().await.get(name).cloned()
     }
 }
 
