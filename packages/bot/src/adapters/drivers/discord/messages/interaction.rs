@@ -8,6 +8,9 @@ use contracts::search_result::SearchResultDto;
 use serenity::all::{Context, CreateActionRow, CreateAttachment, CreateMessage, Message};
 use tokio::time::Instant;
 
+
+const BOT_NOT_MENTIONED: &str = "You didn't @mention me, which for now still works — but Discord is revoking our message content privilege on 31st July 2026, because apparently letting a card bot read card names is a security risk. From then on, inline queries without a mention will get you nothing but silence. Get ahead of it: @Card Bot me now.";
+
 pub struct DiscordMessageInteration {
     ctx: Context,
     msg: Message,
@@ -24,6 +27,12 @@ impl DiscordMessageInteration {
 
     async fn send_message(&self, message: CreateMessage) -> Result<(), MessageInteractionError> {
         let start = Instant::now();
+        let message = if !self.msg.mentions_me(&self.ctx.http).await.unwrap_or(false) {
+            message.content(BOT_NOT_MENTIONED)
+        } else {
+            message
+        };
+
         match self
             .msg
             .channel_id
