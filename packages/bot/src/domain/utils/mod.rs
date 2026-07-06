@@ -3,7 +3,7 @@ pub mod card_picking;
 use regex::Regex;
 use std::sync::LazyLock;
 
-pub use contracts::normalise::normalise;
+pub use normalise::normalise_card_name;
 
 const CARD_QUERY_RE: &str = r"(?i)\[\[(.*?)(:?(?:\s)*\|(?:\s)*(:?set(?:\s)*=(?:\s)*(.*?)?)?)?(:?(?:\s)*\|(?:\s)*(:?artist(?:\s)*=(?:\s)*(.*?)?)?)?]]";
 const SYMBOL_RE: &str = r"(\{T}|\{Q}|\{E}|\{P}|\{PW}|\{CHAOS}|\{A}|\{TK}|\{X}|\{Y}|\{Z}|\{0}|\{Â½}|\{1}|\{2}|\{3}|\{4}|\{5}|\{6}|\{7}|\{8}|\{9}|\{10}|\{11}|\{12}|\{13}|\{14}|\{15}|\{16}|\{17}|\{18}|\{19}|\{20}|\{100}|\{1000000}|\{âˆž}|\{W/U}|\{W/B}|\{B/R}|\{B/G}|\{U/B}|\{U/R}|\{R/G}|\{R/W}|\{G/W}|\{G/U}|\{B/G/P}|\{B/R/P}|\{G/U/P}|\{G/W/P}|\{R/G/P}|\{R/W/P}|\{U/B/P}|\{U/R/P}|\{W/B/P}|\{W/U/P}|\{C/W}|\{C/U}|\{C/B}|\{C/R}|\{C/G}|\{2/W}|\{2/U}|\{2/B}|\{2/R}|\{2/G}|\{H}|\{W/P}|\{U/P}|\{B/P}|\{R/P}|\{G/P}|\{C/P}|\{HW}|\{HR}|\{W}|\{U}|\{B}|\{R}|\{G}|\{C}|\{S}|\{L}|\{D})";
@@ -32,114 +32,114 @@ mod tests {
 
     #[test]
     fn test_normalise_simple_string() {
-        assert_eq!(normalise("Lightning Bolt"), "lightning bolt");
+        assert_eq!(normalise_card_name("Lightning Bolt"), "lightning bolt");
     }
 
     #[test]
     fn test_normalise_with_punctuation() {
         assert_eq!(
-            normalise("Jace, the Mind Sculptor"),
+            normalise_card_name("Jace, the Mind Sculptor"),
             "jace the mind sculptor"
         );
     }
 
     #[test]
     fn test_normalise_with_apostrophe() {
-        assert_eq!(normalise("Ajani's Pridemate"), "ajanis pridemate");
+        assert_eq!(normalise_card_name("Ajani's Pridemate"), "ajanis pridemate");
     }
 
     #[test]
     fn test_normalise_with_hyphen() {
         // Hyphens are replaced with spaces
-        assert_eq!(normalise("X-Men"), "x men");
+        assert_eq!(normalise_card_name("X-Men"), "x men");
     }
 
     #[test]
     fn test_normalise_with_multiple_hyphens() {
-        assert_eq!(normalise("Alpha-Beta-Gamma"), "alpha beta gamma");
+        assert_eq!(normalise_card_name("Alpha-Beta-Gamma"), "alpha beta gamma");
     }
 
     #[test]
     fn test_normalise_unicode_characters() {
         // NFKC normalization handles some but not all Unicode
         // Æ remains as æ (lowercase)
-        assert_eq!(normalise("Ætherling"), "ætherling");
+        assert_eq!(normalise_card_name("Ætherling"), "ætherling");
     }
 
     #[test]
     fn test_normalise_already_normalized() {
-        assert_eq!(normalise("already normalized"), "already normalized");
+        assert_eq!(normalise_card_name("already normalized"), "already normalized");
     }
 
     #[test]
     fn test_normalise_empty_string() {
-        assert_eq!(normalise(""), "");
+        assert_eq!(normalise_card_name(""), "");
     }
 
     #[test]
     fn test_normalise_only_punctuation() {
         // ! is not matched by \w so it remains
-        assert_eq!(normalise("!!!"), "");
+        assert_eq!(normalise_card_name("!!!"), "");
     }
 
     #[test]
     fn test_normalise_mixed_case() {
-        assert_eq!(normalise("ThE GiTrOg MoNsTeR"), "the gitrog monster");
+        assert_eq!(normalise_card_name("ThE GiTrOg MoNsTeR"), "the gitrog monster");
     }
 
     #[test]
     fn test_normalise_numbers() {
-        assert_eq!(normalise("Time Walk 123"), "time walk 123");
+        assert_eq!(normalise_card_name("Time Walk 123"), "time walk 123");
     }
 
     #[test]
     fn test_normalise_special_characters() {
         // ™ is removed but becomes two chars when converted
-        assert_eq!(normalise("Urza's Saga™"), "urzas sagatm");
+        assert_eq!(normalise_card_name("Urza's Saga™"), "urzas sagatm");
     }
 
     #[test]
     fn test_normalise_multiple_spaces() {
         // Multiple spaces should be preserved (not collapsed)
-        assert_eq!(normalise("Multiple  Spaces"), "multiple  spaces");
+        assert_eq!(normalise_card_name("Multiple  Spaces"), "multiple  spaces");
     }
 
     #[test]
     fn test_normalise_leading_trailing_spaces() {
-        assert_eq!(normalise("  Padded  "), "  padded  ");
+        assert_eq!(normalise_card_name("  Padded  "), "  padded  ");
     }
 
     #[test]
     fn test_normalise_parentheses() {
-        assert_eq!(normalise("Card (Name)"), "card name");
+        assert_eq!(normalise_card_name("Card (Name)"), "card name");
     }
 
     #[test]
     fn test_normalise_brackets() {
-        assert_eq!(normalise("[Card] Name"), "card name");
+        assert_eq!(normalise_card_name("[Card] Name"), "card name");
     }
 
     #[test]
     fn test_normalise_slashes() {
-        assert_eq!(normalise("Life/Death"), "lifedeath");
+        assert_eq!(normalise_card_name("Life/Death"), "lifedeath");
     }
 
     #[test]
     fn test_normalise_underscores() {
-        assert_eq!(normalise("Card_Name"), "card_name");
+        assert_eq!(normalise_card_name("Card_Name"), "card_name");
     }
 
     #[test]
     fn test_normalise_dots() {
-        assert_eq!(normalise("Dr. Doom"), "dr doom");
+        assert_eq!(normalise_card_name("Dr. Doom"), "dr doom");
     }
 
     #[test]
     fn test_normalise_real_card_names() {
-        assert_eq!(normalise("Dack Fayden"), "dack fayden");
-        assert_eq!(normalise("Jace, Vryn's Prodigy"), "jace vryns prodigy");
+        assert_eq!(normalise_card_name("Dack Fayden"), "dack fayden");
+        assert_eq!(normalise_card_name("Jace, Vryn's Prodigy"), "jace vryns prodigy");
         assert_eq!(
-            normalise("Emrakul, the Aeons Torn"),
+            normalise_card_name("Emrakul, the Aeons Torn"),
             "emrakul the aeons torn"
         );
     }
@@ -147,27 +147,27 @@ mod tests {
     #[test]
     fn test_normalise_japanese_characters() {
         // Should handle Unicode normalization
-        let result = normalise("カード");
+        let result = normalise_card_name("カード");
         assert!(result.chars().all(|c| !c.is_ascii_punctuation()));
     }
 
     #[test]
     fn test_normalise_accented_characters() {
         // NFKC doesn't decompose all accents
-        assert_eq!(normalise("Café"), "café");
-        assert_eq!(normalise("Señor"), "señor");
+        assert_eq!(normalise_card_name("Café"), "café");
+        assert_eq!(normalise_card_name("Señor"), "señor");
     }
 
     #[test]
     fn test_normalise_ampersand() {
-        assert_eq!(normalise("Rock & Roll"), "rock  roll");
+        assert_eq!(normalise_card_name("Rock & Roll"), "rock  roll");
     }
 
     #[test]
     fn test_normalise_idempotent() {
         let input = "Jace, the Mind Sculptor";
-        let first = normalise(input);
-        let second = normalise(&first);
+        let first = normalise_card_name(input);
+        let second = normalise_card_name(&first);
         assert_eq!(first, second);
     }
 }

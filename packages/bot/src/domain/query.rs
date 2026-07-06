@@ -28,14 +28,14 @@ impl QueryParams {
     #[must_use]
     pub fn from(capture: &Captures<'_>) -> Option<Self> {
         let raw_name = capture.get(1)?.as_str().trim();
-        let name = utils::normalise(raw_name);
+        let name = utils::normalise_card_name(raw_name);
         let (set_code, set_name) = match capture.get(4) {
             Some(set) => {
                 let set = set.as_str().trim();
                 if set.chars().count() < 5 {
-                    (Some(utils::normalise(set)), None)
+                    (Some(utils::normalise_card_name(set)), None)
                 } else {
-                    (None, Some(utils::normalise(set)))
+                    (None, Some(utils::normalise_card_name(set)))
                 }
             }
             None => (None, None),
@@ -43,7 +43,7 @@ impl QueryParams {
 
         let artist = capture
             .get(7)
-            .map(|artist| utils::normalise(artist.as_str().trim()));
+            .map(|artist| utils::normalise_card_name(artist.as_str().trim()));
 
         Some(Self {
             artist,

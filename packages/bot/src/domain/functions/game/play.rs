@@ -21,7 +21,7 @@ where
             let matched_set = if set_name.chars().count() < SET_ABBR_CHAR_LIMIT {
                 self.set_from_abbreviation(&set_name).await
             } else {
-                self.fuzzy_match_set_name(&utils::normalise(&set_name))
+                self.fuzzy_match_set_name(&utils::normalise_card_name(&set_name))
                     .await
             };
 

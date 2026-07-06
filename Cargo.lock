@@ -510,10 +510,8 @@ name = "contracts"
 version = "0.1.0"
 dependencies = [
  "fuzzy",
- "regex",
  "serde",
  "time",
- "unicode-normalization",
  "uuid",
 ]
 
@@ -1999,6 +1997,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38bf9645c8b145698bb0b18a4637dcacbc421ea49bef2317e4fd8065a387cf21"
 
 [[package]]
+name = "normalise"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2765,6 +2771,7 @@ dependencies = [
  "lru",
  "mockall",
  "named_lock",
+ "normalise",
  "redis",
  "regex",
  "ron",
@@ -3586,6 +3593,7 @@ dependencies = [
  "governor",
  "indicatif",
  "log",
+ "normalise",
  "regex",
  "reqwest 0.13.4",
  "resvg",

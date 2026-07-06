@@ -20,7 +20,7 @@ pub struct ScryfallSet {
 
 impl From<ScryfallSet> for Set {
     fn from(val: ScryfallSet) -> Self {
-        let normalised_name = contracts::normalise::normalise(&val.name);
+        let normalised_name = normalise::normalise_card_name(&val.name);
 
         Set {
             id: val.id,
@@ -33,7 +33,7 @@ impl From<ScryfallSet> for Set {
 
 impl From<&ScryfallSet> for Set {
     fn from(val: &ScryfallSet) -> Self {
-        let normalised_name = contracts::normalise::normalise(&val.name);
+        let normalised_name = normalise::normalise_card_name(&val.name);
 
         Set {
             id: val.id,

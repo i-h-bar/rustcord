@@ -4,11 +4,11 @@ use crate::ports::emoji::{
 };
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
-use contracts::emoji::normalise_name;
 use futures::future;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
+use normalise::normalise_emoji_name;
 use reqwest::Client;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ impl EmojiUpload {
 
 impl From<SetEmoji> for EmojiUpload {
     fn from(emoji: SetEmoji) -> Self {
-        let name = normalise_name(&emoji.name);
+        let name = normalise_emoji_name(&emoji.name);
 
         EmojiUpload::new(name, &emoji.image.0)
     }
@@ -46,7 +46,7 @@ impl From<SetEmoji> for EmojiUpload {
 
 impl From<SymbolEmoji> for EmojiUpload {
     fn from(emoji: SymbolEmoji) -> Self {
-        let name = normalise_name(&emoji.name);
+        let name = normalise_emoji_name(&emoji.name);
 
         EmojiUpload::new(name, &emoji.image.0)
     }

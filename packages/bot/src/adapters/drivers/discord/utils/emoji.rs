@@ -1,8 +1,8 @@
 use crate::adapters::drivers::discord::emoji::discord::get_emoji;
 use crate::domain::utils::REGEX_COLLECTION;
 use contracts::card::Card;
-use contracts::emoji::normalise_name;
 use lru::LruCache;
+use normalise::normalise_emoji_name;
 use serenity::all::ReactionType;
 use std::num::NonZeroUsize;
 use std::sync::{LazyLock, Mutex};
@@ -16,7 +16,7 @@ fn cached_normalise_name(symbol: &str) -> String {
         return name.clone();
     }
 
-    let name = normalise_name(symbol);
+    let name = normalise_emoji_name(symbol);
     cache.put(symbol.to_string(), name.clone());
     name
 }

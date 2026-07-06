@@ -4,6 +4,7 @@ members = [
     "packages/contracts",
     "packages/fuzzy",
     "packages/named_lock",
+    "packages/normalise",
     "packages/sync",
 ]
 resolver = "2"
@@ -17,3 +18,4 @@ implicit_hasher = "allow"
 contracts = { path = "packages/contracts" }
 fuzzy = { path = "packages/fuzzy" }
 named_lock = { path = "packages/named_lock" }
+normalise = { path = "packages/normalise" }
