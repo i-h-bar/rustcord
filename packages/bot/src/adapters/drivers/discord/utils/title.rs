@@ -1,12 +1,8 @@
 use crate::adapters::drivers::discord::utils::emoji::add_emoji;
-use crate::domain::utils::REGEX_COLLECTION;
 use contracts::card::Card;
-use regex::Captures;
 
-pub fn create_title(card: &Card) -> String {
-    let mana_cost = REGEX_COLLECTION
-        .symbols
-        .replace_all(card.mana_cost(), |cap: &Captures| add_emoji(cap));
+pub async fn create_title(card: &Card) -> String {
+    let mana_cost = add_emoji(card.mana_cost()).await;
 
     format!("{}        {}", card.name(), mana_cost)
 }

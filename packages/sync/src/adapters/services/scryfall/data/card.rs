@@ -211,7 +211,7 @@ impl ScryfallCard {
         Set {
             id: self.set_id,
             name: self.set_name.clone(),
-            normalised_name: contracts::normalise::normalise(&self.set_name),
+            normalised_name: normalise::normalise_card_name(&self.set_name),
             abbreviation: self.set_abbreviation.clone(),
         }
     }
@@ -258,8 +258,8 @@ impl ScryfallCard {
             .as_ref()
             .and_then(|ids| ids.first().copied())
             .unwrap_or(ANONYMOUS_ARTIST_ID);
-        let artist_normalised = contracts::normalise::normalise(&artist_name);
-        let card_normalised = contracts::normalise::normalise(&self.name);
+        let artist_normalised = normalise::normalise_card_name(&artist_name);
+        let card_normalised = normalise::normalise_card_name(&self.name);
 
         let image = Image {
             id: image_id,
@@ -365,14 +365,14 @@ impl ScryfallCard {
                 .and_then(|ids| ids.first().copied())
                 .unwrap_or(ANONYMOUS_ARTIST_ID),
             name: artist_name.to_string(),
-            normalised_name: contracts::normalise::normalise(artist_name),
+            normalised_name: normalise::normalise_card_name(artist_name),
         };
 
         let card_model = Card {
             id: card_id,
             oracle_id,
             name: face.name.clone(),
-            normalised_name: contracts::normalise::normalise(&face.name),
+            normalised_name: normalise::normalise_card_name(&face.name),
             scryfall_url: card.scryfall_uri.clone(),
             flavour_text: face.flavor_text,
             release_date: card.released_at,

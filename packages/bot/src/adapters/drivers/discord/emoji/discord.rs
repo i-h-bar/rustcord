@@ -25,7 +25,13 @@ impl DiscordEmojiCache {
         }
 
         let cache = RwLock::new(HashMap::with_capacity(2000));
-        let last_sync = RwLock::new(Instant::now() - SYNC_COOLDOWN - Duration::from_secs(60));
+        let last_sync = RwLock::new(
+            Instant::now()
+                .checked_sub(SYNC_COOLDOWN)
+                .unwrap_or(Instant::now())
+                .checked_sub(Duration::from_mins(1))
+                .unwrap_or(Instant::now()),
+        );
         let obj = Self {
             cache,
             last_sync,

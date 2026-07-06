@@ -510,10 +510,8 @@ name = "contracts"
 version = "0.1.0"
 dependencies = [
  "fuzzy",
- "regex",
  "serde",
  "time",
- "unicode-normalization",
  "uuid",
 ]
 
@@ -1273,6 +1271,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash 0.2.0",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1854,6 +1863,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
 
 [[package]]
+name = "lru"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a860605968fce16869fd239cf4237a82f3ac470723415db603b0e8b6c8d4fb9"
+dependencies = [
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1977,6 +1995,14 @@ name = "nonzero_ext"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38bf9645c8b145698bb0b18a4637dcacbc421ea49bef2317e4fd8065a387cf21"
+
+[[package]]
+name = "normalise"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "unicode-normalization",
+]
 
 [[package]]
 name = "num-bigint"
@@ -2742,8 +2768,10 @@ dependencies = [
  "env_logger",
  "fuzzy",
  "log",
+ "lru",
  "mockall",
  "named_lock",
+ "normalise",
  "redis",
  "regex",
  "ron",
@@ -3565,6 +3593,7 @@ dependencies = [
  "governor",
  "indicatif",
  "log",
+ "normalise",
  "regex",
  "reqwest 0.13.4",
  "resvg",
@@ -3575,7 +3604,6 @@ dependencies = [
  "time",
  "tiny-skia",
  "tokio",
- "unicode-normalization",
  "usvg",
  "uuid",
 ]

@@ -39,7 +39,7 @@ impl MessageInteraction for DiscordComponentInteraction {
             components.push(component);
         }
 
-        if let Some(component) = build_similar_dropdown(result.similar_cards()) {
+        if let Some(component) = build_similar_dropdown(result.similar_cards()).await {
             components.push(component);
         }
 

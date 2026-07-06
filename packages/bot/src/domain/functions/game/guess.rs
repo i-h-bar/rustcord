@@ -1,6 +1,6 @@
 use crate::domain::app::App;
 use crate::domain::functions::game::state;
-use crate::domain::utils::normalise;
+use crate::domain::utils::normalise_card_name;
 use crate::ports::drivers::client::GameInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
@@ -36,7 +36,7 @@ where
         game_state.add_guess();
 
         if fuzzy::jaro_winkler_ascii_bitmask(
-            &normalise(&guess),
+            &normalise_card_name(&guess),
             &game_state.card().normalised_name(),
         ) > 0.75
         {

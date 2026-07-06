@@ -6,7 +6,6 @@ use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::adapters::services::scryfall::data::symbols::ScryfallSymbol;
 #[cfg(feature = "local-dev")]
 use crate::domain::utils::bulk_cache;
-use crate::domain::utils::emoji::normalise_name;
 use crate::ports::emoji::{EmojiImage, EmojiMetaData, SetEmoji, SymbolEmoji};
 use crate::ports::source::CardSource;
 use crate::ports::storage::{CardInfo, Set};
@@ -16,6 +15,7 @@ use futures::future;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::{Quota, RateLimiter};
+use normalise::normalise_emoji_name;
 use reqwest::{Client, Response};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -282,8 +282,14 @@ impl CardSource for Scryfall {
                 .read()
                 .await
                 .values()
-                .filter(|s| !s.icon_svg_uri.split('?').next().unwrap_or_default().ends_with("default.svg"))
-                .filter(|s| !current_sets.contains(normalise_name(&s.abbreviation).as_str()))
+                .filter(|s| {
+                    !s.icon_svg_uri
+                        .split('?')
+                        .next()
+                        .unwrap_or_default()
+                        .ends_with("default.svg")
+                })
+                .filter(|s| !current_sets.contains(normalise_emoji_name(&s.abbreviation).as_str()))
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()
                 .map(|s| async {
@@ -303,16 +309,15 @@ impl CardSource for Scryfall {
         .flatten()
         .collect();
 
-        if !current_sets.contains("default") {
-            if let Ok(data) = self
+        if !current_sets.contains("default")
+            && let Ok(data) = self
                 .get_text(DEFAULT_SET_ICON_URL, &self.high_limiter)
                 .await
-            {
-                emojis.push(SetEmoji {
-                    name: "default".to_string(),
-                    image: EmojiImage(data),
-                });
-            }
+        {
+            emojis.push(SetEmoji {
+                name: "default".to_string(),
+                image: EmojiImage(data),
+            });
         }
 
         emojis
@@ -343,7 +348,7 @@ impl CardSource for Scryfall {
             response
                 .data
                 .into_iter()
-                .filter(|s| !current_symbols.contains(normalise_name(&s.symbol).as_str()))
+                .filter(|s| !current_symbols.contains(normalise_emoji_name(&s.symbol).as_str()))
                 .collect::<Vec<ScryfallSymbol>>()
                 .iter()
                 .map(|s| async {

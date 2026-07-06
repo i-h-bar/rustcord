@@ -1,5 +1,5 @@
-use crate::domain::utils::emoji::normalise_name;
 use async_trait::async_trait;
+use normalise::normalise_emoji_name;
 use serde::{Deserialize, Serialize};
 
 pub struct EmojiImage(pub String);
@@ -24,7 +24,7 @@ impl SymbolEmoji {
     #[must_use]
     pub fn new(name: &str, image: EmojiImage) -> Self {
         Self {
-            name: normalise_name(name),
+            name: normalise_emoji_name(name),
             image,
         }
     }

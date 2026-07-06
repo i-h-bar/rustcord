@@ -10,13 +10,13 @@ use serenity::all::{
 };
 use tokio::time::Instant;
 
-
 fn bot_not_mentioned_warning(user: &impl Mentionable, bot: &impl Mentionable) -> String {
     format!(
         "{} You didn't @mention me, which for now still works — but Discord is revoking our \
         message content privilege on 31st July 2026, because apparently letting a card bot \
         read card names is a security risk. From then on, inline queries without a mention \
-        will get you nothing but silence. Get ahead of it: mention {} now.",
+        will get you nothing but silence. Get ahead of it: mention {} now, or switch to the \
+        `/search` command, which will keep working either way.",
         user.mention(),
         bot.mention()
     )
@@ -78,7 +78,7 @@ impl MessageInteraction for DiscordMessageInteration {
             components.push(component);
         }
 
-        if let Some(component) = build_similar_dropdown(result.similar_cards()) {
+        if let Some(component) = build_similar_dropdown(result.similar_cards()).await {
             components.push(component);
         }
 
