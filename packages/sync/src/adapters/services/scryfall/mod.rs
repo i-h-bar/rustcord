@@ -309,16 +309,15 @@ impl CardSource for Scryfall {
         .flatten()
         .collect();
 
-        if !current_sets.contains("default") {
-            if let Ok(data) = self
+        if !current_sets.contains("default")
+            && let Ok(data) = self
                 .get_text(DEFAULT_SET_ICON_URL, &self.high_limiter)
                 .await
-            {
-                emojis.push(SetEmoji {
-                    name: "default".to_string(),
-                    image: EmojiImage(data),
-                });
-            }
+        {
+            emojis.push(SetEmoji {
+                name: "default".to_string(),
+                image: EmojiImage(data),
+            });
         }
 
         emojis

@@ -68,7 +68,10 @@ mod tests {
 
     #[test]
     fn test_normalise_already_normalized() {
-        assert_eq!(normalise_card_name("already normalized"), "already normalized");
+        assert_eq!(
+            normalise_card_name("already normalized"),
+            "already normalized"
+        );
     }
 
     #[test]
@@ -84,7 +87,10 @@ mod tests {
 
     #[test]
     fn test_normalise_mixed_case() {
-        assert_eq!(normalise_card_name("ThE GiTrOg MoNsTeR"), "the gitrog monster");
+        assert_eq!(
+            normalise_card_name("ThE GiTrOg MoNsTeR"),
+            "the gitrog monster"
+        );
     }
 
     #[test]
@@ -137,7 +143,10 @@ mod tests {
     #[test]
     fn test_normalise_real_card_names() {
         assert_eq!(normalise_card_name("Dack Fayden"), "dack fayden");
-        assert_eq!(normalise_card_name("Jace, Vryn's Prodigy"), "jace vryns prodigy");
+        assert_eq!(
+            normalise_card_name("Jace, Vryn's Prodigy"),
+            "jace vryns prodigy"
+        );
         assert_eq!(
             normalise_card_name("Emrakul, the Aeons Torn"),
             "emrakul the aeons torn"
