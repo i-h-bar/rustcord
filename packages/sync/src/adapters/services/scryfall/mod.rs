@@ -6,11 +6,11 @@ use crate::adapters::services::scryfall::data::card::ScryfallCard;
 use crate::adapters::services::scryfall::data::symbols::ScryfallSymbol;
 #[cfg(feature = "local-dev")]
 use crate::domain::utils::bulk_cache;
-use crate::domain::utils::emoji::normalise_name;
 use crate::ports::emoji::{EmojiImage, EmojiMetaData, SetEmoji, SymbolEmoji};
 use crate::ports::source::CardSource;
 use crate::ports::storage::{CardInfo, Set};
 use async_trait::async_trait;
+use contracts::emoji::normalise_name;
 use data::set::ScryfallSet;
 use futures::future;
 use governor::clock::DefaultClock;
@@ -282,7 +282,13 @@ impl CardSource for Scryfall {
                 .read()
                 .await
                 .values()
-                .filter(|s| !s.icon_svg_uri.split('?').next().unwrap_or_default().ends_with("default.svg"))
+                .filter(|s| {
+                    !s.icon_svg_uri
+                        .split('?')
+                        .next()
+                        .unwrap_or_default()
+                        .ends_with("default.svg")
+                })
                 .filter(|s| !current_sets.contains(normalise_name(&s.abbreviation).as_str()))
                 .collect::<Vec<&ScryfallSet>>()
                 .iter()

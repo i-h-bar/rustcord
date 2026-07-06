@@ -1,10 +1,10 @@
-use crate::domain::utils::emoji::normalise_name;
 use crate::domain::utils::svg;
 use crate::ports::emoji::{
     EmojiImage, EmojiMetaData, EmojiName, EmojiStore, SetEmoji, SymbolEmoji,
 };
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD};
+use contracts::emoji::normalise_name;
 use futures::future;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};

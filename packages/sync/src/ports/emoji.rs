@@ -1,5 +1,5 @@
-use crate::domain::utils::emoji::normalise_name;
 use async_trait::async_trait;
+use contracts::emoji::normalise_name;
 use serde::{Deserialize, Serialize};
 
 pub struct EmojiImage(pub String);

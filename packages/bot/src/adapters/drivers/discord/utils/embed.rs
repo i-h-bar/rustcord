@@ -3,13 +3,11 @@ use crate::adapters::drivers::discord::utils::colours::get_colour_identity;
 use crate::adapters::drivers::discord::utils::emoji::add_emoji;
 use crate::adapters::drivers::discord::utils::italicise_reminder_text;
 use crate::adapters::drivers::discord::utils::title::create_title;
-use crate::adapters::drivers::discord::utils::REGEX_COLLECTION;
 use contracts::card::Card;
-use regex::Captures;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use uuid::Uuid;
 
-pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
+pub async fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
         .attachment(format!(
             "{}.png",
@@ -20,9 +18,7 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
         .footer(CreateEmbedFooter::new(format!("🖌️ - {}", card.artist())));
 
     if guesses > multiplier {
-        let mana_cost = REGEX_COLLECTION
-            .symbols
-            .replace_all(card.mana_cost(), |cap: &Captures| add_emoji(cap));
+        let mana_cost = add_emoji(card.mana_cost()).await;
         let title = format!("????        {mana_cost}");
         embed = embed
             .title(title)
@@ -41,10 +37,7 @@ pub fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> Crea
             String::new()
         };
 
-        let rules_text = REGEX_COLLECTION
-            .symbols
-            .replace_all(card.oracle_text(), |cap: &Captures| add_emoji(cap));
-
+        let rules_text = add_emoji(card.oracle_text()).await;
         let oracle_text = italicise_reminder_text(&rules_text);
 
         embed = embed.description(format!("{}\n\n{}{}", card.type_line(), oracle_text, stats));
@@ -65,9 +58,7 @@ pub async fn create_embed(card: &Card) -> CreateEmbed {
         String::new()
     };
 
-    let oracle_text = REGEX_COLLECTION
-        .symbols
-        .replace_all(card.oracle_text(), |cap: &Captures| add_emoji(cap));
+    let oracle_text = add_emoji(card.oracle_text()).await;
     let oracle_text = italicise_reminder_text(&oracle_text);
 
     let set_emoji = match get_emoji(card.set_abbreviation()).await {
@@ -83,7 +74,7 @@ pub async fn create_embed(card: &Card) -> CreateEmbed {
         oracle_text,
         stats
     );
-    let title = create_title(card);
+    let title = create_title(card).await;
 
     CreateEmbed::default()
         .attachment(format!("{}.png", card.image_id()))

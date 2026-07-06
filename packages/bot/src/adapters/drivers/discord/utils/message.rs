@@ -38,20 +38,19 @@ pub async fn build_set_dropdown(sets: Option<&Vec<CardSet>>) -> Option<CreateAct
     None
 }
 
-pub fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActionRow> {
+pub async fn build_similar_dropdown(similar: Option<&Vec<Card>>) -> Option<CreateActionRow> {
     if let Some(cards) = similar {
         if cards.is_empty() {
             return None;
         }
-        let options: Vec<CreateSelectMenuOption> = cards
-            .iter()
-            .take(25) // Discord's hard limit
-            .map(|c| {
-                CreateSelectMenuOption::new(c.name(), c.id().to_string())
-                    .emoji(colour_id_emoji(c))
-                    .description(create_card_description(c))
-            })
-            .collect();
+        let mut options = Vec::with_capacity(cards.len().min(25));
+        for c in cards.iter().take(25) {
+            // Discord's hard limit
+            let option = CreateSelectMenuOption::new(c.name(), c.id().to_string())
+                .emoji(colour_id_emoji(c).await)
+                .description(create_card_description(c));
+            options.push(option);
+        }
         let menu = CreateSelectMenu::new(SIMILAR_ID, CreateSelectMenuKind::String { options })
             .placeholder("Similar cards...");
         return Some(CreateActionRow::SelectMenu(menu));

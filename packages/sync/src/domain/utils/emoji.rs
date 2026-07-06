@@ -1,22 +1,5 @@
 use crate::ports::emoji::EmojiStore;
 use crate::ports::source::CardSource;
-use unicode_normalization::UnicodeNormalization;
-
-#[must_use]
-pub fn normalise_name(name: &str) -> String {
-    let normalised: String = name
-        .nfkc()
-        .collect::<String>()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-
-    if normalised.len() < 2 {
-        format!("{normalised}_")
-    } else {
-        normalised
-    }
-}
 
 pub async fn sync(source: &impl CardSource, emoji_store: &impl EmojiStore) {
     let Some(current_emojis) = emoji_store.get_emojis().await else {

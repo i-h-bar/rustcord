@@ -23,6 +23,7 @@ thiserror = "2.0.16"
 contracts = { workspace = true }
 fuzzy = { workspace = true }
 named_lock = { workspace = true }
+lru = "0.18.0"
 
 [dev-dependencies]
 mockall = "0.13.1"

@@ -36,7 +36,7 @@ impl GameInteraction for DiscordCommandInteraction {
             )));
         };
 
-        let embed = create_game_embed(&state.card, state.multiplier(), state.guesses());
+        let embed = create_game_embed(&state.card, state.multiplier(), state.guesses()).await;
 
         let remaining_guesses = state.max_guesses() - state.number_of_guesses();
         let guess_plural = if remaining_guesses > 1 {
@@ -80,7 +80,7 @@ impl GameInteraction for DiscordCommandInteraction {
             _ => format!("Difficulty is set to `{difficulty}`. This card is from `{set_name}`"),
         };
 
-        let embed = create_game_embed(&state.card, state.multiplier(), state.guesses());
+        let embed = create_game_embed(&state.card, state.multiplier(), state.guesses()).await;
         let response = CreateInteractionResponseMessage::new()
             .content(message)
             .add_file(illustration)
