@@ -1,4 +1,3 @@
-use fuzzy::ToBytes;
 use serde::{Deserialize, Serialize};
 use time::Date;
 use uuid::Uuid;
@@ -174,18 +173,6 @@ impl Card {
     #[must_use]
     pub fn set_abbreviation(&self) -> &str {
         &self.set_abbreviation
-    }
-}
-
-impl PartialEq<Card> for &str {
-    fn eq(&self, other: &Card) -> bool {
-        self == &other.normalised_name
-    }
-}
-
-impl ToBytes for Card {
-    fn to_bytes(&self) -> &[u8] {
-        self.name().as_bytes()
     }
 }
 

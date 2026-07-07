@@ -1,8 +1,23 @@
 use contracts::card::Card;
+use std::cmp::Ordering;
+
+#[must_use]
+pub fn fuzzy_sort(needle: &str, haystack: Vec<Card>) -> Vec<Card> {
+    let mut scored: Vec<(f32, Card)> = haystack
+        .into_iter()
+        .map(|card| {
+            let score = fuzzy::jaro_winkler_ascii_bitmask(&needle, &card.normalised_name());
+            (score, card)
+        })
+        .collect();
+
+    scored.sort_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
+    scored.into_iter().map(|(_, card)| card).collect()
+}
 
 #[must_use]
 pub fn extract_match(haystack: Vec<Card>, needle: &str) -> Option<(Card, Vec<Card>)> {
-    let mut found_cards_sorted = fuzzy::winkliest_sort(&needle, haystack);
+    let mut found_cards_sorted = fuzzy_sort(needle, haystack);
 
     let found_index: usize = {
         let top_card = found_cards_sorted.first()?;

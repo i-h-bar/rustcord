@@ -1,6 +1,6 @@
 use crate::domain::app::App;
 use crate::domain::query::QueryParams;
-use crate::domain::utils::card_picking::extract_match;
+use crate::domain::utils::card_picking::{extract_match, fuzzy_sort};
 use crate::domain::utils::REGEX_COLLECTION;
 use crate::ports::drivers::client::MessageInteraction;
 use crate::ports::services::cache::Cache;
@@ -110,7 +110,7 @@ where
             self.card_store.similar_cards(&card),
         );
 
-        let similar_cards = fuzzy::winkliest_sort(&card.normalised_name(), similar_cards?);
+        let similar_cards = fuzzy_sort(card.normalised_name(), similar_cards?);
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
         Some(
             SearchResultDto::new(card, images.ok()?)
