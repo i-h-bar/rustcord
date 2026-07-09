@@ -1,4 +1,4 @@
-use crate::ports::storage::CardInfo;
+use cards_sdk::CardInfo;
 use async_trait::async_trait;
 use uuid::Uuid;
 

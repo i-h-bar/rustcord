@@ -8,7 +8,7 @@ use crate::adapters::services::scryfall::data::symbols::ScryfallSymbol;
 use crate::domain::utils::bulk_cache;
 use crate::ports::emoji::{EmojiImage, EmojiMetaData, SetEmoji, SymbolEmoji};
 use crate::ports::source::CardSource;
-use crate::ports::storage::{CardInfo, Set};
+use cards_sdk::{CardInfo, Set};
 use async_trait::async_trait;
 use data::set::ScryfallSet;
 use futures::future;

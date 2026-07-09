@@ -1,5 +1,5 @@
 use crate::ports::emoji::{EmojiMetaData, SetEmoji, SymbolEmoji};
-use crate::ports::storage::{CardInfo, Set};
+use cards_sdk::{CardInfo, Set};
 use async_trait::async_trait;
 
 #[async_trait]

@@ -1,19 +1,36 @@
+mod queries;
+
 #[cfg(feature = "local-dev")]
 use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::ports::storage::{
-    Artist, Card, CardInfo, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule, Set,
-    Storage, UpsertResult,
+use crate::ingest::{
+    Artist, CardInfo, CardRecord, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule,
+    Set, UpsertResult,
 };
+use crate::postgres::queries::{
+    ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
+    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
+    RANDOM_SET_CARD, SIMILAR_CARDS_FROM,
+};
+use crate::repository::{ReadRepository, WriteRepository};
 use async_trait::async_trait;
+use contracts::card::Card;
+use contracts::card_set::CardSet;
 use futures::StreamExt;
 use futures::future::Either;
-use sqlx::{Pool, error::DatabaseError, postgres::PgPoolOptions};
+use sqlx::postgres::{PgConnection, PgPoolOptions, PgRow};
+use sqlx::types::time::Date;
+use sqlx::{Connection, Pool, Row, error::DatabaseError};
 use std::env;
 use uuid::Uuid;
 
-const BOT_RESERVE: usize = 5;
-const FALLBACK_POOL_SIZE: usize = 5;
+const DEFAULT_MAX_CONNECTIONS: u32 = 5;
+
+/// Shared advisory lock key used by `create_for_batch` to serialize the
+/// "check usage, then connect" step across concurrently-starting instances,
+/// avoiding a race where two instances both see the same headroom and both
+/// try to claim it.
+const POOL_SIZING_LOCK_KEY: i64 = 727_663_001;
 
 pub struct Postgres {
     pool: Pool<sqlx::Postgres>,
@@ -22,55 +39,83 @@ pub struct Postgres {
 
 impl Postgres {
     /// # Panics
-    ///
     /// Panics if `POSTGRES_USER`, `POSTGRES_PW`, or `POSTGRES_DB` env vars are not set,
-    /// or if the connection to Postgres cannot be established,
-    /// or if `FALLBACK_POOL_SIZE` exceeds a u32.
+    /// or if the connection to Postgres cannot be established.
     pub async fn create() -> Self {
-        let user = env::var("POSTGRES_USER").expect("POSTGRES_USER wasn't in env vars");
-        let password = env::var("POSTGRES_PW").expect("POSTGRES_PW wasn't in env vars");
-        let db = env::var("POSTGRES_DB").expect("POSTGRES_DB wasn't in env vars");
-        let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost:5432".to_string());
-        let uri = format!("postgresql://{user}:{password}@{host}/{db}");
-
-        let pool_size = Self::compute_pool_size(&uri).await;
-        log::info!("Using Postgres pool size: {pool_size}");
-
-        let pool =
-            PgPoolOptions::new()
-                .max_connections(u32::try_from(pool_size).unwrap_or(
-                    u32::try_from(FALLBACK_POOL_SIZE).expect("FALLBACK_POOL_SIZE exceeded"),
-                ))
-                .connect(&uri)
-                .await
-                .expect("Failed Postgres connection");
-
-        Self { pool, pool_size }
+        Self::connect_with_max_connections(&connection_uri(), DEFAULT_MAX_CONNECTIONS).await
     }
 
-    async fn compute_pool_size(uri: &str) -> usize {
-        let Ok(probe) = PgPoolOptions::new().max_connections(1).connect(uri).await else {
-            return FALLBACK_POOL_SIZE;
-        };
+    /// For batch workloads (e.g. `sync`'s bulk/spoiler commands) that want to
+    /// use as much of the available Postgres connection budget as it can
+    /// safely spare, rather than a small fixed pool. Reserves
+    /// `reserve_for_others` connections for other long-lived consumers (e.g.
+    /// `bot`) and claims the rest.
+    ///
+    /// # Panics
+    /// Panics under the same conditions as `create`, and if the initial probe
+    /// connection or its queries fail.
+    pub async fn create_for_batch(reserve_for_others: u32) -> Self {
+        let uri = connection_uri();
 
-        let max: String = sqlx::query_scalar("SHOW max_connections")
-            .fetch_one(&probe)
+        let mut probe = PgConnection::connect(&uri)
             .await
-            .unwrap_or_else(|_| FALLBACK_POOL_SIZE.to_string());
-        let max: usize = max.trim().parse().unwrap_or(FALLBACK_POOL_SIZE);
+            .expect("Failed Postgres connection");
+
+        sqlx::query("SELECT pg_advisory_lock($1)")
+            .bind(POOL_SIZING_LOCK_KEY)
+            .execute(&mut probe)
+            .await
+            .expect("Failed to acquire pool-sizing advisory lock");
+
+        let max_connections: String = sqlx::query_scalar("SHOW max_connections")
+            .fetch_one(&mut probe)
+            .await
+            .expect("Failed to read max_connections");
+        let max_connections: u32 = max_connections
+            .trim()
+            .parse()
+            .expect("max_connections wasn't a valid number");
 
         let in_use: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM pg_stat_activity WHERE pid != pg_backend_pid()",
         )
-        .fetch_one(&probe)
+        .fetch_one(&mut probe)
         .await
-        .unwrap_or(0);
+        .expect("Failed to read pg_stat_activity");
 
-        probe.close().await;
+        sqlx::query("SELECT pg_advisory_unlock($1)")
+            .bind(POOL_SIZING_LOCK_KEY)
+            .execute(&mut probe)
+            .await
+            .expect("Failed to release pool-sizing advisory lock");
 
-        max.saturating_sub(usize::try_from(in_use).unwrap_or(FALLBACK_POOL_SIZE))
-            .saturating_sub(BOT_RESERVE)
-            .max(1)
+        probe.close().await.ok();
+
+        let in_use = u32::try_from(in_use).unwrap_or(max_connections);
+        let available = max_connections
+            .saturating_sub(in_use)
+            .saturating_sub(reserve_for_others)
+            .max(1);
+
+        log::info!(
+            "Sizing batch pool: max_connections={max_connections}, in_use={in_use}, \
+             reserved={reserve_for_others} -> using {available}"
+        );
+
+        Self::connect_with_max_connections(&uri, available).await
+    }
+
+    async fn connect_with_max_connections(uri: &str, max_connections: u32) -> Self {
+        let pool = PgPoolOptions::new()
+            .max_connections(max_connections)
+            .connect(uri)
+            .await
+            .expect("Failed Postgres connection");
+
+        Self {
+            pool,
+            pool_size: max_connections as usize,
+        }
     }
 
     async fn upsert_artist(&self, artist: &Artist) {
@@ -236,7 +281,7 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card(&self, card: &Card) -> (Option<Uuid>, Option<Uuid>) {
+    async fn upsert_card(&self, card: &CardRecord) -> (Option<Uuid>, Option<Uuid>) {
         match sqlx::query_as::<_, (Option<Uuid>, Option<Uuid>)>(
             "WITH prev AS (
                 SELECT image_id, illustration_id FROM card WHERE id = $1
@@ -375,7 +420,149 @@ impl Postgres {
 }
 
 #[async_trait]
-impl Storage for Postgres {
+impl ReadRepository for Postgres {
+    async fn search(&self, normalised_name: &str) -> Option<Vec<Card>> {
+        match sqlx::query(FUZZY_SEARCH_DISTINCT_CARDS)
+            .bind(normalised_name)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed fuzzy search distinct cards fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| card_from(&row)).collect()),
+        }
+    }
+
+    async fn search_artist(&self, artist: &str, normalised_name: &str) -> Option<Vec<Card>> {
+        match sqlx::query(FUZZY_SEARCH_CARD_AND_ARTIST)
+            .bind(normalised_name)
+            .bind(artist)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| card_from(&row)).collect()),
+        }
+    }
+
+    async fn search_set(&self, set_name: &str, normalised_name: &str) -> Option<Vec<Card>> {
+        match sqlx::query(FUZZY_SEARCH_CARD_AND_SET_NAME)
+            .bind(normalised_name)
+            .bind(set_name)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| card_from(&row)).collect()),
+        }
+    }
+
+    async fn search_for_set_name(&self, normalised_name: &str) -> Option<Vec<String>> {
+        match sqlx::query(FUZZY_SEARCH_SET_NAME)
+            .bind(normalised_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed set name fetch - {why}");
+                None
+            }
+            Ok(row) => row.try_get::<Vec<String>, &str>("array_agg").ok(),
+        }
+    }
+
+    async fn set_name_from_abbreviation(&self, abbreviation: &str) -> Option<String> {
+        match sqlx::query(NORMALISED_SET_NAME)
+            .bind(abbreviation)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed set name from abbr fetch - {why}");
+                None
+            }
+            Ok(row) => Some(row.get::<String, &str>("normalised_name")),
+        }
+    }
+
+    async fn random_card(&self) -> Option<Card> {
+        match sqlx::query(RANDOM_CARD).fetch_one(&self.pool).await {
+            Err(why) => {
+                log::warn!("Failed random card fetch - {why}");
+                None
+            }
+            Ok(row) => Some(card_from(&row)),
+        }
+    }
+
+    async fn random_card_from_set(&self, set_name: &str) -> Option<Card> {
+        match sqlx::query(RANDOM_SET_CARD)
+            .bind(set_name)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search set fetch - {why}");
+                None
+            }
+            Ok(row) => Some(card_from(&row)),
+        }
+    }
+
+    async fn all_prints(&self, oracle_id: &Uuid) -> Option<Vec<CardSet>> {
+        match sqlx::query(ALL_PRINTS)
+            .bind(oracle_id)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search all prints fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| set_from(&row)).collect()),
+        }
+    }
+
+    async fn fetch_card_by_id(&self, id: &Uuid) -> Option<Card> {
+        match sqlx::query(CARD_FROM_ID)
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed card fetch - {why}");
+                None
+            }
+            Ok(row) => Some(card_from(&row)),
+        }
+    }
+
+    async fn similar_cards(&self, card: &Card) -> Option<Vec<Card>> {
+        match sqlx::query(SIMILAR_CARDS_FROM)
+            .bind(card.normalised_name())
+            .bind(card.oracle_id())
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed search all prints fetch - {why}");
+                None
+            }
+            Ok(rows) => Some(rows.into_iter().map(|row| card_from(&row)).collect()),
+        }
+    }
+}
+
+#[async_trait]
+impl WriteRepository for Postgres {
     async fn upsert_cards(&self, cards: &[CardInfo]) -> UpsertResult {
         log::info!("Upserting {} cards", cards.len());
 
@@ -482,4 +669,46 @@ impl Storage for Postgres {
         }
         deleted
     }
+}
+
+fn set_from(row: &PgRow) -> CardSet {
+    CardSet::new(
+        row.get::<Uuid, &str>("card_id"),
+        row.get::<String, &str>("set_name"),
+        row.get::<&str, &str>("set_abbreviation"),
+        row.get::<Date, &str>("release_date"),
+    )
+}
+
+fn connection_uri() -> String {
+    let user = env::var("POSTGRES_USER").expect("POSTGRES_USER wasn't in env vars");
+    let password = env::var("POSTGRES_PW").expect("POSTGRES_PW wasn't in env vars");
+    let db = env::var("POSTGRES_DB").expect("POSTGRES_DB wasn't in env vars");
+    let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost:5432".to_string());
+    format!("postgresql://{user}:{password}@{host}/{db}")
+}
+
+fn card_from(row: &PgRow) -> Card {
+    Card::new(
+        row.get::<Uuid, &str>("front_id"),
+        row.get::<String, &str>("front_name"),
+        row.get::<String, &str>("front_normalised_name"),
+        row.get::<Uuid, &str>("front_oracle_id"),
+        row.get::<String, &str>("front_scryfall_url"),
+        row.get::<Uuid, &str>("front_image_id"),
+        row.get::<Option<Uuid>, &str>("front_illustration_id"),
+        row.get::<String, &str>("front_mana_cost"),
+        row.get::<Vec<String>, &str>("front_colour_identity"),
+        row.get::<Option<String>, &str>("front_power"),
+        row.get::<Option<String>, &str>("front_toughness"),
+        row.get::<Option<String>, &str>("front_loyalty"),
+        row.get::<Option<String>, &str>("front_defence"),
+        row.get::<String, &str>("front_type_line"),
+        row.get::<String, &str>("front_oracle_text"),
+        row.get::<Option<Uuid>, &str>("back_id"),
+        row.get::<String, &str>("artist"),
+        row.get::<String, &str>("set_name"),
+        row.get::<String, &str>("set_abbreviation"),
+        row.get::<Date, &str>("release_date"),
+    )
 }

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "packages/bot",
+    "packages/cards_sdk",
     "packages/contracts",
     "packages/fuzzy",
     "packages/named_lock",
@@ -15,6 +16,7 @@ pedantic = { level = "warn", priority = -1 }
 implicit_hasher = "allow"
 
 [workspace.dependencies]
+cards_sdk = { path = "packages/cards_sdk" }
 contracts = { path = "packages/contracts" }
 fuzzy = { path = "packages/fuzzy" }
 named_lock = { path = "packages/named_lock" }
