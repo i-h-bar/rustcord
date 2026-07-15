@@ -2,8 +2,10 @@ mod adapters;
 mod domain;
 mod ports;
 
+use crate::adapters::services::spoiler_sender_init;
 use adapters::services::card_storage_init;
-use adapters::webhook::ReqwestWebhookSender;
+use adapters::services::init_image_store;
+use domain::notify;
 use std::time::Duration;
 
 /// Round 1: `notifier` is a plain always-on process that polls on a fixed
@@ -18,10 +20,11 @@ async fn main() {
     env_logger::init();
 
     let storage = card_storage_init().await;
-    let sender = ReqwestWebhookSender::new();
+    let images = init_image_store();
+    let sender = spoiler_sender_init();
 
     loop {
-        domain::notify::run(&storage, &sender).await;
+        notify::run(&storage, &images, &sender).await;
         tokio::time::sleep(POLL_INTERVAL).await;
     }
 }

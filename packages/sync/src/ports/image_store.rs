@@ -1,5 +1,5 @@
-use cards_sdk::CardInfo;
 use async_trait::async_trait;
+use cards_sdk::CardInfo;
 use uuid::Uuid;
 
 pub struct Image(pub Uuid, pub Vec<u8>);

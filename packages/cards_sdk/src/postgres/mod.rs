@@ -720,8 +720,8 @@ impl SpoilerQueue for Postgres {
                 .map(|row| Subscription {
                     guild_id: row.get::<GuildId, &str>("guild_id"),
                     channel_id: row.get::<ChannelId, &str>("channel_id"),
-                    webhook_id: row.get::<SubscriptionId, &str>("webhook_id"),
-                    webhook_token: row.get::<String, &str>("webhook_token"),
+                    id: row.get::<SubscriptionId, &str>("webhook_id"),
+                    token: row.get::<String, &str>("webhook_token"),
                     cursor: row.get::<i64, &str>("cursor"),
                 })
                 .collect(),
@@ -744,7 +744,6 @@ impl SpoilerQueue for Postgres {
                 .map(|row| PendingCard {
                     queue_id: row.get::<i64, &str>("queue_id"),
                     card: card_from(&row),
-                    image_url: row.get::<String, &str>("image_scryfall_url"),
                 })
                 .collect(),
         }

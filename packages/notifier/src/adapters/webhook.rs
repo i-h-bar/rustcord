@@ -1,57 +1,63 @@
-use crate::ports::webhook::{WebhookError, WebhookSender};
+use crate::ports::spoilers::{SpoilerError, SpoilerSender};
 use async_trait::async_trait;
-use serde::Serialize;
-use serenity::builder::CreateEmbed;
+use cards_sdk::SubscriptionId;
+use contracts::card::Card;
+use discord_embeds::create_embed;
+use serenity::Error as SerenityError;
+use serenity::builder::{Builder, CreateAttachment, ExecuteWebhook};
+use serenity::http::{Http, HttpError};
+use serenity::model::id::WebhookId;
+use std::env;
 
-#[derive(Serialize)]
-struct WebhookPayload {
-    embeds: Vec<CreateEmbed>,
+pub struct DiscordWebhookSender {
+    http: Http,
 }
 
-pub struct ReqwestWebhookSender {
-    client: reqwest::Client,
-    base_url: String,
+impl DiscordWebhookSender {
+    #[must_use]
+    pub fn new() -> Self {
+        let token = env::var("BOT_TOKEN").expect("BOT_TOKEN wasn't in env vars");
+        Self {
+            http: Http::new(&token),
+        }
+    }
 }
 
-impl Default for ReqwestWebhookSender {
+impl Default for DiscordWebhookSender {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ReqwestWebhookSender {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            base_url: "https://discord.com/api/webhooks".to_string(),
-        }
-    }
-}
-
 #[async_trait]
-impl WebhookSender for ReqwestWebhookSender {
+impl SpoilerSender for DiscordWebhookSender {
     async fn send(
         &self,
-        webhook_id: u64,
-        webhook_token: &str,
-        embed: CreateEmbed,
-    ) -> Result<(), WebhookError> {
-        let url = format!("{}/{}/{}", self.base_url, webhook_id, webhook_token);
-        let resp = self
-            .client
-            .post(&url)
-            .json(&WebhookPayload {
-                embeds: vec![embed],
-            })
-            .send()
-            .await
-            .map_err(|e| WebhookError::Request(e.to_string()))?;
-
-        if resp.status().is_success() {
-            Ok(())
-        } else {
-            Err(WebhookError::Status(resp.status().as_u16()))
+        sub_id: SubscriptionId,
+        token: &str,
+        cards: &[(Card, Vec<u8>)],
+    ) -> Result<(), SpoilerError> {
+        let mut embeds = Vec::with_capacity(cards.len());
+        let mut attachments = Vec::with_capacity(cards.len());
+        for (card, image) in cards {
+            embeds.push(create_embed(card).await);
+            attachments.push(CreateAttachment::bytes(
+                image.clone(),
+                format!("{}.png", card.image_id()),
+            ));
         }
+        let builder = ExecuteWebhook::new().embeds(embeds).add_files(attachments);
+
+        builder
+            .execute(&self.http, (WebhookId::new(sub_id.into()), token, false))
+            .await
+            .map_err(|e| match &e {
+                SerenityError::Http(HttpError::UnsuccessfulRequest(response)) => {
+                    SpoilerError::Status(response.status_code.as_u16())
+                }
+                _ => SpoilerError::Request(e.to_string()),
+            })?;
+
+        Ok(())
     }
 }

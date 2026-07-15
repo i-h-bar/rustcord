@@ -282,14 +282,12 @@ select q.id                      as queue_id,
        artist.name               as artist,
        set.name                  as set_name,
        set.abbreviation          as set_abbreviation,
-       card.release_date         as release_date,
-       image.scryfall_url        as image_scryfall_url
+       card.release_date         as release_date
 from spoiler_queue q
          join card on card.id = q.card_id
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
-         left join image on image.id = card.image_id
 where q.id > (select cursor from spoiler_subscription where guild_id = $1)
 order by q.id asc
 limit $2

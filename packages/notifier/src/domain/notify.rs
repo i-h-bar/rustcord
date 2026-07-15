@@ -1,42 +1,58 @@
-use discord_embeds::create_embed_with_image_url;
-
 const BATCH_SIZE: i64 = 10;
 
 /// After this many consecutive `notifier` runs fail to deliver to a guild,
 /// assume its webhook is permanently dead (channel/webhook deleted,
 /// permissions revoked) and unsubscribe it automatically rather than
-/// retrying forever — resolves the spec's "auto-unsubscribe vs. retry
-/// indefinitely" open question in favour of auto-unsubscribe. The streak
-/// resets to `0` on every successful delivery (folded into `ack`).
+/// retrying forever.  The streak resets to `0` on every successful delivery (folded into `ack`).
 const MAX_CONSECUTIVE_FAILURES: i64 = 5;
 
 pub async fn run(
     repo: &impl cards_sdk::SpoilerQueue,
-    sender: &impl crate::ports::webhook::WebhookSender,
+    images: &impl crate::ports::images::ImageStore,
+    sender: &impl crate::ports::spoilers::SpoilerSender,
 ) {
     for sub in repo.subscriptions_with_pending().await {
         let cards = repo.pending_cards(sub.guild_id, BATCH_SIZE).await;
+
+        // The cursor is a single scalar, so a card whose image can't be
+        // fetched yet can't be skipped over: acking past it would drop it
+        // forever, and sending later cards without acking it would resend
+        // them next poll (since the query is `id > cursor`). So the batch
+        // stops at the first missing image rather than skipping it.
+        let mut batch = Vec::with_capacity(cards.len());
+        let mut last_queue_id = None;
         for pending in cards {
-            let embed = create_embed_with_image_url(&pending.card, &pending.image_url).await;
-            match sender
-                .send(sub.webhook_id.into(), &sub.webhook_token, embed)
-                .await
-            {
-                Ok(()) => repo.ack(sub.guild_id, pending.queue_id).await,
+            match images.fetch(&pending.card).await {
+                Ok(bytes) => {
+                    last_queue_id = Some(pending.queue_id);
+                    batch.push((pending.card, bytes));
+                }
                 Err(e) => {
                     log::warn!(
-                        "Stopping delivery to guild {} after webhook failure: {e}",
+                        "Stopping batch for guild {} at missing image for {}: {e}",
+                        sub.guild_id,
+                        pending.card.name()
+                    );
+                    break;
+                }
+            }
+        }
+
+        let Some(last_queue_id) = last_queue_id else {
+            continue;
+        };
+
+        match sender.send(sub.id, &sub.token, &batch).await {
+            Ok(()) => repo.ack(sub.guild_id, last_queue_id).await,
+            Err(e) => {
+                log::warn!("Failed to deliver batch to guild {}: {e}", sub.guild_id);
+                let failures = repo.record_failure(sub.guild_id).await;
+                if failures >= MAX_CONSECUTIVE_FAILURES {
+                    log::warn!(
+                        "Auto-unsubscribing guild {} after {failures} consecutive webhook failures",
                         sub.guild_id
                     );
-                    let failures = repo.record_failure(sub.guild_id).await;
-                    if failures >= MAX_CONSECUTIVE_FAILURES {
-                        log::warn!(
-                            "Auto-unsubscribing guild {} after {failures} consecutive webhook failures",
-                            sub.guild_id
-                        );
-                        repo.delete_subscription(sub.guild_id).await;
-                    }
-                    break;
+                    repo.delete_subscription(sub.guild_id).await;
                 }
             }
         }
@@ -53,27 +69,11 @@ pub async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ports::webhook::{MockWebhookSender, WebhookError};
+    use crate::ports::images::MockImageStore;
+    use crate::ports::spoilers::{MockSpoilerSender, SpoilerError};
     use cards_sdk::spoiler::{PendingCard, Subscription};
     use cards_sdk::{ChannelId, GuildId, MockSpoilerQueue, SubscriptionId};
     use mockall::predicate::eq;
-
-    /// `discord_embeds::create_embed_with_image_url` lazily initializes a
-    /// process-wide emoji cache that requires `BOT_TOKEN` to be present
-    /// (network calls inside it degrade gracefully on failure, so a dummy
-    /// value is fine for tests — only the `env::var(...).expect(...)` at
-    /// startup is fatal if unset). `std::sync::Once` guarantees this runs
-    /// exactly once and that every caller — including tests running on
-    /// other threads — blocks until it's done, so it's safe under `cargo
-    /// test`'s parallel test execution.
-    fn ensure_bot_token_env() {
-        static INIT: std::sync::Once = std::sync::Once::new();
-        INIT.call_once(|| {
-            // SAFETY: guarded by `Once` above; nothing else in this test
-            // binary reads or writes `BOT_TOKEN` concurrently.
-            unsafe { std::env::set_var("BOT_TOKEN", "test-token") };
-        });
-    }
 
     fn test_card(name: &str) -> contracts::card::Card {
         let id = uuid::Uuid::new_v4();
@@ -101,23 +101,31 @@ mod tests {
         )
     }
 
+    fn always_returns_image_bytes() -> MockImageStore {
+        let mut images = MockImageStore::new();
+        images.expect_fetch().returning(|_| Ok(vec![1, 2, 3]));
+        images
+    }
+
+    fn test_subscription() -> Subscription {
+        Subscription {
+            guild_id: GuildId::from(1u64),
+            channel_id: ChannelId::from(2u64),
+            id: SubscriptionId::from(3u64),
+            token: "tok".to_string(),
+            cursor: 0,
+        }
+    }
+
     #[tokio::test]
-    async fn acks_each_card_after_successful_delivery() {
-        ensure_bot_token_env();
+    async fn acks_up_to_the_last_card_after_a_successful_batch_send() {
         let mut repo = MockSpoilerQueue::new();
-        let mut sender = MockWebhookSender::new();
+        let mut sender = MockSpoilerSender::new();
+        let images = always_returns_image_bytes();
 
         repo.expect_subscriptions_with_pending()
             .times(1)
-            .return_once(|| {
-                vec![Subscription {
-                    guild_id: GuildId::from(1u64),
-                    channel_id: ChannelId::from(2u64),
-                    webhook_id: SubscriptionId::from(3u64),
-                    webhook_token: "tok".to_string(),
-                    cursor: 0,
-                }]
-            });
+            .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
             .with(eq(GuildId::from(1u64)), eq(10i64))
             .times(1)
@@ -126,46 +134,36 @@ mod tests {
                     PendingCard {
                         queue_id: 1,
                         card: test_card("Card A"),
-                        image_url: "u1".to_string(),
                     },
                     PendingCard {
                         queue_id: 2,
                         card: test_card("Card B"),
-                        image_url: "u2".to_string(),
                     },
                 ]
             });
-        sender.expect_send().times(2).returning(|_, _, _| Ok(()));
-        repo.expect_ack()
-            .with(eq(GuildId::from(1u64)), eq(1i64))
+        sender
+            .expect_send()
+            .withf(|_, _, cards| cards.len() == 2)
             .times(1)
-            .return_const(());
+            .returning(|_, _, _| Ok(()));
         repo.expect_ack()
             .with(eq(GuildId::from(1u64)), eq(2i64))
             .times(1)
             .return_const(());
         repo.expect_prune_queue().times(1).return_const(());
 
-        run(&repo, &sender).await;
+        run(&repo, &images, &sender).await;
     }
 
     #[tokio::test]
-    async fn stops_processing_a_guild_after_the_first_failure_mid_batch() {
-        ensure_bot_token_env();
+    async fn does_not_ack_and_records_a_failure_when_the_batch_send_fails() {
         let mut repo = MockSpoilerQueue::new();
-        let mut sender = MockWebhookSender::new();
+        let mut sender = MockSpoilerSender::new();
+        let images = always_returns_image_bytes();
 
         repo.expect_subscriptions_with_pending()
             .times(1)
-            .return_once(|| {
-                vec![Subscription {
-                    guild_id: GuildId::from(1u64),
-                    channel_id: ChannelId::from(2u64),
-                    webhook_id: SubscriptionId::from(3u64),
-                    webhook_token: "tok".to_string(),
-                    cursor: 0,
-                }]
-            });
+            .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
             .with(eq(GuildId::from(1u64)), eq(10i64))
             .times(1)
@@ -174,43 +172,18 @@ mod tests {
                     PendingCard {
                         queue_id: 1,
                         card: test_card("Card A"),
-                        image_url: "u1".to_string(),
                     },
                     PendingCard {
                         queue_id: 2,
                         card: test_card("Card B"),
-                        image_url: "u2".to_string(),
-                    },
-                    // A third card that must never be attempted — it's only
-                    // reachable if the failure on card 2 doesn't stop the
-                    // batch, which is exactly the behaviour under test.
-                    PendingCard {
-                        queue_id: 3,
-                        card: test_card("Card C"),
-                        image_url: "u3".to_string(),
                     },
                 ]
             });
-        // First send succeeds and is acked; second fails and must NOT be acked;
-        // exactly 2 sends total (mockall panics on a 3rd call, since no
-        // expectation covers it) — proves the batch stopped after card 2.
-        sender.expect_send().times(1).returning(|_, _, _| Ok(()));
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(WebhookError::Status(404)));
-        repo.expect_ack()
-            .with(eq(GuildId::from(1u64)), eq(1i64))
-            .times(1)
-            .return_const(());
-        repo.expect_ack()
-            .with(eq(GuildId::from(1u64)), eq(2i64))
-            .times(0)
-            .return_const(());
-        repo.expect_ack()
-            .with(eq(GuildId::from(1u64)), eq(3i64))
-            .times(0)
-            .return_const(());
+            .returning(|_, _, _| Err(SpoilerError::Status(404)));
+        repo.expect_ack().times(0);
         // Below MAX_CONSECUTIVE_FAILURES (5) — must NOT trigger auto-unsubscribe.
         repo.expect_record_failure()
             .with(eq(GuildId::from(1u64)))
@@ -219,26 +192,18 @@ mod tests {
         repo.expect_delete_subscription().times(0);
         repo.expect_prune_queue().times(1).return_const(());
 
-        run(&repo, &sender).await;
+        run(&repo, &images, &sender).await;
     }
 
     #[tokio::test]
     async fn auto_unsubscribes_once_the_failure_threshold_is_reached() {
-        ensure_bot_token_env();
         let mut repo = MockSpoilerQueue::new();
-        let mut sender = MockWebhookSender::new();
+        let mut sender = MockSpoilerSender::new();
+        let images = always_returns_image_bytes();
 
         repo.expect_subscriptions_with_pending()
             .times(1)
-            .return_once(|| {
-                vec![Subscription {
-                    guild_id: GuildId::from(1u64),
-                    channel_id: ChannelId::from(2u64),
-                    webhook_id: SubscriptionId::from(3u64),
-                    webhook_token: "tok".to_string(),
-                    cursor: 0,
-                }]
-            });
+            .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
             .with(eq(GuildId::from(1u64)), eq(10i64))
             .times(1)
@@ -246,13 +211,12 @@ mod tests {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Card A"),
-                    image_url: "u1".to_string(),
                 }]
             });
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(WebhookError::Status(404)));
+            .returning(|_, _, _| Err(SpoilerError::Status(404)));
         repo.expect_ack().times(0);
         // Reaches MAX_CONSECUTIVE_FAILURES (5) exactly — must trigger auto-unsubscribe.
         repo.expect_record_failure()
@@ -265,6 +229,89 @@ mod tests {
             .return_const(Some(SubscriptionId::from(3u64)));
         repo.expect_prune_queue().times(1).return_const(());
 
-        run(&repo, &sender).await;
+        run(&repo, &images, &sender).await;
+    }
+
+    #[tokio::test]
+    async fn stops_the_batch_at_the_first_missing_image_and_acks_only_the_cards_before_it() {
+        let mut repo = MockSpoilerQueue::new();
+        let mut sender = MockSpoilerSender::new();
+        let mut images = MockImageStore::new();
+
+        repo.expect_subscriptions_with_pending()
+            .times(1)
+            .return_once(|| vec![test_subscription()]);
+        repo.expect_pending_cards()
+            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .times(1)
+            .return_once(|_, _| {
+                vec![
+                    PendingCard {
+                        queue_id: 1,
+                        card: test_card("Card A"),
+                    },
+                    PendingCard {
+                        queue_id: 2,
+                        card: test_card("Missing Image"),
+                    },
+                    // Must never be reached — the batch stops at the gap
+                    // left by card 2, so this card isn't even fetched.
+                    PendingCard {
+                        queue_id: 3,
+                        card: test_card("Card C"),
+                    },
+                ]
+            });
+        images
+            .expect_fetch()
+            .times(1)
+            .returning(|_| Ok(vec![1, 2, 3]));
+        images.expect_fetch().times(1).return_once(|_| {
+            Err(crate::ports::images::ImageRetrievalError::new(
+                "no file".into(),
+            ))
+        });
+        sender
+            .expect_send()
+            .withf(|_, _, cards| cards.len() == 1)
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        repo.expect_ack()
+            .with(eq(GuildId::from(1u64)), eq(1i64))
+            .times(1)
+            .return_const(());
+        repo.expect_prune_queue().times(1).return_const(());
+
+        run(&repo, &images, &sender).await;
+    }
+
+    #[tokio::test]
+    async fn sends_nothing_when_the_first_card_has_no_image() {
+        let mut repo = MockSpoilerQueue::new();
+        let sender = MockSpoilerSender::new();
+        let mut images = MockImageStore::new();
+
+        repo.expect_subscriptions_with_pending()
+            .times(1)
+            .return_once(|| vec![test_subscription()]);
+        repo.expect_pending_cards()
+            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .times(1)
+            .return_once(|_, _| {
+                vec![PendingCard {
+                    queue_id: 1,
+                    card: test_card("Missing Image"),
+                }]
+            });
+        images.expect_fetch().times(1).return_once(|_| {
+            Err(crate::ports::images::ImageRetrievalError::new(
+                "no file".into(),
+            ))
+        });
+        // `sender` has no expectations at all — send() must never be called.
+        repo.expect_ack().times(0);
+        repo.expect_prune_queue().times(1).return_const(());
+
+        run(&repo, &images, &sender).await;
     }
 }

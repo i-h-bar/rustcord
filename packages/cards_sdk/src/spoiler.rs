@@ -2,23 +2,20 @@ use crate::ids::{ChannelId, GuildId, SubscriptionId};
 use contracts::card::Card;
 
 pub struct Subscription {
+    pub id: SubscriptionId,
     pub guild_id: GuildId,
     pub channel_id: ChannelId,
-    pub webhook_id: SubscriptionId,
-    pub webhook_token: String,
+    pub token: String,
     pub cursor: i64,
 }
 
 /// A single queued card ready for delivery to a guild, paired with the
-/// queue row it came from (for acking) and the card image's own
-/// `scryfall_url` (distinct from `Card::url`, which is the Scryfall page
-/// link) — `notifier` sets the embed image directly to this URL rather than
-/// attaching a local file, to avoid mounting the card-image volume into a
-/// scale-to-zero pod.
+/// queue row it came from (for acking). The image itself is read from the
+/// local `IMAGES_DIR` cache by `notifier` (via `card.image_id()`), the same
+/// as `bot` does, rather than pointed at by a remote URL.
 pub struct PendingCard {
     pub queue_id: i64,
     pub card: Card,
-    pub image_url: String,
 }
 
 #[cfg(test)]
@@ -31,8 +28,8 @@ mod tests {
         let sub = Subscription {
             guild_id: GuildId::from(1u64),
             channel_id: ChannelId::from(2u64),
-            webhook_id: SubscriptionId::from(3u64),
-            webhook_token: "token".to_string(),
+            id: SubscriptionId::from(3u64),
+            token: "token".to_string(),
             cursor: 0,
         };
         assert_eq!(u64::from(sub.guild_id), 1);
@@ -63,11 +60,7 @@ mod tests {
             "LEA".to_string(),
             time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         );
-        let pending = PendingCard {
-            queue_id: 5,
-            card,
-            image_url: "https://img".to_string(),
-        };
+        let pending = PendingCard { queue_id: 5, card };
         assert_eq!(pending.queue_id, 5);
     }
 }

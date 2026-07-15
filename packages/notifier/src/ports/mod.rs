@@ -1,1 +1,2 @@
-pub mod webhook;
+pub mod images;
+pub mod spoilers;

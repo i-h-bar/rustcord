@@ -2044,7 +2044,6 @@ dependencies = [
  "env_logger",
  "log",
  "mockall",
- "reqwest 0.13.4",
  "serde",
  "serenity",
  "thiserror 2.0.16",

@@ -5,19 +5,18 @@ edition = "2024"
 
 [dependencies]
 cards_sdk = { workspace = true }
+contracts = { workspace = true }
 discord_embeds = { workspace = true }
 async-trait = "0.1.89"
-reqwest = { version = "0.13.4", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 log = "0.4.27"
 env_logger = "0.11.10"
-tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "time", "fs"] }
 thiserror = "2.0.16"
-serenity = { version = "0.12.4", default-features = false, features = ["builder", "model"] }
+serenity = { version = "0.12.4", default-features = false, features = ["builder", "model", "http", "rustls_backend"] }
 
 [dev-dependencies]
 cards_sdk = { workspace = true, features = ["test-util"] }
-contracts = { workspace = true }
 mockall = "0.13.1"
 uuid = "1.18.0"
 time = { version = "0.3", features = ["macros"] }
