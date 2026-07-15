@@ -40,8 +40,9 @@ pub async fn subscribe<S, Sub, I>(
                 .await;
             let _ = interaction
                 .reply_ephemeral(format!(
-                    "Spoiler notifications enabled for this channel. This feature is in beta — \
-                     if anything looks wrong, please let us know here: {ISSUES_URL}"
+                    "Spoiler notifications enabled for <#{}>. This feature is in beta — \
+                     if anything looks wrong, please let us know here: {ISSUES_URL}",
+                    u64::from(channel_id)
                 ))
                 .await;
         }
