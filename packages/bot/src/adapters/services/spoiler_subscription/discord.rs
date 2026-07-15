@@ -1,14 +1,16 @@
 use crate::ports::services::spoiler_subscription::{
-    Subscription, SpoilerSubError, SpoilerSubscription,
+    SpoilerSubError, SpoilerSubscription, Subscription,
 };
 use async_trait::async_trait;
+use cards_sdk::{ChannelId, SubscriptionId};
 use secrecy::ExposeSecret;
-use serenity::all::{ChannelId, CreateWebhook, Http, WebhookId};
+use serenity::all::{
+    ChannelId as DiscordChannelId, CreateWebhook, Http, WebhookId as DiscordWebhookId,
+};
 use std::env;
-use std::sync::Arc;
 
 pub struct DiscordWebhookRegistrar {
-    http: Arc<Http>,
+    http: Http,
 }
 
 #[async_trait]
@@ -16,15 +18,15 @@ impl SpoilerSubscription for DiscordWebhookRegistrar {
     fn create() -> Self {
         let token = env::var("BOT_TOKEN").expect("BOT_TOKEN wasn't in env vars");
         Self {
-            http: Arc::new(Http::new(&token)),
+            http: Http::new(&token),
         }
     }
 
     async fn create_subscription(
         &self,
-        channel_id: u64,
+        channel_id: ChannelId,
     ) -> Result<Subscription, SpoilerSubError> {
-        let channel = ChannelId::new(channel_id);
+        let channel = DiscordChannelId::new(channel_id.into());
         let builder = CreateWebhook::new("Spoiler Notifications");
 
         let webhook = channel
@@ -39,15 +41,14 @@ impl SpoilerSubscription for DiscordWebhookRegistrar {
             .ok_or_else(|| SpoilerSubError::new("created webhook has no token"))?;
 
         Ok(Subscription {
-            id: i64::try_from(webhook.id.get())
-                .map_err(|_| SpoilerSubError::new("webhook id doesn't fit in i64"))?,
+            id: SubscriptionId::from(webhook.id.get()),
             token,
         })
     }
 
-    async fn delete_subscription(&self, webhook_id: u64) -> Result<(), SpoilerSubError> {
+    async fn delete_subscription(&self, sub_id: SubscriptionId) -> Result<(), SpoilerSubError> {
         self.http
-            .delete_webhook(WebhookId::new(webhook_id), None)
+            .delete_webhook(DiscordWebhookId::new(sub_id.into()), None)
             .await
             .map_err(|e| SpoilerSubError::new(e.to_string()))
     }

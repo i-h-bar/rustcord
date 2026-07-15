@@ -80,27 +80,34 @@ impl cards_sdk::SpoilerQueue for TestCardStore {
     async fn subscriptions_with_pending(&self) -> Vec<cards_sdk::Subscription> {
         self.spoiler.subscriptions_with_pending().await
     }
-    async fn pending_cards(&self, guild_id: i64, limit: i64) -> Vec<cards_sdk::PendingCard> {
+    async fn pending_cards(
+        &self,
+        guild_id: cards_sdk::GuildId,
+        limit: i64,
+    ) -> Vec<cards_sdk::PendingCard> {
         self.spoiler.pending_cards(guild_id, limit).await
     }
-    async fn ack(&self, guild_id: i64, up_to_queue_id: i64) {
+    async fn ack(&self, guild_id: cards_sdk::GuildId, up_to_queue_id: i64) {
         self.spoiler.ack(guild_id, up_to_queue_id).await;
     }
     async fn create_subscription(
         &self,
-        guild_id: i64,
-        channel_id: i64,
-        webhook_id: i64,
-        webhook_token: &str,
+        guild_id: cards_sdk::GuildId,
+        channel_id: cards_sdk::ChannelId,
+        sub_id: cards_sdk::SubscriptionId,
+        token: &str,
     ) {
         self.spoiler
-            .create_subscription(guild_id, channel_id, webhook_id, webhook_token)
+            .create_subscription(guild_id, channel_id, sub_id, token)
             .await;
     }
-    async fn delete_subscription(&self, guild_id: i64) -> Option<i64> {
+    async fn delete_subscription(
+        &self,
+        guild_id: cards_sdk::GuildId,
+    ) -> Option<cards_sdk::SubscriptionId> {
         self.spoiler.delete_subscription(guild_id).await
     }
-    async fn record_failure(&self, guild_id: i64) -> i64 {
+    async fn record_failure(&self, guild_id: cards_sdk::GuildId) -> i64 {
         self.spoiler.record_failure(guild_id).await
     }
     async fn prune_queue(&self) {

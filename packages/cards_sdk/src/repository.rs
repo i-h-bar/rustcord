@@ -1,3 +1,4 @@
+use crate::ids::{ChannelId, GuildId, SubscriptionId};
 use crate::ingest::{CardInfo, UpsertResult};
 use crate::spoiler::{PendingCard, Subscription};
 use async_trait::async_trait;
@@ -35,23 +36,23 @@ pub trait WriteRepository {
 #[async_trait]
 pub trait SpoilerQueue {
     async fn subscriptions_with_pending(&self) -> Vec<Subscription>;
-    async fn pending_cards(&self, guild_id: i64, limit: i64) -> Vec<PendingCard>;
+    async fn pending_cards(&self, guild_id: GuildId, limit: i64) -> Vec<PendingCard>;
     /// Advances the cursor and resets `consecutive_failures` to `0` — acking
     /// only ever follows a successful delivery (see `notifier`'s
     /// `domain::notify::run`), so this is where the failure streak clears.
-    async fn ack(&self, guild_id: i64, up_to_queue_id: i64);
+    async fn ack(&self, guild_id: GuildId, up_to_queue_id: i64);
     async fn create_subscription(
         &self,
-        guild_id: i64,
-        channel_id: i64,
-        webhook_id: i64,
-        webhook_token: &str,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+        sub_id: SubscriptionId,
+        token: &str,
     );
     /// Deletes the subscription and returns the `webhook_id` it had, if it
     /// existed — the caller (`bot`'s `/spoilers unsubscribe` handler) needs
     /// this to also delete the actual Discord webhook via `WebhookRegistrar`,
     /// since `cards_sdk` has no Discord API access of its own.
-    async fn delete_subscription(&self, guild_id: i64) -> Option<i64>;
+    async fn delete_subscription(&self, guild_id: GuildId) -> Option<SubscriptionId>;
     /// Increments `consecutive_failures` for a guild whose webhook delivery
     /// just failed and returns the new count (`0` if the subscription no
     /// longer exists, e.g. a concurrent unsubscribe raced this call — safe
@@ -61,7 +62,7 @@ pub trait SpoilerQueue {
     /// threshold is delivery policy, not something `cards_sdk` should own,
     /// matching this crate's existing "repository stays dumb data access"
     /// principle.
-    async fn record_failure(&self, guild_id: i64) -> i64;
+    async fn record_failure(&self, guild_id: GuildId) -> i64;
     /// Deletes `spoiler_queue` rows that are no longer useful, for either of
     /// two reasons: every current subscription has already passed them (i.e.
     /// below the *minimum* cursor across all subscriptions — a row still
@@ -112,6 +113,6 @@ mod tests {
         let mut mock = MockSpoilerQueue::new();
         mock.expect_ack().times(1).return_const(());
 
-        mock.ack(1, 2).await;
+        mock.ack(GuildId::from(1u64), 2).await;
     }
 }

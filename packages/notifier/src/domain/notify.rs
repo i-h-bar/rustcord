@@ -18,7 +18,10 @@ pub async fn run(
         let cards = repo.pending_cards(sub.guild_id, BATCH_SIZE).await;
         for pending in cards {
             let embed = create_embed_with_image_url(&pending.card, &pending.image_url).await;
-            match sender.send(sub.webhook_id, &sub.webhook_token, embed).await {
+            match sender
+                .send(sub.webhook_id.into(), &sub.webhook_token, embed)
+                .await
+            {
                 Ok(()) => repo.ack(sub.guild_id, pending.queue_id).await,
                 Err(e) => {
                     log::warn!(
@@ -51,8 +54,8 @@ pub async fn run(
 mod tests {
     use super::*;
     use crate::ports::webhook::{MockWebhookSender, WebhookError};
-    use cards_sdk::MockSpoilerQueue;
     use cards_sdk::spoiler::{PendingCard, Subscription};
+    use cards_sdk::{ChannelId, GuildId, MockSpoilerQueue, SubscriptionId};
     use mockall::predicate::eq;
 
     /// `discord_embeds::create_embed_with_image_url` lazily initializes a
@@ -108,15 +111,15 @@ mod tests {
             .times(1)
             .return_once(|| {
                 vec![Subscription {
-                    guild_id: 1,
-                    channel_id: 2,
-                    webhook_id: 3,
+                    guild_id: GuildId::from(1u64),
+                    channel_id: ChannelId::from(2u64),
+                    webhook_id: SubscriptionId::from(3u64),
                     webhook_token: "tok".to_string(),
                     cursor: 0,
                 }]
             });
         repo.expect_pending_cards()
-            .with(eq(1i64), eq(10i64))
+            .with(eq(GuildId::from(1u64)), eq(10i64))
             .times(1)
             .return_once(|_, _| {
                 vec![
@@ -134,11 +137,11 @@ mod tests {
             });
         sender.expect_send().times(2).returning(|_, _, _| Ok(()));
         repo.expect_ack()
-            .with(eq(1i64), eq(1i64))
+            .with(eq(GuildId::from(1u64)), eq(1i64))
             .times(1)
             .return_const(());
         repo.expect_ack()
-            .with(eq(1i64), eq(2i64))
+            .with(eq(GuildId::from(1u64)), eq(2i64))
             .times(1)
             .return_const(());
         repo.expect_prune_queue().times(1).return_const(());
@@ -156,15 +159,15 @@ mod tests {
             .times(1)
             .return_once(|| {
                 vec![Subscription {
-                    guild_id: 1,
-                    channel_id: 2,
-                    webhook_id: 3,
+                    guild_id: GuildId::from(1u64),
+                    channel_id: ChannelId::from(2u64),
+                    webhook_id: SubscriptionId::from(3u64),
                     webhook_token: "tok".to_string(),
                     cursor: 0,
                 }]
             });
         repo.expect_pending_cards()
-            .with(eq(1i64), eq(10i64))
+            .with(eq(GuildId::from(1u64)), eq(10i64))
             .times(1)
             .return_once(|_, _| {
                 vec![
@@ -197,20 +200,20 @@ mod tests {
             .times(1)
             .returning(|_, _, _| Err(WebhookError::Status(404)));
         repo.expect_ack()
-            .with(eq(1i64), eq(1i64))
+            .with(eq(GuildId::from(1u64)), eq(1i64))
             .times(1)
             .return_const(());
         repo.expect_ack()
-            .with(eq(1i64), eq(2i64))
+            .with(eq(GuildId::from(1u64)), eq(2i64))
             .times(0)
             .return_const(());
         repo.expect_ack()
-            .with(eq(1i64), eq(3i64))
+            .with(eq(GuildId::from(1u64)), eq(3i64))
             .times(0)
             .return_const(());
         // Below MAX_CONSECUTIVE_FAILURES (5) — must NOT trigger auto-unsubscribe.
         repo.expect_record_failure()
-            .with(eq(1i64))
+            .with(eq(GuildId::from(1u64)))
             .times(1)
             .return_once(|_| 2);
         repo.expect_delete_subscription().times(0);
@@ -229,15 +232,15 @@ mod tests {
             .times(1)
             .return_once(|| {
                 vec![Subscription {
-                    guild_id: 1,
-                    channel_id: 2,
-                    webhook_id: 3,
+                    guild_id: GuildId::from(1u64),
+                    channel_id: ChannelId::from(2u64),
+                    webhook_id: SubscriptionId::from(3u64),
                     webhook_token: "tok".to_string(),
                     cursor: 0,
                 }]
             });
         repo.expect_pending_cards()
-            .with(eq(1i64), eq(10i64))
+            .with(eq(GuildId::from(1u64)), eq(10i64))
             .times(1)
             .return_once(|_, _| {
                 vec![PendingCard {
@@ -253,13 +256,13 @@ mod tests {
         repo.expect_ack().times(0);
         // Reaches MAX_CONSECUTIVE_FAILURES (5) exactly — must trigger auto-unsubscribe.
         repo.expect_record_failure()
-            .with(eq(1i64))
+            .with(eq(GuildId::from(1u64)))
             .times(1)
             .return_once(|_| 5);
         repo.expect_delete_subscription()
-            .with(eq(1i64))
+            .with(eq(GuildId::from(1u64)))
             .times(1)
-            .return_const(Some(3i64));
+            .return_const(Some(SubscriptionId::from(3u64)));
         repo.expect_prune_queue().times(1).return_const(());
 
         run(&repo, &sender).await;

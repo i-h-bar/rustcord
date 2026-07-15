@@ -1,30 +1,22 @@
 use crate::ports::drivers::client::MessageInteraction;
-use crate::ports::services::spoiler_subscription::{Subscription, SpoilerSubscription};
-use cards_sdk::SpoilerQueue;
+use crate::ports::services::spoiler_subscription::{SpoilerSubscription, Subscription};
+use cards_sdk::{ChannelId, GuildId, SpoilerQueue};
 
 pub async fn subscribe<S, Sub, I>(
     storage: &S,
     sub: &Sub,
     interaction: &I,
-    guild_id: i64,
-    channel_id: u64,
+    guild_id: GuildId,
+    channel_id: ChannelId,
 ) where
     S: SpoilerQueue,
     Sub: SpoilerSubscription,
     I: MessageInteraction,
 {
     match sub.create_subscription(channel_id).await {
-        Ok(Subscription {
-               id,
-               token,
-        }) => {
+        Ok(Subscription { id, token }) => {
             storage
-                .create_subscription(
-                    guild_id,
-                    channel_id.cast_signed(),
-                    id,
-                    &token,
-                )
+                .create_subscription(guild_id, channel_id, id, &token)
                 .await;
             let _ = interaction
                 .reply("Spoiler notifications enabled for this channel.".to_string())
@@ -41,19 +33,15 @@ pub async fn subscribe<S, Sub, I>(
     }
 }
 
-pub async fn unsubscribe<S, Sub, I>(storage: &S, sub: &Sub, interaction: &I, guild_id: i64)
+pub async fn unsubscribe<S, Sub, I>(storage: &S, sub: &Sub, interaction: &I, guild_id: GuildId)
 where
     S: SpoilerQueue,
     Sub: SpoilerSubscription,
     I: MessageInteraction,
 {
     if let Some(sub_id) = storage.delete_subscription(guild_id).await {
-        if let Ok(sub_id) = u64::try_from(sub_id) {
-            if let Err(e) = sub.delete_subscription(sub_id).await {
-                log::warn!(
-                    "Failed to delete Discord webhook {sub_id} for guild {guild_id}: {e}"
-                );
-            }
+        if let Err(e) = sub.delete_subscription(sub_id).await {
+            log::warn!("Failed to delete Discord webhook {sub_id} for guild {guild_id}: {e}");
         }
     }
     let _ = interaction
@@ -66,7 +54,7 @@ mod tests {
     use super::*;
     use crate::ports::drivers::client::MockMessageInteraction;
     use crate::ports::services::spoiler_subscription::MockSpoilerSubscription;
-    use cards_sdk::MockSpoilerQueue;
+    use cards_sdk::{MockSpoilerQueue, SubscriptionId};
     use mockall::predicate::eq;
 
     #[tokio::test]
@@ -76,22 +64,34 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
 
         sub.expect_create_subscription()
-            .with(eq(42u64))
+            .with(eq(ChannelId::from(42u64)))
             .times(1)
             .returning(|_| {
                 Ok(Subscription {
-                    id: 99,
+                    id: SubscriptionId::from(99u64),
                     token: "tok".to_string(),
                 })
             });
         storage
             .expect_create_subscription()
-            .with(eq(1i64), eq(42i64), eq(99i64), eq("tok"))
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(42u64)),
+                eq(SubscriptionId::from(99u64)),
+                eq("tok"),
+            )
             .times(1)
             .return_const(());
         interaction.expect_reply().times(1).returning(|_| Ok(()));
 
-        subscribe(&storage, &sub, &interaction, 1, 42).await;
+        subscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -106,7 +106,14 @@ mod tests {
         storage.expect_create_subscription().times(0);
         interaction.expect_reply().times(1).returning(|_| Ok(()));
 
-        subscribe(&storage, &sub, &interaction, 1, 42).await;
+        subscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -117,16 +124,16 @@ mod tests {
 
         storage
             .expect_delete_subscription()
-            .with(eq(1i64))
+            .with(eq(GuildId::from(1u64)))
             .times(1)
-            .return_once(|_| Some(99));
+            .return_once(|_| Some(SubscriptionId::from(99u64)));
         sub.expect_delete_subscription()
-            .with(eq(99u64))
+            .with(eq(SubscriptionId::from(99u64)))
             .times(1)
             .returning(|_| Ok(()));
         interaction.expect_reply().times(1).returning(|_| Ok(()));
 
-        unsubscribe(&storage, &sub, &interaction, 1).await;
+        unsubscribe(&storage, &sub, &interaction, GuildId::from(1u64)).await;
     }
 
     #[tokio::test]
@@ -137,12 +144,12 @@ mod tests {
 
         storage
             .expect_delete_subscription()
-            .with(eq(1i64))
+            .with(eq(GuildId::from(1u64)))
             .times(1)
             .return_once(|_| None);
         sub.expect_delete_subscription().times(0);
         interaction.expect_reply().times(1).returning(|_| Ok(()));
 
-        unsubscribe(&storage, &sub, &interaction, 1).await;
+        unsubscribe(&storage, &sub, &interaction, GuildId::from(1u64)).await;
     }
 }

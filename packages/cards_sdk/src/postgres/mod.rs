@@ -3,6 +3,7 @@ mod queries;
 #[cfg(feature = "local-dev")]
 use indicatif::{ProgressBar, ProgressStyle};
 
+use crate::ids::{ChannelId, GuildId, SubscriptionId};
 use crate::ingest::{
     Artist, CardInfo, CardRecord, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule,
     Set, UpsertResult,
@@ -717,9 +718,9 @@ impl SpoilerQueue for Postgres {
             Ok(rows) => rows
                 .into_iter()
                 .map(|row| Subscription {
-                    guild_id: row.get::<i64, &str>("guild_id"),
-                    channel_id: row.get::<i64, &str>("channel_id"),
-                    webhook_id: row.get::<i64, &str>("webhook_id"),
+                    guild_id: row.get::<GuildId, &str>("guild_id"),
+                    channel_id: row.get::<ChannelId, &str>("channel_id"),
+                    webhook_id: row.get::<SubscriptionId, &str>("webhook_id"),
                     webhook_token: row.get::<String, &str>("webhook_token"),
                     cursor: row.get::<i64, &str>("cursor"),
                 })
@@ -727,7 +728,7 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn pending_cards(&self, guild_id: i64, limit: i64) -> Vec<PendingCard> {
+    async fn pending_cards(&self, guild_id: GuildId, limit: i64) -> Vec<PendingCard> {
         match sqlx::query(PENDING_CARDS)
             .bind(guild_id)
             .bind(limit)
@@ -749,7 +750,7 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn ack(&self, guild_id: i64, up_to_queue_id: i64) {
+    async fn ack(&self, guild_id: GuildId, up_to_queue_id: i64) {
         if let Err(e) = sqlx::query(
             "UPDATE spoiler_subscription
              SET cursor = $2, consecutive_failures = 0
@@ -766,9 +767,9 @@ impl SpoilerQueue for Postgres {
 
     async fn create_subscription(
         &self,
-        guild_id: i64,
-        channel_id: i64,
-        webhook_id: i64,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+        webhook_id: SubscriptionId,
         webhook_token: &str,
     ) {
         if let Err(e) = sqlx::query(
@@ -791,8 +792,8 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn delete_subscription(&self, guild_id: i64) -> Option<i64> {
-        match sqlx::query_as::<_, (i64,)>(
+    async fn delete_subscription(&self, guild_id: GuildId) -> Option<SubscriptionId> {
+        match sqlx::query_as::<_, (SubscriptionId,)>(
             "DELETE FROM spoiler_subscription WHERE guild_id = $1 RETURNING webhook_id",
         )
         .bind(guild_id)
@@ -807,7 +808,7 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn record_failure(&self, guild_id: i64) -> i64 {
+    async fn record_failure(&self, guild_id: GuildId) -> i64 {
         match sqlx::query_as::<_, (i32,)>(
             "UPDATE spoiler_subscription
              SET consecutive_failures = consecutive_failures + 1

@@ -33,7 +33,7 @@ impl ReqwestWebhookSender {
 impl WebhookSender for ReqwestWebhookSender {
     async fn send(
         &self,
-        webhook_id: i64,
+        webhook_id: u64,
         webhook_token: &str,
         embed: CreateEmbed,
     ) -> Result<(), WebhookError> {

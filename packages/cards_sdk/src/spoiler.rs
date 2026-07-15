@@ -1,9 +1,10 @@
+use crate::ids::{ChannelId, GuildId, SubscriptionId};
 use contracts::card::Card;
 
 pub struct Subscription {
-    pub guild_id: i64,
-    pub channel_id: i64,
-    pub webhook_id: i64,
+    pub guild_id: GuildId,
+    pub channel_id: ChannelId,
+    pub webhook_id: SubscriptionId,
     pub webhook_token: String,
     pub cursor: i64,
 }
@@ -28,13 +29,13 @@ mod tests {
     #[test]
     fn subscription_fields_are_accessible() {
         let sub = Subscription {
-            guild_id: 1,
-            channel_id: 2,
-            webhook_id: 3,
+            guild_id: GuildId::from(1u64),
+            channel_id: ChannelId::from(2u64),
+            webhook_id: SubscriptionId::from(3u64),
             webhook_token: "token".to_string(),
             cursor: 0,
         };
-        assert_eq!(sub.guild_id, 1);
+        assert_eq!(u64::from(sub.guild_id), 1);
     }
 
     #[test]

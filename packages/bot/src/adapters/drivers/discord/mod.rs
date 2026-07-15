@@ -23,7 +23,7 @@ use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
 use crate::ports::services::spoiler_subscription::SpoilerSubscription;
 use async_trait::async_trait;
-use cards_sdk::SpoilerQueue;
+use cards_sdk::{ChannelId, GuildId, SpoilerQueue};
 use discord_embeds::warmup_emoji;
 use serenity::all::{
     Command, CommandInteraction, ComponentInteractionDataKind, Context, EventHandler, Interaction,
@@ -59,13 +59,13 @@ where
                 let ResolvedValue::Channel(channel) = channel_opt.value else {
                     return;
                 };
-                let channel_id = channel.id.get();
+                let channel_id = ChannelId::from(channel.id.get());
                 let interaction = DiscordCommand::new(ctx, command);
                 functions::spoilers::subscribe(
                     &self.card_store,
                     &self.sub,
                     &interaction,
-                    guild_id.get().cast_signed(),
+                    GuildId::from(guild_id.get()),
                     channel_id,
                 )
                 .await;
@@ -76,7 +76,7 @@ where
                     &self.card_store,
                     &self.sub,
                     &interaction,
-                    guild_id.get().cast_signed(),
+                    GuildId::from(guild_id.get()),
                 )
                 .await;
             }

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use cards_sdk::{ChannelId, SubscriptionId};
 use thiserror::Error;
 
 #[cfg(test)]
@@ -16,15 +17,25 @@ impl SpoilerSubError {
 }
 
 pub struct Subscription {
-    pub id: i64,
+    pub id: SubscriptionId,
     pub token: String,
 }
 
+/// A source of spoiler-announcement subscriptions — currently always
+/// Discord webhooks (`DiscordWebhookRegistrar`), but this trait deliberately
+/// speaks in `cards_sdk`'s platform-agnostic `ChannelId`/`SubscriptionId`
+/// newtypes rather than Discord's native `u64` snowflakes, so a future
+/// non-Discord implementation isn't forced to shoehorn its own identifiers
+/// into Discord's representation. Only the concrete Discord adapter
+/// (`adapters/services/spoiler_subscription/discord.rs`) ever touches a raw
+/// `u64`.
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait SpoilerSubscription {
     fn create() -> Self;
-    async fn create_subscription(&self, channel_id: u64)
-        -> Result<Subscription, SpoilerSubError>;
-    async fn delete_subscription(&self, webhook_id: u64) -> Result<(), SpoilerSubError>;
+    async fn create_subscription(
+        &self,
+        channel_id: ChannelId,
+    ) -> Result<Subscription, SpoilerSubError>;
+    async fn delete_subscription(&self, sub_id: SubscriptionId) -> Result<(), SpoilerSubError>;
 }
