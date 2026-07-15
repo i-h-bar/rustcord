@@ -1,11 +1,10 @@
 use crate::adapters::drivers::discord::components::interaction::{FLIP, PICK_PRINT_ID, SIMILAR_ID};
-use crate::adapters::drivers::discord::emoji::discord::get_emoji;
 use crate::adapters::drivers::discord::utils::description::{
     create_card_description, create_set_description,
 };
-use crate::adapters::drivers::discord::utils::emoji::colour_id_emoji;
 use contracts::card::Card;
 use contracts::card_set::CardSet;
+use discord_embeds::{colour_id_emoji, get_emoji};
 use serenity::all::{
     ButtonStyle, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,

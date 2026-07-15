@@ -1,17 +1,17 @@
 pub mod client;
 mod commands;
 mod components;
-pub mod emoji;
 mod messages;
 mod utils;
 
 use crate::adapters::drivers::discord::commands::game::DiscordCommandInteraction;
 use crate::adapters::drivers::discord::commands::interaction::DiscordCommand;
-use crate::adapters::drivers::discord::commands::register::{give_up, guess, help, play, search};
+use crate::adapters::drivers::discord::commands::register::{
+    give_up, guess, help, play, search, spoilers,
+};
 use crate::adapters::drivers::discord::components::interaction::{
     DiscordComponentInteraction, FLIP, PICK_PRINT_ID, SIMILAR_ID,
 };
-use crate::adapters::drivers::discord::emoji::discord::warmup_emoji;
 use crate::adapters::drivers::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::drivers::discord::utils::help::HELP;
 use crate::domain::app::App;
@@ -21,19 +21,77 @@ use crate::domain::{card, functions};
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use crate::ports::services::spoiler_subscription::SpoilerSubscription;
 use async_trait::async_trait;
+use cards_sdk::SpoilerQueue;
+use discord_embeds::warmup_emoji;
 use serenity::all::{
-    Command, ComponentInteractionDataKind, Context, EventHandler, Interaction, Message, Ready,
+    Command, CommandInteraction, ComponentInteractionDataKind, Context, EventHandler, Interaction,
+    Message, Ready, ResolvedValue,
 };
 use utils::parse;
 use uuid::Uuid;
 
-#[async_trait]
-impl<IS, CS, C> EventHandler for App<IS, CS, C>
+impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
 where
     IS: ImageStore + Send + Sync,
-    CS: CardStore + Send + Sync,
+    CS: CardStore + SpoilerQueue + Send + Sync,
     C: Cache + Send + Sync,
+    Sub: SpoilerSubscription + Send + Sync,
+{
+    async fn dispatch_spoilers_command(&self, ctx: Context, command: CommandInteraction) {
+        let Some(guild_id) = command.guild_id else {
+            return;
+        };
+        let options = command.data.options();
+        let Some(sub) = options.first() else {
+            return;
+        };
+
+        match sub.name {
+            "subscribe" => {
+                let ResolvedValue::SubCommand(sub_options) = &sub.value else {
+                    return;
+                };
+                let Some(channel_opt) = sub_options.iter().find(|o| o.name == "channel") else {
+                    return;
+                };
+                let ResolvedValue::Channel(channel) = channel_opt.value else {
+                    return;
+                };
+                let channel_id = channel.id.get();
+                let interaction = DiscordCommand::new(ctx, command);
+                functions::spoilers::subscribe(
+                    &self.card_store,
+                    &self.sub,
+                    &interaction,
+                    guild_id.get().cast_signed(),
+                    channel_id,
+                )
+                .await;
+            }
+            "unsubscribe" => {
+                let interaction = DiscordCommand::new(ctx, command);
+                functions::spoilers::unsubscribe(
+                    &self.card_store,
+                    &self.sub,
+                    &interaction,
+                    guild_id.get().cast_signed(),
+                )
+                .await;
+            }
+            _ => (),
+        }
+    }
+}
+
+#[async_trait]
+impl<IS, CS, C, Sub> EventHandler for App<IS, CS, C, Sub>
+where
+    IS: ImageStore + Send + Sync,
+    CS: CardStore + SpoilerQueue + Send + Sync,
+    C: Cache + Send + Sync,
+    Sub: SpoilerSubscription + Send + Sync,
 {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.id == ctx.cache.current_user().id || msg.author.bot {
@@ -78,6 +136,12 @@ where
             log::warn!("Could not create command {err:?}");
         } else {
             log::info!("Created give_up command");
+        }
+
+        if let Err(err) = Command::create_global_command(&ctx, spoilers::register()).await {
+            log::warn!("Could not create command {err:?}");
+        } else {
+            log::info!("Created spoilers command");
         }
 
         warmup_emoji().await;
@@ -141,6 +205,9 @@ where
                     "give_up" => {
                         let interaction = DiscordCommandInteraction::new(ctx, command);
                         self.give_up_command(&interaction).await;
+                    }
+                    "spoilers" => {
+                        self.dispatch_spoilers_command(ctx, command).await;
                     }
                     _ => (),
                 }

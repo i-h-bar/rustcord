@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 12 June 2026_
+_Last updated: 15 July 2026_
 
 ## Overview
 
@@ -19,6 +19,19 @@ When a guessing game is started with `/play`, the bot stores game state (the mys
 - Is scoped to the channel, not to any individual user
 - Expires automatically after 24 hours
 - Is deleted immediately when the game ends (win, loss, or `/give_up`)
+
+### Spoiler Notification Subscriptions
+When a server admin runs `/spoilers subscribe #channel`, the bot creates a Discord webhook for that channel and stores the following in a persistent PostgreSQL database:
+- The Discord server (guild) ID
+- The Discord channel ID
+- The webhook's ID and token
+
+This data:
+- Is scoped to the server and channel, not to any individual user — the identity of the admin who ran the command is not stored
+- Is used solely to post automated new-card announcement embeds to the designated channel as new Magic: The Gathering cards are added to the database
+- Is never shared with any third party; the webhook token is a credential stored only in the bot's own self-hosted database
+
+Unlike game state, this data is **not** time-limited. It is retained until the server unsubscribes (`/spoilers unsubscribe`), or until the subscription is automatically removed after several consecutive failed delivery attempts (for example, if the channel or webhook has been deleted).
 
 ### Operational Logs
 The bot writes operational logs for debugging purposes. These logs may contain:
@@ -43,7 +56,7 @@ Rustcord does not share any data with third parties. Card data is served from a 
 
 ## Data Retention
 
-Game state in Redis expires after 24 hours. Operational logs are retained at the discretion of the bot operator and are used solely for debugging.
+Game state in Redis expires after 24 hours. Spoiler notification subscriptions (server ID, channel ID, webhook credentials) are retained until the subscribing server unsubscribes or the subscription is automatically removed after repeated delivery failures — see "Spoiler Notification Subscriptions" above. Operational logs are retained at the discretion of the bot operator and are used solely for debugging.
 
 ## Contact
 

@@ -764,6 +764,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "discord_embeds"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "contracts",
+ "log",
+ "lru",
+ "normalise",
+ "regex",
+ "serenity",
+ "tokio",
+]
+
+[[package]]
 name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2020,6 +2034,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "notifier"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cards_sdk",
+ "contracts",
+ "discord_embeds",
+ "env_logger",
+ "log",
+ "mockall",
+ "reqwest 0.13.4",
+ "serde",
+ "serenity",
+ "thiserror 2.0.16",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2780,17 +2814,18 @@ dependencies = [
  "async-trait",
  "cards_sdk",
  "contracts",
+ "discord_embeds",
  "dotenv",
  "env_logger",
  "fuzzy",
  "log",
- "lru",
  "mockall",
  "named_lock",
  "normalise",
  "redis",
  "regex",
  "ron",
+ "secrecy",
  "serde",
  "serenity",
  "thiserror 2.0.16",

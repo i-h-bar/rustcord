@@ -1,12 +1,58 @@
-use crate::adapters::drivers::discord::utils::embed::{create_embed, create_game_embed};
 use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::ports::drivers::client::{GameInteraction, MessageInteractionError};
 use async_trait::async_trait;
+use contracts::card::Card;
 use contracts::image::Image;
+use discord_embeds::{add_emoji, create_embed, get_colour_identity, italicise_reminder_text};
 use serenity::all::{
-    CommandInteraction, Context, CreateAttachment, CreateInteractionResponse,
-    CreateInteractionResponseMessage, MessageBuilder,
+    CommandInteraction, Context, CreateAttachment, CreateEmbed, CreateEmbedFooter,
+    CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder,
 };
+use uuid::Uuid;
+
+/// The guessing game's progressive-reveal embed — distinct from `/search`'s
+/// `discord_embeds::create_embed`, since it hides the card name/mana
+/// cost/rules text until enough wrong guesses have been made. Not part of
+/// the `discord_embeds` extraction: this is game-specific presentation
+/// logic, not something `notifier` or any other consumer needs.
+pub async fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
+    let mut embed = CreateEmbed::default()
+        .attachment(format!(
+            "{}.png",
+            card.illustration_id().unwrap_or(&Uuid::default())
+        ))
+        .title("????")
+        .description("????")
+        .footer(CreateEmbedFooter::new(format!("🖌️ - {}", card.artist())));
+
+    if guesses > multiplier {
+        let mana_cost = add_emoji(card.mana_cost()).await;
+        let title = format!("????        {mana_cost}");
+        embed = embed
+            .title(title)
+            .colour(get_colour_identity(card.colour_identity()));
+    }
+
+    if guesses > multiplier * 2 {
+        let stats = if let Some(power) = card.power() {
+            let toughness = card.toughness().unwrap_or("0");
+            format!("\n\n{power}/{toughness}")
+        } else if let Some(loyalty) = card.loyalty() {
+            format!("\n\n{loyalty}")
+        } else if let Some(defence) = card.defence() {
+            format!("\n\n{defence}")
+        } else {
+            String::new()
+        };
+
+        let rules_text = add_emoji(card.oracle_text()).await;
+        let oracle_text = italicise_reminder_text(&rules_text);
+
+        embed = embed.description(format!("{}\n\n{}{}", card.type_line(), oracle_text, stats));
+    }
+
+    embed
+}
 
 pub struct DiscordCommandInteraction {
     ctx: Context,

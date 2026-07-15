@@ -1,0 +1,15 @@
+FROM rust:1.96-bullseye AS builder
+
+WORKDIR /app
+
+COPY Cargo.toml Cargo.lock ./
+COPY packages ./packages
+
+RUN cargo fetch
+RUN cargo build --release -p notifier
+
+FROM debian:bullseye-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=builder /app/target/release/notifier /app/notifier
+ENTRYPOINT ["/app/notifier"]

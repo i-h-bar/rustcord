@@ -9,10 +9,11 @@ use crate::ingest::{
 };
 use crate::postgres::queries::{
     ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
-    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, RANDOM_CARD,
-    RANDOM_SET_CARD, SIMILAR_CARDS_FROM,
+    FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, PENDING_CARDS,
+    RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM, SUBSCRIPTIONS_WITH_PENDING,
 };
-use crate::repository::{ReadRepository, WriteRepository};
+use crate::repository::{ReadRepository, SpoilerQueue, WriteRepository};
+use crate::spoiler::{PendingCard, Subscription};
 use async_trait::async_trait;
 use contracts::card::Card;
 use contracts::card_set::CardSet;
@@ -22,9 +23,16 @@ use sqlx::postgres::{PgConnection, PgPoolOptions, PgRow};
 use sqlx::types::time::Date;
 use sqlx::{Connection, Pool, Row, error::DatabaseError};
 use std::env;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 const DEFAULT_MAX_CONNECTIONS: u32 = 5;
+
+/// A `spoiler_queue` row older than this is purged by `prune_queue`
+/// regardless of delivery state — a safety valve for a subscription whose
+/// webhook silently died and will never advance its cursor again, which
+/// would otherwise block the cursor-based half of `prune_queue` forever.
+const MAX_QUEUE_AGE_DAYS: i64 = 7;
 
 /// Shared advisory lock key used by `create_for_batch` to serialize the
 /// "check usage, then connect" step across concurrently-starting instances,
@@ -281,8 +289,8 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card(&self, card: &CardRecord) -> (Option<Uuid>, Option<Uuid>) {
-        match sqlx::query_as::<_, (Option<Uuid>, Option<Uuid>)>(
+    async fn upsert_card(&self, card: &CardRecord) -> (Option<Uuid>, Option<Uuid>, bool) {
+        match sqlx::query_as::<_, (Option<Uuid>, Option<Uuid>, bool)>(
             "WITH prev AS (
                 SELECT image_id, illustration_id FROM card WHERE id = $1
             )
@@ -305,7 +313,8 @@ impl Postgres {
                     card.illustration_id  IS DISTINCT FROM EXCLUDED.illustration_id)
              RETURNING
                (SELECT image_id FROM prev) AS prev_image_id,
-               (SELECT illustration_id FROM prev) AS prev_illustration_id",
+               (SELECT illustration_id FROM prev) AS prev_illustration_id,
+               (SELECT 1 FROM prev) IS NULL AS is_new",
         )
         .bind(card.id)
         .bind(card.oracle_id)
@@ -324,15 +333,15 @@ impl Postgres {
         .fetch_optional(&self.pool)
         .await
         {
-            Ok(Some((prev_img, prev_ill))) => {
+            Ok(Some((prev_img, prev_ill, is_new))) => {
                 let orphaned_img = prev_img.filter(|&old| old != card.image_id);
                 let orphaned_ill = prev_ill.filter(|old| Some(*old) != card.illustration_id);
-                (orphaned_img, orphaned_ill)
+                (orphaned_img, orphaned_ill, is_new)
             }
-            Ok(None) => (None, None),
+            Ok(None) => (None, None, false),
             Err(e) => {
                 log::warn!("Failed to upsert card {}: {}", card.id, e);
-                (None, None)
+                (None, None, false)
             }
         }
     }
@@ -403,7 +412,7 @@ impl Postgres {
         }
     }
 
-    async fn upsert_card_info(&self, info: &CardInfo) -> (Option<Uuid>, Option<Uuid>) {
+    async fn upsert_card_info(&self, info: &CardInfo) -> (Option<Uuid>, Option<Uuid>, bool) {
         self.upsert_artist(&info.artist).await;
         self.upsert_image(&info.image).await;
         if let Some(ill) = &info.illustration {
@@ -412,10 +421,10 @@ impl Postgres {
         self.upsert_set(&info.set).await;
         self.upsert_rule(&info.rule).await;
         self.upsert_legality(&info.legality).await;
-        let (orphaned_img, orphaned_ill) = self.upsert_card(&info.card).await;
+        let (orphaned_img, orphaned_ill, is_new) = self.upsert_card(&info.card).await;
         self.upsert_price(&info.price).await;
 
-        (orphaned_img, orphaned_ill)
+        (orphaned_img, orphaned_ill, is_new)
     }
 }
 
@@ -581,6 +590,7 @@ impl WriteRepository for Postgres {
 
         let mut orphaned_images: Vec<Uuid> = Vec::new();
         let mut orphaned_illustrations: Vec<Uuid> = Vec::new();
+        let mut new_card_ids: Vec<Uuid> = Vec::new();
 
         let card_futs: Vec<_> = cards
             .iter()
@@ -595,12 +605,15 @@ impl WriteRepository for Postgres {
             .collect()
             .await;
 
-        for (orphaned_img, orphaned_ill) in results {
+        for (info, (orphaned_img, orphaned_ill, is_new)) in cards.iter().zip(results) {
             if let Some(id) = orphaned_img {
                 orphaned_images.push(id);
             }
             if let Some(id) = orphaned_ill {
                 orphaned_illustrations.push(id);
+            }
+            if is_new {
+                new_card_ids.push(info.card.id);
             }
         }
 
@@ -625,6 +638,25 @@ impl WriteRepository for Postgres {
             .buffer_unordered(self.pool_size)
             .collect::<Vec<_>>()
             .await;
+
+        if !new_card_ids.is_empty() {
+            if let Err(e) =
+                sqlx::query("INSERT INTO spoiler_queue (card_id) SELECT * FROM UNNEST($1::uuid[])")
+                    .bind(&new_card_ids)
+                    .execute(&self.pool)
+                    .await
+            {
+                log::warn!(
+                    "Failed to enqueue {} new card(s) for spoiler delivery: {e}",
+                    new_card_ids.len()
+                );
+            } else {
+                log::info!(
+                    "Enqueued {} new card(s) for spoiler delivery",
+                    new_card_ids.len()
+                );
+            }
+        }
 
         UpsertResult {
             orphaned_images,
@@ -668,6 +700,163 @@ impl WriteRepository for Postgres {
             }
         }
         deleted
+    }
+}
+
+#[async_trait]
+impl SpoilerQueue for Postgres {
+    async fn subscriptions_with_pending(&self) -> Vec<Subscription> {
+        match sqlx::query(SUBSCRIPTIONS_WITH_PENDING)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed to fetch subscriptions with pending cards: {why}");
+                Vec::new()
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| Subscription {
+                    guild_id: row.get::<i64, &str>("guild_id"),
+                    channel_id: row.get::<i64, &str>("channel_id"),
+                    webhook_id: row.get::<i64, &str>("webhook_id"),
+                    webhook_token: row.get::<String, &str>("webhook_token"),
+                    cursor: row.get::<i64, &str>("cursor"),
+                })
+                .collect(),
+        }
+    }
+
+    async fn pending_cards(&self, guild_id: i64, limit: i64) -> Vec<PendingCard> {
+        match sqlx::query(PENDING_CARDS)
+            .bind(guild_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Err(why) => {
+                log::warn!("Failed to fetch pending cards for guild {guild_id}: {why}");
+                Vec::new()
+            }
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| PendingCard {
+                    queue_id: row.get::<i64, &str>("queue_id"),
+                    card: card_from(&row),
+                    image_url: row.get::<String, &str>("image_scryfall_url"),
+                })
+                .collect(),
+        }
+    }
+
+    async fn ack(&self, guild_id: i64, up_to_queue_id: i64) {
+        if let Err(e) = sqlx::query(
+            "UPDATE spoiler_subscription
+             SET cursor = $2, consecutive_failures = 0
+             WHERE guild_id = $1 AND cursor < $2",
+        )
+        .bind(guild_id)
+        .bind(up_to_queue_id)
+        .execute(&self.pool)
+        .await
+        {
+            log::warn!("Failed to advance cursor for guild {guild_id}: {e}");
+        }
+    }
+
+    async fn create_subscription(
+        &self,
+        guild_id: i64,
+        channel_id: i64,
+        webhook_id: i64,
+        webhook_token: &str,
+    ) {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO spoiler_subscription
+               (guild_id, channel_id, webhook_id, webhook_token, cursor)
+             VALUES ($1, $2, $3, $4, COALESCE((SELECT max(id) FROM spoiler_queue), 0))
+             ON CONFLICT (guild_id) DO UPDATE SET
+               channel_id    = EXCLUDED.channel_id,
+               webhook_id    = EXCLUDED.webhook_id,
+               webhook_token = EXCLUDED.webhook_token",
+        )
+        .bind(guild_id)
+        .bind(channel_id)
+        .bind(webhook_id)
+        .bind(webhook_token)
+        .execute(&self.pool)
+        .await
+        {
+            log::warn!("Failed to create spoiler subscription for guild {guild_id}: {e}");
+        }
+    }
+
+    async fn delete_subscription(&self, guild_id: i64) -> Option<i64> {
+        match sqlx::query_as::<_, (i64,)>(
+            "DELETE FROM spoiler_subscription WHERE guild_id = $1 RETURNING webhook_id",
+        )
+        .bind(guild_id)
+        .fetch_optional(&self.pool)
+        .await
+        {
+            Ok(row) => row.map(|(webhook_id,)| webhook_id),
+            Err(e) => {
+                log::warn!("Failed to delete spoiler subscription for guild {guild_id}: {e}");
+                None
+            }
+        }
+    }
+
+    async fn record_failure(&self, guild_id: i64) -> i64 {
+        match sqlx::query_as::<_, (i32,)>(
+            "UPDATE spoiler_subscription
+             SET consecutive_failures = consecutive_failures + 1
+             WHERE guild_id = $1
+             RETURNING consecutive_failures",
+        )
+        .bind(guild_id)
+        .fetch_optional(&self.pool)
+        .await
+        {
+            Ok(Some((count,))) => i64::from(count),
+            Ok(None) => 0,
+            Err(e) => {
+                log::warn!("Failed to record delivery failure for guild {guild_id}: {e}");
+                0
+            }
+        }
+    }
+
+    async fn prune_queue(&self) {
+        // A subscription's `cursor` is the id of the last row *delivered* to
+        // it (see `ack`/`pending_cards`, which excludes `id <= cursor` from
+        // future work) — so a row is safe to delete once `id <= min(cursor)`
+        // across all subscriptions, not merely `<`. `min(cursor)` over zero
+        // subscriptions is NULL, and `id <= NULL` is never true — so the
+        // first arm of this OR is a no-op (not a full-table delete) when
+        // nobody is subscribed yet, which is the safe direction to fail in.
+        // The second arm (age cap) still applies independently in that case,
+        // so rows don't accumulate forever even with zero subscribers.
+        let cutoff = OffsetDateTime::now_utc() - Duration::days(MAX_QUEUE_AGE_DAYS);
+
+        match sqlx::query(
+            "DELETE FROM spoiler_queue
+             WHERE id <= (SELECT min(cursor) FROM spoiler_subscription)
+                OR detected_at < $1",
+        )
+        .bind(cutoff)
+        .execute(&self.pool)
+        .await
+        {
+            Ok(result) if result.rows_affected() > 0 => {
+                log::info!(
+                    "Pruned {} spoiler_queue row(s) (delivered to all subscribers, or older than {MAX_QUEUE_AGE_DAYS} days)",
+                    result.rows_affected()
+                );
+            }
+            Ok(_) => {}
+            Err(e) => log::warn!("Failed to prune spoiler_queue: {e}"),
+        }
     }
 }
 

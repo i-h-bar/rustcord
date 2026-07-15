@@ -1,6 +1,6 @@
 # Terms of Service
 
-_Last updated: 12 June 2026_
+_Last updated: 15 July 2026_
 
 ## Acceptance
 
@@ -16,6 +16,8 @@ Rustcord is provided free of charge for personal and community use. You agree no
 ## Availability
 
 Rustcord is provided as-is with no guarantee of uptime or availability. The bot may be taken offline for maintenance, updates, or any other reason at any time without notice.
+
+Server admins may opt in to automated spoiler announcements via `/spoilers subscribe`, which requires the Manage Server permission and posts new-card announcements to a designated channel via a Discord webhook. Delivery of these announcements is not guaranteed — a subscription may be automatically removed after repeated failed delivery attempts (for example, if the channel or webhook is deleted), and admins are responsible for re-subscribing if this occurs.
 
 ## Intellectual Property
 

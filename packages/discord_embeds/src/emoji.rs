@@ -1,5 +1,5 @@
-use crate::adapters::drivers::discord::emoji::discord::get_emoji;
-use crate::domain::utils::REGEX_COLLECTION;
+use crate::emoji_cache::get_emoji;
+use crate::regex::REGEX_COLLECTION;
 use contracts::card::Card;
 use lru::LruCache;
 use normalise::normalise_emoji_name;

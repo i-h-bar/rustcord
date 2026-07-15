@@ -1,0 +1,17 @@
+[package]
+name = "discord_embeds"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+contracts = { workspace = true }
+normalise = { workspace = true }
+async-trait = "0.1.89"
+regex = "1.12.2"
+lru = "0.18.0"
+log = "0.4.27"
+tokio = { version = "1.47.1", features = ["sync", "time"] }
+serenity = { version = "0.12.4", default-features = false, features = ["builder", "model", "http", "rustls_backend"] }
+
+[lints]
+workspace = true
