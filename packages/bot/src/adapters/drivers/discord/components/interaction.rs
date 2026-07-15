@@ -70,4 +70,18 @@ impl MessageInteraction for DiscordComponentInteraction {
             .await
             .map_err(|e| MessageInteractionError::new(e.to_string()))
     }
+
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError> {
+        self.component
+            .create_response(
+                &self.ctx,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(message)
+                        .ephemeral(true),
+                ),
+            )
+            .await
+            .map_err(|e| MessageInteractionError::new(e.to_string()))
+    }
 }

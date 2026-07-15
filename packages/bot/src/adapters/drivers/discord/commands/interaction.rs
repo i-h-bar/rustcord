@@ -81,4 +81,13 @@ impl MessageInteraction for DiscordCommand {
 
         Ok(())
     }
+
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError> {
+        let message = CreateInteractionResponseMessage::new()
+            .content(message)
+            .ephemeral(true);
+        self.send_message(message).await?;
+
+        Ok(())
+    }
 }

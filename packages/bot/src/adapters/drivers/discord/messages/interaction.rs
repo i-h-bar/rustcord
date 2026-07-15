@@ -106,4 +106,11 @@ impl MessageInteraction for DiscordMessageInteration {
 
         Ok(())
     }
+
+    /// Plain channel messages (unlike slash command/component interaction
+    /// responses) have no ephemeral flag to set, so this falls back to a
+    /// normal, everyone-visible reply.
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError> {
+        self.reply(message).await
+    }
 }

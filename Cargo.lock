@@ -2041,6 +2041,7 @@ dependencies = [
  "cards_sdk",
  "contracts",
  "discord_embeds",
+ "dotenv",
  "env_logger",
  "log",
  "mockall",

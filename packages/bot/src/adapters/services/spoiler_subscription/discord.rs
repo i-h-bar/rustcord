@@ -5,7 +5,8 @@ use async_trait::async_trait;
 use cards_sdk::{ChannelId, SubscriptionId};
 use secrecy::ExposeSecret;
 use serenity::all::{
-    ChannelId as DiscordChannelId, CreateWebhook, Http, WebhookId as DiscordWebhookId,
+    ChannelId as DiscordChannelId, CreateAttachment, CreateWebhook, Http,
+    WebhookId as DiscordWebhookId,
 };
 use std::env;
 
@@ -27,7 +28,18 @@ impl SpoilerSubscription for DiscordWebhookRegistrar {
         channel_id: ChannelId,
     ) -> Result<Subscription, SpoilerSubError> {
         let channel = DiscordChannelId::new(channel_id.into());
-        let builder = CreateWebhook::new("Spoiler Notifications");
+        let mut builder = CreateWebhook::new("Card Bot Spoiler Notifications");
+
+        // Best-effort: give the webhook the bot's own avatar so it doesn't
+        // show up with Discord's blank default one. Not fatal if this fails
+        // — the webhook is still useful without a matching avatar.
+        if let Ok(bot_user) = self.http.get_current_user().await {
+            if let Some(avatar_url) = bot_user.avatar_url() {
+                if let Ok(avatar) = CreateAttachment::url(&self.http, &avatar_url).await {
+                    builder = builder.avatar(&avatar);
+                }
+            }
+        }
 
         let webhook = channel
             .create_webhook(&self.http, builder)
