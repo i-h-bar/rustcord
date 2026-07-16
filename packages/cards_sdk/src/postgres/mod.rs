@@ -749,23 +749,14 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn pending_cards(
-        &self,
-        guild_id: GuildId,
-        channel_id: ChannelId,
-        limit: i64,
-    ) -> Vec<PendingCard> {
+    async fn pending_cards_since(&self, min_cursor: i64) -> Vec<PendingCard> {
         match sqlx::query(PENDING_CARDS)
-            .bind(guild_id)
-            .bind(channel_id)
-            .bind(limit)
+            .bind(min_cursor)
             .fetch_all(&self.pool)
             .await
         {
             Err(why) => {
-                log::warn!(
-                    "Failed to fetch pending cards for guild {guild_id} channel {channel_id}: {why}"
-                );
+                log::warn!("Failed to fetch pending cards since cursor {min_cursor}: {why}");
                 Vec::new()
             }
             Ok(rows) => rows

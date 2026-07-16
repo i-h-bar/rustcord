@@ -292,9 +292,6 @@ from spoiler_queue q
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
-where q.id > (
-    select cursor from spoiler_subscription where guild_id = $1 and channel_id = $2
-)
+where q.id > $1
 order by q.id asc
-limit $3
 ";

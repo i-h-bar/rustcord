@@ -1,4 +1,4 @@
-const BATCH_SIZE: i64 = 10;
+const BATCH_SIZE: usize = 10;
 
 /// After this many consecutive *webhook/subscription-specific* failures
 /// (see `SpoilerError::counts_toward_failure_threshold`) — invalid or
@@ -17,69 +17,92 @@ pub async fn run(
     images: &impl crate::ports::images::ImageStore,
     sender: &impl crate::ports::spoilers::SpoilerSender,
 ) {
-    for sub in repo.subscriptions_with_pending().await {
-        let cards = repo
-            .pending_cards(sub.guild_id, sub.channel_id, BATCH_SIZE)
-            .await;
+    let subs = repo.subscriptions_with_pending().await;
 
-        // The cursor is a single scalar, so a card whose image can't be
-        // fetched yet can't be skipped over: acking past it would drop it
-        // forever, and sending later cards without acking it would resend
-        // them next poll (since the query is `id > cursor`). So the batch
-        // stops at the first missing image rather than skipping it.
-        let mut batch = Vec::with_capacity(cards.len());
-        let mut last_queue_id = None;
-        for pending in cards {
-            match images.fetch(&pending.card).await {
-                Ok(bytes) => {
-                    last_queue_id = Some(pending.queue_id);
-                    batch.push((pending.card, bytes));
-                }
+    if let Some(min_cursor) = subs.iter().map(|sub| sub.cursor).min() {
+        // Fetched once per poll and shared across every subscription below —
+        // most subscriptions are behind on the same cards, so this avoids
+        // every one of them re-running the same joined query individually.
+        let shared_cards = repo.pending_cards_since(min_cursor).await;
+        // Likewise, a card's image is only read off disk once per poll no
+        // matter how many subscriptions need it, keyed by image id.
+        let mut image_cache = std::collections::HashMap::new();
+
+        for sub in subs {
+            // The cursor is a single scalar, so a card whose image can't be
+            // fetched yet can't be skipped over: acking past it would drop
+            // it forever, and sending later cards without acking it would
+            // resend them next poll. So the batch stops at the first
+            // missing image rather than skipping it.
+            let mut batch = Vec::new();
+            let mut last_queue_id = None;
+            let pending_for_sub = shared_cards
+                .iter()
+                .filter(|pending| pending.queue_id > sub.cursor)
+                .take(BATCH_SIZE);
+
+            for pending in pending_for_sub {
+                let image_id = *pending.card.image_id();
+                let image = match image_cache.get(&image_id) {
+                    Some(cached) => Some(Vec::clone(cached)),
+                    None => match images.fetch(&pending.card).await {
+                        Ok(bytes) => {
+                            image_cache.insert(image_id, bytes.clone());
+                            Some(bytes)
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "Stopping batch for guild {} at missing image for {}: {e}",
+                                sub.guild_id,
+                                pending.card.name()
+                            );
+                            None
+                        }
+                    },
+                };
+
+                let Some(image) = image else {
+                    break;
+                };
+                last_queue_id = Some(pending.queue_id);
+                batch.push((pending.card.clone(), image));
+            }
+
+            let Some(last_queue_id) = last_queue_id else {
+                continue;
+            };
+
+            match sender.send(sub.id, &sub.token, &batch).await {
+                Ok(()) => repo.ack(sub.guild_id, sub.channel_id, last_queue_id).await,
                 Err(e) => {
                     log::warn!(
-                        "Stopping batch for guild {} at missing image for {}: {e}",
-                        sub.guild_id,
-                        pending.card.name()
-                    );
-                    break;
-                }
-            }
-        }
-
-        let Some(last_queue_id) = last_queue_id else {
-            continue;
-        };
-
-        match sender.send(sub.id, &sub.token, &batch).await {
-            Ok(()) => repo.ack(sub.guild_id, sub.channel_id, last_queue_id).await,
-            Err(e) => {
-                log::warn!(
-                    "Failed to deliver batch to guild {} channel {}: {e}",
-                    sub.guild_id,
-                    sub.channel_id
-                );
-                if e.is_permanently_gone() {
-                    log::warn!(
-                        "Webhook for guild {} channel {} is gone (404) — unsubscribing immediately",
+                        "Failed to deliver batch to guild {} channel {}: {e}",
                         sub.guild_id,
                         sub.channel_id
                     );
-                    repo.delete_subscription(sub.guild_id, sub.channel_id).await;
-                } else if e.counts_toward_failure_threshold() {
-                    let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
-                    if failures >= MAX_CONSECUTIVE_FAILURES {
+                    if e.is_permanently_gone() {
                         log::warn!(
-                            "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
+                            "Webhook for guild {} channel {} is gone (404) — unsubscribing immediately",
                             sub.guild_id,
                             sub.channel_id
                         );
                         repo.delete_subscription(sub.guild_id, sub.channel_id).await;
+                    } else if e.counts_toward_failure_threshold() {
+                        let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
+                        if failures >= MAX_CONSECUTIVE_FAILURES {
+                            log::warn!(
+                                "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
+                                sub.guild_id,
+                                sub.channel_id
+                            );
+                            repo.delete_subscription(sub.guild_id, sub.channel_id).await;
+                        }
                     }
+                    // else: a connection error, 5xx, or rate limiting —
+                    // could just as easily mean Discord itself is having
+                    // trouble, so it's neither recorded nor counted toward
+                    // unsubscribing. The batch is simply retried next poll.
                 }
-                // else: a connection error, 5xx, or rate limiting — could
-                // just as easily mean Discord itself is having trouble, so
-                // it's neither recorded nor counted toward unsubscribing.
-                // The batch is simply retried next poll.
             }
         }
     }
@@ -152,14 +175,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![
                     PendingCard {
                         queue_id: 1,
@@ -194,14 +213,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![
                     PendingCard {
                         queue_id: 1,
@@ -238,14 +253,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Card A"),
@@ -279,14 +290,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Card A"),
@@ -317,14 +324,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Card A"),
@@ -353,14 +356,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![
                     PendingCard {
                         queue_id: 1,
@@ -410,14 +409,10 @@ mod tests {
         repo.expect_subscriptions_with_pending()
             .times(1)
             .return_once(|| vec![test_subscription()]);
-        repo.expect_pending_cards()
-            .with(
-                eq(GuildId::from(1u64)),
-                eq(ChannelId::from(2u64)),
-                eq(10i64),
-            )
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
             .times(1)
-            .return_once(|_, _, _| {
+            .return_once(|_| {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Missing Image"),
@@ -430,6 +425,72 @@ mod tests {
         });
         // `sender` has no expectations at all — send() must never be called.
         repo.expect_ack().times(0);
+        repo.expect_prune_queue().times(1).return_const(());
+
+        run(&repo, &images, &sender).await;
+    }
+
+    #[tokio::test]
+    async fn shares_one_query_and_one_image_fetch_across_multiple_subscriptions() {
+        let mut repo = MockSpoilerQueue::new();
+        let mut sender = MockSpoilerSender::new();
+        let mut images = MockImageStore::new();
+
+        let sub_a = test_subscription(); // guild 1, channel 2, cursor 0
+        let sub_b = Subscription {
+            guild_id: GuildId::from(1u64),
+            channel_id: ChannelId::from(3u64),
+            id: SubscriptionId::from(4u64),
+            token: "tok-b".to_string(),
+            cursor: 1, // already saw card 1, only wants card 2
+        };
+
+        repo.expect_subscriptions_with_pending()
+            .times(1)
+            .return_once(|| vec![sub_a, sub_b]);
+        // Called exactly once total, with the *minimum* cursor across both
+        // subscriptions (0), even though there are two subscriptions.
+        repo.expect_pending_cards_since()
+            .with(eq(0i64))
+            .times(1)
+            .return_once(|_| {
+                vec![
+                    PendingCard {
+                        queue_id: 1,
+                        card: test_card("Card A"),
+                    },
+                    PendingCard {
+                        queue_id: 2,
+                        card: test_card("Card B"),
+                    },
+                ]
+            });
+        // Card B is needed by both subscriptions but must only be fetched
+        // from disk once — the cache serves the second subscriber's copy.
+        images
+            .expect_fetch()
+            .times(2)
+            .returning(|_| Ok(vec![9, 9, 9]));
+
+        sender
+            .expect_send()
+            .withf(|sub_id, _, cards| sub_id == &SubscriptionId::from(3u64) && cards.len() == 2)
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        sender
+            .expect_send()
+            .withf(|sub_id, _, cards| sub_id == &SubscriptionId::from(4u64) && cards.len() == 1)
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        repo.expect_ack()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(2i64))
+            .times(1)
+            .return_const(());
+        repo.expect_ack()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(3u64)), eq(2i64))
+            .times(1)
+            .return_const(());
         repo.expect_prune_queue().times(1).return_const(());
 
         run(&repo, &images, &sender).await;

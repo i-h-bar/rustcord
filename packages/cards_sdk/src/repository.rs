@@ -49,12 +49,15 @@ pub trait SpoilerQueue {
         guild_id: GuildId,
         channel_id: ChannelId,
     ) -> Option<SubscriptionId>;
-    async fn pending_cards(
-        &self,
-        guild_id: GuildId,
-        channel_id: ChannelId,
-        limit: i64,
-    ) -> Vec<PendingCard>;
+    /// Fetches every queued card after `min_cursor`, across *all*
+    /// subscriptions — not scoped to one guild/channel. `notifier`'s
+    /// `domain::notify::run` calls this once per poll with the *minimum*
+    /// cursor across every subscription with pending cards, then
+    /// filters/limits the shared result per subscription in memory (each
+    /// subscription only takes cards past its own cursor, up to its own
+    /// batch size), instead of every subscription re-running this same
+    /// joined query for cards most of them already have in common.
+    async fn pending_cards_since(&self, min_cursor: i64) -> Vec<PendingCard>;
     /// Advances the cursor and resets `consecutive_failures` to `0` — acking
     /// only ever follows a successful delivery (see `notifier`'s
     /// `domain::notify::run`), so this is where the failure streak clears.

@@ -87,15 +87,8 @@ impl cards_sdk::SpoilerQueue for TestCardStore {
     ) -> Option<cards_sdk::SubscriptionId> {
         self.spoiler.subscription_id(guild_id, channel_id).await
     }
-    async fn pending_cards(
-        &self,
-        guild_id: cards_sdk::GuildId,
-        channel_id: cards_sdk::ChannelId,
-        limit: i64,
-    ) -> Vec<cards_sdk::PendingCard> {
-        self.spoiler
-            .pending_cards(guild_id, channel_id, limit)
-            .await
+    async fn pending_cards_since(&self, min_cursor: i64) -> Vec<cards_sdk::PendingCard> {
+        self.spoiler.pending_cards_since(min_cursor).await
     }
     async fn ack(
         &self,
