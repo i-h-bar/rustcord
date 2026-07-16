@@ -35,18 +35,12 @@ impl SpoilerSender for DiscordWebhookSender {
         &self,
         sub_id: SubscriptionId,
         token: &str,
-        cards: &[(Card, Vec<u8>)],
+        card: &Card,
+        image: Vec<u8>,
     ) -> Result<(), SpoilerError> {
-        let mut embeds = Vec::with_capacity(cards.len());
-        let mut attachments = Vec::with_capacity(cards.len());
-        for (card, image) in cards {
-            embeds.push(create_embed(card).await);
-            attachments.push(CreateAttachment::bytes(
-                image.clone(),
-                format!("{}.png", card.image_id()),
-            ));
-        }
-        let builder = ExecuteWebhook::new().embeds(embeds).add_files(attachments);
+        let embed = create_embed(card).await;
+        let attachment = CreateAttachment::bytes(image, format!("{}.png", card.image_id()));
+        let builder = ExecuteWebhook::new().embed(embed).add_file(attachment);
 
         builder
             .execute(&self.http, (WebhookId::new(sub_id.into()), token, false))

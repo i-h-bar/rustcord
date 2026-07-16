@@ -39,17 +39,17 @@ impl SpoilerError {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait SpoilerSender {
-    /// Sends every `(card, image bytes)` pair as a single message — Discord
-    /// allows up to 10 embeds and attachments per webhook execution, and
-    /// `notify::run` never stages more than `BATCH_SIZE` (10) cards at once,
-    /// so one call always covers a full batch. This is all-or-nothing: on
-    /// failure none of the batch is acked and the whole thing is retried
-    /// next poll, trading per-card retry granularity for one Discord API
-    /// call per subscription per poll instead of one per card.
+    /// Sends one card as its own message — deliberately *not* batched into a
+    /// single multi-embed message, so each card can have its own Discord
+    /// thread started on it for discussion. `notify::run` sends these one at
+    /// a time (never concurrently) for a given subscription, acking as far
+    /// as it gets and stopping at the first failure, so a mid-batch failure
+    /// never causes an already-delivered card to be resent next poll.
     async fn send(
         &self,
         sub_id: SubscriptionId,
         token: &str,
-        cards: &[(Card, Vec<u8>)],
+        card: &Card,
+        image: Vec<u8>,
     ) -> Result<(), SpoilerError>;
 }

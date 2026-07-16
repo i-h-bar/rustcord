@@ -1,3 +1,8 @@
+use cards_sdk::spoiler::{PendingCard, Subscription};
+use futures::stream::{self, StreamExt};
+use std::collections::HashMap;
+use uuid::Uuid;
+
 const BATCH_SIZE: usize = 10;
 
 /// After this many consecutive *webhook/subscription-specific* failures
@@ -12,6 +17,19 @@ const BATCH_SIZE: usize = 10;
 /// successful delivery (folded into `ack`).
 const MAX_CONSECUTIVE_FAILURES: i64 = 5;
 
+/// How many subscriptions are delivered to concurrently in one poll.
+/// Different subscriptions target entirely different webhooks, so there's
+/// no rate-limit interaction between them. Card/image fetching already
+/// happens once, up front, outside this concurrency entirely — what's
+/// actually concurrent here is each subscription's own `ack`/
+/// `record_failure`/`delete_subscription` bookkeeping call, which *does*
+/// hit `cards_sdk::Postgres`. This is capped near that pool's default
+/// connection count (5) purely so a large poll doesn't cause needless
+/// contention for a connection to run those. Sends *within* one
+/// subscription always stay sequential regardless of this limit (see
+/// `deliver_to_subscription`).
+const MAX_CONCURRENT_DELIVERIES: usize = 5;
+
 pub async fn run(
     repo: &impl cards_sdk::SpoilerQueue,
     images: &impl crate::ports::images::ImageStore,
@@ -24,87 +42,17 @@ pub async fn run(
         // most subscriptions are behind on the same cards, so this avoids
         // every one of them re-running the same joined query individually.
         let shared_cards = repo.pending_cards_since(min_cursor).await;
-        // Likewise, a card's image is only read off disk once per poll no
-        // matter how many subscriptions need it, keyed by image id.
-        let mut image_cache = std::collections::HashMap::new();
 
-        for sub in subs {
-            // The cursor is a single scalar, so a card whose image can't be
-            // fetched yet can't be skipped over: acking past it would drop
-            // it forever, and sending later cards without acking it would
-            // resend them next poll. So the batch stops at the first
-            // missing image rather than skipping it.
-            let mut batch = Vec::new();
-            let mut last_queue_id = None;
-            let pending_for_sub = shared_cards
-                .iter()
-                .filter(|pending| pending.queue_id > sub.cursor)
-                .take(BATCH_SIZE);
+        // Resolved once per unique image, up front, before any subscription
+        // starts sending — turns the concurrent delivery phase below into a
+        // read-only lookup, so it needs no locking around the cache.
+        let image_cache = resolve_images(&subs, &shared_cards, images).await;
 
-            for pending in pending_for_sub {
-                let image_id = *pending.card.image_id();
-                let image = match image_cache.get(&image_id) {
-                    Some(cached) => Some(Vec::clone(cached)),
-                    None => match images.fetch(&pending.card).await {
-                        Ok(bytes) => {
-                            image_cache.insert(image_id, bytes.clone());
-                            Some(bytes)
-                        }
-                        Err(e) => {
-                            log::warn!(
-                                "Stopping batch for guild {} at missing image for {}: {e}",
-                                sub.guild_id,
-                                pending.card.name()
-                            );
-                            None
-                        }
-                    },
-                };
-
-                let Some(image) = image else {
-                    break;
-                };
-                last_queue_id = Some(pending.queue_id);
-                batch.push((pending.card.clone(), image));
-            }
-
-            let Some(last_queue_id) = last_queue_id else {
-                continue;
-            };
-
-            match sender.send(sub.id, &sub.token, &batch).await {
-                Ok(()) => repo.ack(sub.guild_id, sub.channel_id, last_queue_id).await,
-                Err(e) => {
-                    log::warn!(
-                        "Failed to deliver batch to guild {} channel {}: {e}",
-                        sub.guild_id,
-                        sub.channel_id
-                    );
-                    if e.is_permanently_gone() {
-                        log::warn!(
-                            "Webhook for guild {} channel {} is gone (404) — unsubscribing immediately",
-                            sub.guild_id,
-                            sub.channel_id
-                        );
-                        repo.delete_subscription(sub.guild_id, sub.channel_id).await;
-                    } else if e.counts_toward_failure_threshold() {
-                        let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
-                        if failures >= MAX_CONSECUTIVE_FAILURES {
-                            log::warn!(
-                                "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
-                                sub.guild_id,
-                                sub.channel_id
-                            );
-                            repo.delete_subscription(sub.guild_id, sub.channel_id).await;
-                        }
-                    }
-                    // else: a connection error, 5xx, or rate limiting —
-                    // could just as easily mean Discord itself is having
-                    // trouble, so it's neither recorded nor counted toward
-                    // unsubscribing. The batch is simply retried next poll.
-                }
-            }
-        }
+        stream::iter(subs.iter())
+            .for_each_concurrent(MAX_CONCURRENT_DELIVERIES, |sub| {
+                deliver_to_subscription(repo, sender, sub, &shared_cards, &image_cache)
+            })
+            .await;
     }
 
     // Runs once per invocation, after every subscription's cursor has been
@@ -115,17 +63,141 @@ pub async fn run(
     repo.prune_queue().await;
 }
 
+/// Resolves every image that at least one subscription's own
+/// cursor-filtered, `BATCH_SIZE`-capped window will actually need, each
+/// fetched from disk at most once regardless of how many subscriptions
+/// share it. A failed fetch is cached as `None` (and logged once here,
+/// rather than once per subscription that would have hit it).
+async fn resolve_images(
+    subs: &[Subscription],
+    shared_cards: &[PendingCard],
+    images: &impl crate::ports::images::ImageStore,
+) -> HashMap<Uuid, Option<Vec<u8>>> {
+    let mut cache = HashMap::new();
+
+    for sub in subs {
+        let pending_for_sub = shared_cards
+            .iter()
+            .filter(|pending| pending.queue_id > sub.cursor)
+            .take(BATCH_SIZE);
+
+        for pending in pending_for_sub {
+            let image_id = *pending.card.image_id();
+            if cache.contains_key(&image_id) {
+                continue;
+            }
+
+            let result = match images.fetch(&pending.card).await {
+                Ok(bytes) => Some(bytes),
+                Err(e) => {
+                    log::warn!("Missing image for card {}: {e}", pending.card.name());
+                    None
+                }
+            };
+            cache.insert(image_id, result);
+        }
+    }
+
+    cache
+}
+
+/// Delivers as many of `sub`'s pending cards as it can, one message at a
+/// time, and acks up to the last one actually delivered. Stops at the first
+/// missing image or send failure — a missing image is already known by this
+/// point (see `resolve_images`) rather than being fetched here.
+async fn deliver_to_subscription(
+    repo: &impl cards_sdk::SpoilerQueue,
+    sender: &impl crate::ports::spoilers::SpoilerSender,
+    sub: &Subscription,
+    shared_cards: &[PendingCard],
+    image_cache: &HashMap<Uuid, Option<Vec<u8>>>,
+) {
+    // The cursor is a single scalar, so a card whose image is missing, or
+    // whose send fails, can't be skipped over: acking past it would drop it
+    // forever, and sending later cards without acking it would resend them
+    // next poll. So this stops at the first problem rather than skipping it
+    // — everything before that point has already been delivered as its own
+    // message, so it's acked regardless of what happens next.
+    let mut last_queue_id = None;
+    let pending_for_sub = shared_cards
+        .iter()
+        .filter(|pending| pending.queue_id > sub.cursor)
+        .take(BATCH_SIZE);
+
+    for pending in pending_for_sub {
+        let image_id = *pending.card.image_id();
+        let Some(Some(image)) = image_cache.get(&image_id) else {
+            log::warn!(
+                "Stopping at missing image for guild {} card {}",
+                sub.guild_id,
+                pending.card.name()
+            );
+            break;
+        };
+
+        // Sent one card at a time (never batched into one message) so each
+        // card can have its own Discord thread started on it. Sends for a
+        // single subscription stay sequential — this function is never
+        // called concurrently with itself for the same subscription — so
+        // Discord's per-webhook rate limit is naturally respected without
+        // any extra pacing here. Different subscriptions *are* delivered
+        // concurrently (see `run`), which is safe since each targets an
+        // entirely different webhook.
+        match sender
+            .send(sub.id, &sub.token, &pending.card, image.clone())
+            .await
+        {
+            Ok(()) => {
+                last_queue_id = Some(pending.queue_id);
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to deliver card to guild {} channel {}: {e}",
+                    sub.guild_id,
+                    sub.channel_id
+                );
+                if e.is_permanently_gone() {
+                    log::warn!(
+                        "Webhook for guild {} channel {} is gone (404) — unsubscribing immediately",
+                        sub.guild_id,
+                        sub.channel_id
+                    );
+                    repo.delete_subscription(sub.guild_id, sub.channel_id).await;
+                } else if e.counts_toward_failure_threshold() {
+                    let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
+                    if failures >= MAX_CONSECUTIVE_FAILURES {
+                        log::warn!(
+                            "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
+                            sub.guild_id,
+                            sub.channel_id
+                        );
+                        repo.delete_subscription(sub.guild_id, sub.channel_id).await;
+                    }
+                }
+                // else: a connection error, 5xx, or rate limiting — could
+                // just as easily mean Discord itself is having trouble, so
+                // it's neither recorded nor counted toward unsubscribing.
+                // Retried next poll.
+                break;
+            }
+        }
+    }
+
+    if let Some(last_queue_id) = last_queue_id {
+        repo.ack(sub.guild_id, sub.channel_id, last_queue_id).await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ports::images::MockImageStore;
     use crate::ports::spoilers::{MockSpoilerSender, SpoilerError};
-    use cards_sdk::spoiler::{PendingCard, Subscription};
     use cards_sdk::{ChannelId, GuildId, MockSpoilerQueue, SubscriptionId};
     use mockall::predicate::eq;
 
     fn test_card(name: &str) -> contracts::card::Card {
-        let id = uuid::Uuid::new_v4();
+        let id = Uuid::new_v4();
         contracts::card::Card::new(
             id,
             name.to_string(),
@@ -167,7 +239,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn acks_up_to_the_last_card_after_a_successful_batch_send() {
+    async fn acks_up_to_the_last_card_after_every_card_sends_successfully() {
         let mut repo = MockSpoilerQueue::new();
         let mut sender = MockSpoilerSender::new();
         let images = always_returns_image_bytes();
@@ -190,11 +262,8 @@ mod tests {
                     },
                 ]
             });
-        sender
-            .expect_send()
-            .withf(|_, _, cards| cards.len() == 2)
-            .times(1)
-            .returning(|_, _, _| Ok(()));
+        // Each card is its own message — two separate sends, not one batch.
+        sender.expect_send().times(2).returning(|_, _, _, _| Ok(()));
         repo.expect_ack()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(2i64))
             .times(1)
@@ -205,7 +274,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn does_not_ack_and_records_a_failure_when_the_batch_send_fails() {
+    async fn acks_only_the_cards_sent_before_a_mid_batch_failure() {
         let mut repo = MockSpoilerQueue::new();
         let mut sender = MockSpoilerSender::new();
         let images = always_returns_image_bytes();
@@ -226,13 +295,28 @@ mod tests {
                         queue_id: 2,
                         card: test_card("Card B"),
                     },
+                    // Must never be attempted — the loop stops after card 2
+                    // fails, so this card is never sent.
+                    PendingCard {
+                        queue_id: 3,
+                        card: test_card("Card C"),
+                    },
                 ]
             });
         sender
             .expect_send()
+            .withf(|_, _, card, _| card.name() == "Card A")
             .times(1)
-            .returning(|_, _, _| Err(SpoilerError::Status(403)));
-        repo.expect_ack().times(0);
+            .returning(|_, _, _, _| Ok(()));
+        sender
+            .expect_send()
+            .withf(|_, _, card, _| card.name() == "Card B")
+            .times(1)
+            .returning(|_, _, _, _| Err(SpoilerError::Status(403)));
+        repo.expect_ack()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(1i64))
+            .times(1)
+            .return_const(());
         // Below MAX_CONSECUTIVE_FAILURES (5) — must NOT trigger auto-unsubscribe.
         repo.expect_record_failure()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)))
@@ -265,7 +349,7 @@ mod tests {
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(SpoilerError::Status(403)));
+            .returning(|_, _, _, _| Err(SpoilerError::Status(403)));
         repo.expect_ack().times(0);
         // Reaches MAX_CONSECUTIVE_FAILURES (5) exactly — must trigger auto-unsubscribe.
         repo.expect_record_failure()
@@ -302,7 +386,7 @@ mod tests {
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(SpoilerError::Status(404)));
+            .returning(|_, _, _, _| Err(SpoilerError::Status(404)));
         repo.expect_ack().times(0);
         // A 404 skips the failure-counting mechanism entirely.
         repo.expect_record_failure().times(0);
@@ -338,7 +422,7 @@ mod tests {
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(SpoilerError::Status(503)));
+            .returning(|_, _, _, _| Err(SpoilerError::Status(503)));
         repo.expect_ack().times(0);
         repo.expect_record_failure().times(0);
         repo.expect_delete_subscription().times(0);
@@ -348,7 +432,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stops_the_batch_at_the_first_missing_image_and_acks_only_the_cards_before_it() {
+    async fn stops_at_the_first_missing_image_and_acks_only_the_cards_before_it() {
         let mut repo = MockSpoilerQueue::new();
         let mut sender = MockSpoilerSender::new();
         let mut images = MockImageStore::new();
@@ -369,8 +453,12 @@ mod tests {
                         queue_id: 2,
                         card: test_card("Missing Image"),
                     },
-                    // Must never be reached — the batch stops at the gap
-                    // left by card 2, so this card isn't even fetched.
+                    // Image resolution happens up front for the whole
+                    // window (not lazily stopping at the first gap, so it
+                    // can stay safe to run concurrently across
+                    // subscriptions) — so this card's image *is* still
+                    // resolved, it's just never delivered, since delivery
+                    // itself still stops at the gap left by card 2.
                     PendingCard {
                         queue_id: 3,
                         card: test_card("Card C"),
@@ -386,11 +474,12 @@ mod tests {
                 "no file".into(),
             ))
         });
-        sender
-            .expect_send()
-            .withf(|_, _, cards| cards.len() == 1)
+        images
+            .expect_fetch()
             .times(1)
-            .returning(|_, _, _| Ok(()));
+            .returning(|_| Ok(vec![9, 9, 9]));
+        // Only card 1 is ever sent — delivery still stops at the gap.
+        sender.expect_send().times(1).returning(|_, _, _, _| Ok(()));
         repo.expect_ack()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(1i64))
             .times(1)
@@ -472,16 +561,28 @@ mod tests {
             .times(2)
             .returning(|_| Ok(vec![9, 9, 9]));
 
+        // sub_a sends both cards as separate messages; sub_b sends only card B.
         sender
             .expect_send()
-            .withf(|sub_id, _, cards| sub_id == &SubscriptionId::from(3u64) && cards.len() == 2)
+            .withf(|sub_id, _, card, _| {
+                sub_id == &SubscriptionId::from(3u64) && card.name() == "Card A"
+            })
             .times(1)
-            .returning(|_, _, _| Ok(()));
+            .returning(|_, _, _, _| Ok(()));
         sender
             .expect_send()
-            .withf(|sub_id, _, cards| sub_id == &SubscriptionId::from(4u64) && cards.len() == 1)
+            .withf(|sub_id, _, card, _| {
+                sub_id == &SubscriptionId::from(3u64) && card.name() == "Card B"
+            })
             .times(1)
-            .returning(|_, _, _| Ok(()));
+            .returning(|_, _, _, _| Ok(()));
+        sender
+            .expect_send()
+            .withf(|sub_id, _, card, _| {
+                sub_id == &SubscriptionId::from(4u64) && card.name() == "Card B"
+            })
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
 
         repo.expect_ack()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(2i64))
