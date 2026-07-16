@@ -6,14 +6,17 @@ use crate::ports::drivers::client::GameInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use crate::ports::services::spoiler_subscription::SpoilerSubscription;
+use cards_sdk::SpoilerQueue;
 
 const SET_ABBR_CHAR_LIMIT: usize = 5;
 
-impl<IS, CS, C> App<IS, CS, C>
+impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
 where
     IS: ImageStore + Send + Sync,
-    CS: CardStore + Send + Sync,
+    CS: CardStore + SpoilerQueue + Send + Sync,
     C: Cache + Send + Sync,
+    Sub: SpoilerSubscription + Send + Sync,
 {
     pub async fn play_command<I: GameInteraction>(&self, interaction: &I, options: PlayOptions) {
         let PlayOptions { set, difficulty } = options;
@@ -74,8 +77,9 @@ mod tests {
     use crate::domain::app::App;
     use crate::ports::drivers::client::MockGameInteraction;
     use crate::ports::services::cache::MockCache;
-    use crate::ports::services::card_store::MockCardStore;
+    use crate::ports::services::card_store::{MockCardStore, TestCardStore};
     use crate::ports::services::image_store::MockImageStore;
+    use crate::ports::services::spoiler_subscription::MockSpoilerSubscription;
     use contracts::card::Card;
     use contracts::image::Image;
     use mockall::predicate::*;
@@ -141,7 +145,12 @@ mod tests {
             })
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = PlayOptions::new(None, Difficulty::Medium);
 
         app.play_command(&interaction, options).await;
@@ -181,7 +190,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = PlayOptions::new(Some("LEA".to_string()), Difficulty::Easy);
 
         app.play_command(&interaction, options).await;
@@ -221,7 +235,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = PlayOptions::new(Some("Limited Edition Alpha".to_string()), Difficulty::Hard);
 
         app.play_command(&interaction, options).await;
@@ -249,7 +268,12 @@ mod tests {
             .with(eq(String::from("Could not find set 'XYZ'")))
             .returning(|_| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = PlayOptions::new(Some("XYZ".to_string()), Difficulty::Medium);
 
         app.play_command(&interaction, options).await;
@@ -286,7 +310,12 @@ mod tests {
             })
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = PlayOptions::new(None, Difficulty::Hard);
 
         app.play_command(&interaction, options).await;
@@ -326,7 +355,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = PlayOptions::new(Some("LEA1".to_string()), Difficulty::Medium);
 
         app.play_command(&interaction, options).await;

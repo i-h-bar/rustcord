@@ -1,10 +1,10 @@
-use crate::adapters::drivers::discord::utils::embed::create_embed;
 use crate::adapters::drivers::discord::utils::message::{
     build_flip_button, build_set_dropdown, build_similar_dropdown,
 };
 use crate::ports::drivers::client::{MessageInteraction, MessageInteractionError};
 use async_trait::async_trait;
 use contracts::search_result::SearchResultDto;
+use discord_embeds::create_embed;
 use serenity::all::{
     CommandInteraction, Context, CreateActionRow, CreateAttachment, CreateInteractionResponse,
     CreateInteractionResponseMessage,
@@ -77,6 +77,15 @@ impl MessageInteraction for DiscordCommand {
 
     async fn reply(&self, message: String) -> Result<(), MessageInteractionError> {
         let message = CreateInteractionResponseMessage::new().content(message);
+        self.send_message(message).await?;
+
+        Ok(())
+    }
+
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError> {
+        let message = CreateInteractionResponseMessage::new()
+            .content(message)
+            .ephemeral(true);
         self.send_message(message).await?;
 
         Ok(())

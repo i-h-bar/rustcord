@@ -1,11 +1,13 @@
 use crate::domain::app::App;
 use crate::domain::query::QueryParams;
-use crate::domain::utils::card_picking::extract_match;
+use crate::domain::utils::card_picking::{extract_match, fuzzy_sort};
 use crate::domain::utils::REGEX_COLLECTION;
 use crate::ports::drivers::client::MessageInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use crate::ports::services::spoiler_subscription::SpoilerSubscription;
+use cards_sdk::SpoilerQueue;
 use contracts::card::Card;
 use contracts::search_result::SearchResultDto;
 use fuzzy;
@@ -13,11 +15,12 @@ use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
 
-impl<IS, CS, C> App<IS, CS, C>
+impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
 where
     IS: ImageStore + Send + Sync,
-    CS: CardStore + Send + Sync,
+    CS: CardStore + SpoilerQueue + Send + Sync,
     C: Cache + Send + Sync,
+    Sub: SpoilerSubscription + Send + Sync,
 {
     pub async fn parse_message(&self, msg: &str) -> Vec<Option<SearchResultDto>> {
         join_all(
@@ -110,7 +113,7 @@ where
             self.card_store.similar_cards(&card),
         );
 
-        let similar_cards = fuzzy::winkliest_sort(&card.normalised_name(), similar_cards?);
+        let similar_cards = fuzzy_sort(card.normalised_name(), similar_cards?);
         log::info!("Fetch new print in {}ms", start.elapsed().as_millis());
         Some(
             SearchResultDto::new(card, images.ok()?)
@@ -171,8 +174,9 @@ mod tests {
     use super::*;
     use crate::ports::drivers::client::MockMessageInteraction;
     use crate::ports::services::cache::MockCache;
-    use crate::ports::services::card_store::MockCardStore;
+    use crate::ports::services::card_store::{MockCardStore, TestCardStore};
     use crate::ports::services::image_store::MockImageStore;
+    use crate::ports::services::spoiler_subscription::MockSpoilerSubscription;
     use contracts::image::Image;
     use mockall::predicate::eq;
     use uuid::{uuid, Uuid};
@@ -225,7 +229,12 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
         interaction.expect_send_card().times(1).return_const(Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.search(&interaction, query.clone()).await;
     }
@@ -252,7 +261,12 @@ mod tests {
             .with(eq(String::from("Could not find card :(")))
             .return_const(Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.search(&interaction, query.clone()).await;
     }
@@ -297,7 +311,12 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
         interaction.expect_send_card().times(1).return_const(Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.search(&interaction, query.clone()).await;
     }
@@ -362,7 +381,12 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
         interaction.expect_send_card().times(1).return_const(Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.search(&interaction, query.clone()).await;
     }
@@ -392,7 +416,12 @@ mod tests {
         card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         let results = app.parse_message("Check out [[Lightning Bolt]]!").await;
 
@@ -440,7 +469,12 @@ mod tests {
         card_store.expect_all_prints().times(2).returning(|_| None);
 
         let cache = MockCache::new();
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         let results = app
             .parse_message("I love [[Lightning Bolt]] and [[Giant Growth]]!")
@@ -456,7 +490,12 @@ mod tests {
         let image_store = MockImageStore::new();
         let card_store = MockCardStore::new();
         let cache = MockCache::new();
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         let results = app
             .parse_message("This message has no card references")
@@ -496,7 +535,12 @@ mod tests {
         card_store.expect_all_prints().returning(|_| None);
 
         let cache = MockCache::new();
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         let result = app.find_card(query).await;
 
@@ -521,7 +565,12 @@ mod tests {
             .return_const(Some(vec![]));
 
         let cache = MockCache::new();
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         let result = app.find_card(query).await;
 
@@ -542,7 +591,12 @@ mod tests {
 
         let image_store = MockImageStore::new();
         let cache = MockCache::new();
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         let result = app.fuzzy_match_set_name("limited edition alpha").await;
 

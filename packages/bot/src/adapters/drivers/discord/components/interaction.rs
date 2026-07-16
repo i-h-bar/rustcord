@@ -1,10 +1,10 @@
-use crate::adapters::drivers::discord::utils::embed::create_embed;
 use crate::adapters::drivers::discord::utils::message::{
     build_flip_button, build_set_dropdown, build_similar_dropdown,
 };
 use crate::ports::drivers::client::{MessageInteraction, MessageInteractionError};
 use async_trait::async_trait;
 use contracts::search_result::SearchResultDto;
+use discord_embeds::create_embed;
 use serenity::all::{
     ComponentInteraction, Context, CreateActionRow, CreateAttachment, CreateInteractionResponse,
     CreateInteractionResponseMessage,
@@ -65,6 +65,20 @@ impl MessageInteraction for DiscordComponentInteraction {
                 &self.ctx,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new().content(message),
+                ),
+            )
+            .await
+            .map_err(|e| MessageInteractionError::new(e.to_string()))
+    }
+
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError> {
+        self.component
+            .create_response(
+                &self.ctx,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(message)
+                        .ephemeral(true),
                 ),
             )
             .await

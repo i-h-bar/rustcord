@@ -1,4 +1,4 @@
-use crate::adapters::drivers::discord::utils::emoji::add_emoji;
+use crate::emoji::add_emoji;
 use contracts::card::Card;
 
 pub async fn create_title(card: &Card) -> String {

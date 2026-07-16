@@ -36,11 +36,27 @@ jobs:
       - name: Push Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord:latest
 
+  build-notifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Image
+        run: docker build -f packages/notifier/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/rustcord-notifier .
+
+      - name: Push Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/rustcord-notifier:latest
+
   deploy:
     needs:
       - build-bot
       - build-sync
-    if: always() && needs.build-bot.result == 'success' && (needs.build-sync.result == 'success' || needs.build-sync.result == 'skipped')
+      - build-notifier
+    if: always() && needs.build-bot.result == 'success' && (needs.build-sync.result == 'success' || needs.build-sync.result == 'skipped') && (needs.build-notifier.result == 'success' || needs.build-notifier.result == 'skipped')
     runs-on: self-hosted
     steps:
       - name: Checkout
@@ -69,3 +85,6 @@ jobs:
 
       - name: Restart Bot Deployment
         run: kubectl rollout restart deployment/discord-bot
+
+      - name: Restart Notifier Deployment
+        run: kubectl rollout restart deployment/notifier

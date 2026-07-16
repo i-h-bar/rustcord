@@ -4,12 +4,15 @@ use crate::ports::drivers::client::GameInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use crate::ports::services::spoiler_subscription::SpoilerSubscription;
+use cards_sdk::SpoilerQueue;
 
-impl<IS, CS, C> App<IS, CS, C>
+impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
 where
     IS: ImageStore + Send + Sync,
-    CS: CardStore + Send + Sync,
+    CS: CardStore + SpoilerQueue + Send + Sync,
     C: Cache + Send + Sync,
+    Sub: SpoilerSubscription + Send + Sync,
 {
     pub async fn give_up_command<I: GameInteraction>(&self, interaction: &I) {
         let Some(game_state) = state::fetch(interaction.id(), &self.cache).await else {
@@ -35,8 +38,9 @@ mod tests {
     use crate::domain::functions::game::state::{Difficulty, GameState};
     use crate::ports::drivers::client::MockGameInteraction;
     use crate::ports::services::cache::MockCache;
-    use crate::ports::services::card_store::MockCardStore;
+    use crate::ports::services::card_store::{MockCardStore, TestCardStore};
     use crate::ports::services::image_store::MockImageStore;
+    use crate::ports::services::spoiler_subscription::MockSpoilerSubscription;
     use contracts::card::Card;
     use contracts::image::Image;
     use mockall::predicate::*;
@@ -111,7 +115,12 @@ mod tests {
             })
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.give_up_command(&interaction).await;
     }
@@ -156,7 +165,12 @@ mod tests {
             .withf(|state: &GameState, _imgs: &Image| state.number_of_guesses() == 2)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.give_up_command(&interaction).await;
     }
@@ -179,7 +193,12 @@ mod tests {
         interaction.expect_id().return_const(channel_id.clone());
         // Should return early without calling any other methods
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.give_up_command(&interaction).await;
     }
@@ -221,7 +240,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
 
         app.give_up_command(&interaction).await;
     }
@@ -255,7 +279,12 @@ mod tests {
                 .times(1)
                 .returning(|_, _| Ok(()));
 
-            let app = App::new(image_store, card_store, cache);
+            let app = App::new(
+                image_store,
+                TestCardStore::new(card_store),
+                cache,
+                MockSpoilerSubscription::new(),
+            );
 
             app.give_up_command(&interaction).await;
         }

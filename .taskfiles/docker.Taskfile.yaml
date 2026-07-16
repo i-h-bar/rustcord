@@ -14,3 +14,16 @@ tasks:
       - build-discord-bot
     cmds:
       - docker push gitfrog/rustcord:latest
+
+  build-notifier: docker build -f packages/notifier/Dockerfile -t gitfrog/rustcord-notifier .
+  push-notifier:
+    deps:
+      - build-notifier
+    cmds:
+      - docker push gitfrog/rustcord-notifier:latest
+
+  push:
+    deps:
+      - push-sync
+      - push-discord-bot
+      - push-notifier

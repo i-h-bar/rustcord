@@ -23,6 +23,10 @@ impl MessageInteractionError {
 pub trait MessageInteraction {
     async fn send_card(&self, result: SearchResultDto) -> Result<(), MessageInteractionError>;
     async fn reply(&self, message: String) -> Result<(), MessageInteractionError>;
+    /// Same as `reply`, but only visible to the invoking user — for
+    /// responses that shouldn't clutter the channel for everyone else, e.g.
+    /// a permissions error only the admin who ran the command can act on.
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError>;
 }
 
 #[cfg_attr(test, automock)]

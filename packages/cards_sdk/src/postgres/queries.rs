@@ -253,3 +253,45 @@ from card
 where card.normalised_name % $1 and card.oracle_id != $2
 order by card.oracle_id desc
 ";
+
+pub const SUBSCRIPTIONS_WITH_PENDING: &str = r"
+select guild_id, channel_id, subscription_id, subscription_token, cursor
+from spoiler_subscription s
+where exists (select 1 from spoiler_queue q where q.id > s.cursor)
+";
+
+pub const SUBSCRIPTION_ID: &str = r"
+select subscription_id from spoiler_subscription where guild_id = $1 and channel_id = $2
+";
+
+pub const PENDING_CARDS: &str = r"
+select q.id                      as queue_id,
+       card.id                   as front_id,
+       card.oracle_id            as front_oracle_id,
+       card.name                 as front_name,
+       card.normalised_name      as front_normalised_name,
+       card.scryfall_url         as front_scryfall_url,
+       card.image_id             as front_image_id,
+       card.illustration_id      as front_illustration_id,
+       card.backside_id          as back_id,
+       rule.mana_cost            as front_mana_cost,
+       rule.colour_identity      as front_colour_identity,
+       rule.power                as front_power,
+       rule.toughness            as front_toughness,
+       rule.loyalty              as front_loyalty,
+       rule.defence              as front_defence,
+       rule.type_line            as front_type_line,
+       rule.keywords             as front_keywords,
+       rule.oracle_text          as front_oracle_text,
+       artist.name               as artist,
+       set.name                  as set_name,
+       set.abbreviation          as set_abbreviation,
+       card.release_date         as release_date
+from spoiler_queue q
+         join card on card.id = q.card_id
+         left join rule on card.oracle_id = rule.id
+         left join artist on card.artist_id = artist.id
+         left join set on set.id = card.set_id
+where q.id > $1
+order by q.id asc
+";

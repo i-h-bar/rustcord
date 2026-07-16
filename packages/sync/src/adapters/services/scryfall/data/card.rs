@@ -1,7 +1,8 @@
 use crate::adapters::services::scryfall::utils::image::parse_image_id;
 use crate::adapters::services::scryfall::utils::uuid::increment_uuid;
-use crate::ports::storage::{
-    Artist, Card, CardInfo, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule, Set,
+use cards_sdk::{
+    Artist, CardInfo, CardRecord, Combo, Illustration, Image, Legality, Price, RelatedToken, Rule,
+    Set,
 };
 use serde::{Deserialize, Serialize};
 use time::serde::format_description;
@@ -280,7 +281,7 @@ impl ScryfallCard {
             normalised_name: artist_normalised,
         };
 
-        let card = Card {
+        let card = CardRecord {
             id: self.id,
             oracle_id,
             name: self.name.clone(),
@@ -368,7 +369,7 @@ impl ScryfallCard {
             normalised_name: normalise::normalise_card_name(artist_name),
         };
 
-        let card_model = Card {
+        let card_model = CardRecord {
             id: card_id,
             oracle_id,
             name: face.name.clone(),

@@ -1,5 +1,6 @@
 use serenity::model::Colour;
 
+#[must_use]
 pub fn get_colour_identity(colour_id: &[String]) -> Colour {
     let colour_id = colour_id.join("");
     let (r, g, b) = get_colour_num(&colour_id);

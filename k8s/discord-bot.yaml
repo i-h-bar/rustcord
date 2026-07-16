@@ -27,6 +27,11 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: BOT_TOKEN
+            - name: APPLICATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: APPLICATION_ID
             - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:
@@ -60,7 +65,7 @@ spec:
                   name: app-secrets
                   key: DISCORD_SERVER_URL
             - name: RUST_LOG
-              value: warn,rustcord=info
+              value: warn,rustcord=info,cards_sdk=info
           volumeMounts:
             - name: images
               mountPath: /var/mtg_cards/

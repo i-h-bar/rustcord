@@ -1,6 +1,6 @@
 use crate::ports::image_store::{Illustration, Image, ImageStore};
 use crate::ports::source::CardSource;
-use crate::ports::storage::CardInfo;
+use cards_sdk::CardInfo;
 use futures::future;
 
 #[cfg(feature = "local-dev")]

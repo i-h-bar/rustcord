@@ -1,10 +1,10 @@
-use crate::adapters::drivers::discord::utils::embed::create_embed;
 use crate::adapters::drivers::discord::utils::message::{
     build_flip_button, build_set_dropdown, build_similar_dropdown,
 };
 use crate::ports::drivers::client::{MessageInteraction, MessageInteractionError};
 use async_trait::async_trait;
 use contracts::search_result::SearchResultDto;
+use discord_embeds::create_embed;
 use serenity::all::{
     Context, CreateActionRow, CreateAttachment, CreateMessage, Mentionable, Message,
 };
@@ -105,5 +105,12 @@ impl MessageInteraction for DiscordMessageInteration {
             .map_err(|_| MessageInteractionError::new(String::from("Failed to send message")))?;
 
         Ok(())
+    }
+
+    /// Plain channel messages (unlike slash command/component interaction
+    /// responses) have no ephemeral flag to set, so this falls back to a
+    /// normal, everyone-visible reply.
+    async fn reply_ephemeral(&self, message: String) -> Result<(), MessageInteractionError> {
+        self.reply(message).await
     }
 }

@@ -301,6 +301,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cards_sdk"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "contracts",
+ "futures",
+ "indicatif",
+ "log",
+ "mockall",
+ "sqlx",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -509,7 +525,6 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 name = "contracts"
 version = "0.1.0"
 dependencies = [
- "fuzzy",
  "serde",
  "time",
  "uuid",
@@ -746,6 +761,20 @@ dependencies = [
  "const-oid",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "discord_embeds"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "contracts",
+ "log",
+ "lru",
+ "normalise",
+ "regex",
+ "serenity",
+ "tokio",
 ]
 
 [[package]]
@@ -2005,6 +2034,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "notifier"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cards_sdk",
+ "contracts",
+ "discord_embeds",
+ "dotenv",
+ "env_logger",
+ "log",
+ "mockall",
+ "serde",
+ "serenity",
+ "thiserror 2.0.16",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2763,21 +2812,22 @@ name = "rustcord"
 version = "0.1.2"
 dependencies = [
  "async-trait",
+ "cards_sdk",
  "contracts",
+ "discord_embeds",
  "dotenv",
  "env_logger",
  "fuzzy",
  "log",
- "lru",
  "mockall",
  "named_lock",
  "normalise",
  "redis",
  "regex",
  "ron",
+ "secrecy",
  "serde",
  "serenity",
- "sqlx",
  "thiserror 2.0.16",
  "time",
  "tokio",
@@ -3585,6 +3635,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "cards_sdk",
  "clap",
  "contracts",
  "dotenv",
@@ -3599,7 +3650,6 @@ dependencies = [
  "resvg",
  "serde",
  "serde_json",
- "sqlx",
  "thiserror 2.0.16",
  "time",
  "tiny-skia",

@@ -5,14 +5,17 @@ use crate::ports::drivers::client::GameInteraction;
 use crate::ports::services::cache::Cache;
 use crate::ports::services::card_store::CardStore;
 use crate::ports::services::image_store::ImageStore;
+use crate::ports::services::spoiler_subscription::SpoilerSubscription;
+use cards_sdk::SpoilerQueue;
 use fuzzy;
 use named_lock;
 
-impl<IS, CS, C> App<IS, CS, C>
+impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
 where
     IS: ImageStore + Send + Sync,
-    CS: CardStore + Send + Sync,
+    CS: CardStore + SpoilerQueue + Send + Sync,
     C: Cache + Send + Sync,
+    Sub: SpoilerSubscription + Send + Sync,
 {
     pub async fn guess_command<I: GameInteraction>(&self, interaction: &I, options: GuessOptions) {
         let channel_id = interaction.id();
@@ -93,8 +96,9 @@ mod tests {
     use crate::domain::functions::game::state::{Difficulty, GameState};
     use crate::ports::drivers::client::MockGameInteraction;
     use crate::ports::services::cache::MockCache;
-    use crate::ports::services::card_store::MockCardStore;
+    use crate::ports::services::card_store::{MockCardStore, TestCardStore};
     use crate::ports::services::image_store::MockImageStore;
+    use crate::ports::services::spoiler_subscription::MockSpoilerSubscription;
     use contracts::card::Card;
     use contracts::image::Image;
     use mockall::predicate::*;
@@ -169,7 +173,12 @@ mod tests {
             })
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = GuessOptions::new("Lightning Bolt".to_string());
 
         app.guess_command(&interaction, options).await;
@@ -211,7 +220,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         // "Lightningg Boltt" should match due to fuzzy matching
         let options = GuessOptions::new("Lightningg Boltt".to_string());
 
@@ -259,7 +273,12 @@ mod tests {
             })
             .returning(|_, _, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = GuessOptions::new("Shock".to_string());
 
         app.guess_command(&interaction, options).await;
@@ -306,7 +325,12 @@ mod tests {
             .withf(|state: &GameState, _imgs: &Image| state.number_of_guesses() == 4)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = GuessOptions::new("Shock".to_string());
 
         app.guess_command(&interaction, options).await;
@@ -334,7 +358,12 @@ mod tests {
             .with(eq(String::from("No game found in this channel :(")))
             .returning(|_| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = GuessOptions::new("Lightning Bolt".to_string());
 
         app.guess_command(&interaction, options).await;
@@ -376,7 +405,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         // "lightning bol" has Jaro-Winkler score just above 0.75 with "lightning bolt"
         let options = GuessOptions::new("lightning bol".to_string());
 
@@ -419,7 +453,12 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let app = App::new(image_store, card_store, cache);
+        let app = App::new(
+            image_store,
+            TestCardStore::new(card_store),
+            cache,
+            MockSpoilerSubscription::new(),
+        );
         let options = GuessOptions::new("LIGHTNING BOLT".to_string());
 
         app.guess_command(&interaction, options).await;

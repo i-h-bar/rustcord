@@ -1,17 +1,9 @@
-use async_trait::async_trait;
 use time::{Date, OffsetDateTime};
 use uuid::Uuid;
 
 pub struct UpsertResult {
     pub orphaned_images: Vec<Uuid>,
     pub orphaned_illustrations: Vec<Uuid>,
-}
-
-#[async_trait]
-pub trait Storage {
-    async fn upsert_cards(&self, cards: &[CardInfo]) -> UpsertResult;
-    async fn delete_orphaned_images(&self, ids: &[Uuid]) -> Vec<Uuid>;
-    async fn delete_orphaned_illustrations(&self, ids: &[Uuid]) -> Vec<Uuid>;
 }
 
 pub struct Set {
@@ -80,7 +72,10 @@ pub struct Rule {
     pub rulings_url: Option<String>,
 }
 
-pub struct Card {
+/// Raw per-column ingest shape for a card row — distinct from
+/// `contracts::card::Card`, which is the flattened, read-oriented shape used
+/// by search/fetch responses.
+pub struct CardRecord {
     pub id: Uuid,
     pub oracle_id: Uuid,
     pub name: String,
@@ -121,7 +116,7 @@ pub struct RelatedToken {
 }
 
 pub struct CardInfo {
-    pub card: Card,
+    pub card: CardRecord,
     pub artist: Artist,
     pub image: Image,
     pub illustration: Option<Illustration>,
@@ -131,4 +126,33 @@ pub struct CardInfo {
     pub price: Price,
     pub combos: Vec<Combo>,
     pub related_tokens: Vec<RelatedToken>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::uuid;
+
+    #[test]
+    fn card_record_fields_are_accessible() {
+        let id = uuid!("00000000-0000-0000-0000-000000000001");
+        let record = CardRecord {
+            id,
+            oracle_id: id,
+            name: "Lightning Bolt".to_string(),
+            normalised_name: "lightning bolt".to_string(),
+            scryfall_url: String::new(),
+            flavour_text: None,
+            release_date: Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
+            reserved: false,
+            rarity: "common".to_string(),
+            artist_id: id,
+            image_id: id,
+            illustration_id: None,
+            set_id: id,
+            backside_id: None,
+        };
+
+        assert_eq!(record.name, "Lightning Bolt");
+    }
 }
