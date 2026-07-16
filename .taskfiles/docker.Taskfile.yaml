@@ -21,3 +21,9 @@ tasks:
       - build-notifier
     cmds:
       - docker push gitfrog/rustcord-notifier:latest
+
+  push:
+    deps:
+      - push-sync
+      - push-discord-bot
+      - push-notifier
