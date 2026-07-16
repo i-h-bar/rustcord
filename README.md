@@ -11,6 +11,17 @@ A Discord bot for searching Magic: The Gathering cards and playing a card-guessi
 
 ---
 
+## Invite Options
+
+Two invite links are available, depending on whether you want spoiler notifications:
+
+- **[Card search & games only](https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277025507328&integration_type=0&scope=bot)** — the core bot, no extra permissions
+- **[Full functionality, incl. spoiler notifications](https://discord.com/oauth2/authorize?client_id=1315969494161559595&permissions=277562378240&integration_type=0&scope=bot)** — adds `Manage Webhooks` so `/spoilers` can post to a channel
+
+If you invited the bot without `Manage Webhooks` and later want spoiler notifications, just use the second link — Discord will prompt to grant the extra permission without needing to kick and re-invite the bot.
+
+---
+
 ## Features
 
 - **Card search** via `/search` or inline `[[card name]]` syntax in any message
@@ -74,15 +85,15 @@ This feature is still in beta — if something looks wrong, please [report it](h
 
 ## Commands
 
-| Command               | Options       | Description                                |
-|------------------------|---------------|---------------------------------------------|
-| `/search`              | `name`, `set`, `artist` | Fuzzy search for a card            |
-| `/play`                | `set`, `difficulty`   | Start a guessing game                |
-| `/guess`               | `card`                | Submit a guess for the active game    |
-| `/give_up`             | -                     | Reveal the answer and end the game    |
-| `/spoilers subscribe`   | `channel`     | *(Beta)* Start posting new-card spoilers to a channel |
-| `/spoilers unsubscribe` | `channel`     | Stop posting spoilers to a channel        |
-| `/help`                | -                     | Show command reference                |
+| Command                 | Options                 | Description                                            |
+|-------------------------|-------------------------|---------------------------------------------------------|
+| `/search`               | `name`, `set`, `artist` | Fuzzy search for a card                                |
+| `/play`                 | `set`, `difficulty`     | Start a guessing game                                  |
+| `/guess`                | `card`                  | Submit a guess for the active game                     |
+| `/give_up`              | -                       | Reveal the answer and end the game                     |
+| `/spoilers subscribe`   | `channel`               | *(Beta)* Start posting new-card spoilers to a channel  |
+| `/spoilers unsubscribe` | `channel`               | Stop posting spoilers to a channel                     |
+| `/help`                 | -                       | Show command reference                                 |
 
 ---
 
