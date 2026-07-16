@@ -119,6 +119,9 @@ where
     }
 
     async fn ready(&self, ctx: Context, _: Ready) {
+        warmup_emoji().await;
+        log::info!("Emojis toasty warm");
+
         if let Err(err) = Command::create_global_command(&ctx, play::register()).await {
             log::warn!("Could not create command {err:?}");
         } else {
@@ -154,9 +157,6 @@ where
         } else {
             log::info!("Created spoilers command");
         }
-
-        warmup_emoji().await;
-        log::info!("Emojis toasty warm");
 
         log::info!("Bot ready!");
     }
