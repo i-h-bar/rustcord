@@ -80,12 +80,12 @@ impl cards_sdk::SpoilerQueue for TestCardStore {
     async fn subscriptions_with_pending(&self) -> Vec<cards_sdk::Subscription> {
         self.spoiler.subscriptions_with_pending().await
     }
-    async fn subscription_exists(
+    async fn subscription_id(
         &self,
         guild_id: cards_sdk::GuildId,
         channel_id: cards_sdk::ChannelId,
-    ) -> bool {
-        self.spoiler.subscription_exists(guild_id, channel_id).await
+    ) -> Option<cards_sdk::SubscriptionId> {
+        self.spoiler.subscription_id(guild_id, channel_id).await
     }
     async fn pending_cards(
         &self,

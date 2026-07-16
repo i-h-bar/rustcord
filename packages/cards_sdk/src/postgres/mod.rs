@@ -11,8 +11,7 @@ use crate::ingest::{
 use crate::postgres::queries::{
     ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
     FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, PENDING_CARDS,
-    RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM, SUBSCRIPTION_EXISTS,
-    SUBSCRIPTIONS_WITH_PENDING,
+    RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM, SUBSCRIPTION_ID, SUBSCRIPTIONS_WITH_PENDING,
 };
 use crate::repository::{ReadRepository, SpoilerQueue, WriteRepository};
 use crate::spoiler::{PendingCard, Subscription};
@@ -721,27 +720,31 @@ impl SpoilerQueue for Postgres {
                 .map(|row| Subscription {
                     guild_id: row.get::<GuildId, &str>("guild_id"),
                     channel_id: row.get::<ChannelId, &str>("channel_id"),
-                    id: row.get::<SubscriptionId, &str>("webhook_id"),
-                    token: row.get::<String, &str>("webhook_token"),
+                    id: row.get::<SubscriptionId, &str>("subscription_id"),
+                    token: row.get::<String, &str>("subscription_token"),
                     cursor: row.get::<i64, &str>("cursor"),
                 })
                 .collect(),
         }
     }
 
-    async fn subscription_exists(&self, guild_id: GuildId, channel_id: ChannelId) -> bool {
-        match sqlx::query_as::<_, (bool,)>(SUBSCRIPTION_EXISTS)
+    async fn subscription_id(
+        &self,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+    ) -> Option<SubscriptionId> {
+        match sqlx::query_as::<_, (SubscriptionId,)>(SUBSCRIPTION_ID)
             .bind(guild_id)
             .bind(channel_id)
-            .fetch_one(&self.pool)
+            .fetch_optional(&self.pool)
             .await
         {
-            Ok((exists,)) => exists,
+            Ok(row) => row.map(|(subscription_id,)| subscription_id),
             Err(e) => {
                 log::warn!(
-                    "Failed to check for an existing subscription for guild {guild_id} channel {channel_id}: {e}"
+                    "Failed to look up subscription for guild {guild_id} channel {channel_id}: {e}"
                 );
-                false
+                None
             }
         }
     }
@@ -795,21 +798,21 @@ impl SpoilerQueue for Postgres {
         &self,
         guild_id: GuildId,
         channel_id: ChannelId,
-        webhook_id: SubscriptionId,
-        webhook_token: &str,
+        subscription_id: SubscriptionId,
+        subscription_token: &str,
     ) {
         if let Err(e) = sqlx::query(
             "INSERT INTO spoiler_subscription
-               (guild_id, channel_id, webhook_id, webhook_token, cursor)
+               (guild_id, channel_id, subscription_id, subscription_token, cursor)
              VALUES ($1, $2, $3, $4, COALESCE((SELECT max(id) FROM spoiler_queue), 0))
              ON CONFLICT (guild_id, channel_id) DO UPDATE SET
-               webhook_id    = EXCLUDED.webhook_id,
-               webhook_token = EXCLUDED.webhook_token",
+               subscription_id    = EXCLUDED.subscription_id,
+               subscription_token = EXCLUDED.subscription_token",
         )
         .bind(guild_id)
         .bind(channel_id)
-        .bind(webhook_id)
-        .bind(webhook_token)
+        .bind(subscription_id)
+        .bind(subscription_token)
         .execute(&self.pool)
         .await
         {
@@ -827,14 +830,14 @@ impl SpoilerQueue for Postgres {
         match sqlx::query_as::<_, (SubscriptionId,)>(
             "DELETE FROM spoiler_subscription
              WHERE guild_id = $1 AND channel_id = $2
-             RETURNING webhook_id",
+             RETURNING subscription_id",
         )
         .bind(guild_id)
         .bind(channel_id)
         .fetch_optional(&self.pool)
         .await
         {
-            Ok(row) => row.map(|(webhook_id,)| webhook_id),
+            Ok(row) => row.map(|(subscription_id,)| subscription_id),
             Err(e) => {
                 log::warn!(
                     "Failed to delete spoiler subscription for guild {guild_id} channel {channel_id}: {e}"

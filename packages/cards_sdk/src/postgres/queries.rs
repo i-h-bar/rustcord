@@ -255,15 +255,13 @@ order by card.oracle_id desc
 ";
 
 pub const SUBSCRIPTIONS_WITH_PENDING: &str = r"
-select guild_id, channel_id, webhook_id, webhook_token, cursor
+select guild_id, channel_id, subscription_id, subscription_token, cursor
 from spoiler_subscription s
 where exists (select 1 from spoiler_queue q where q.id > s.cursor)
 ";
 
-pub const SUBSCRIPTION_EXISTS: &str = r"
-select exists (
-    select 1 from spoiler_subscription where guild_id = $1 and channel_id = $2
-)
+pub const SUBSCRIPTION_ID: &str = r"
+select subscription_id from spoiler_subscription where guild_id = $1 and channel_id = $2
 ";
 
 pub const PENDING_CARDS: &str = r"

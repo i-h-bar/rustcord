@@ -36,12 +36,19 @@ pub trait WriteRepository {
 #[async_trait]
 pub trait SpoilerQueue {
     async fn subscriptions_with_pending(&self) -> Vec<Subscription>;
-    /// Whether a subscription already exists for this exact
-    /// `(guild_id, channel_id)` pair — checked by `bot`'s `/spoilers
-    /// subscribe` handler *before* it asks `SpoilerSubscription` to create a
-    /// Discord webhook, so re-running `subscribe` on a channel that's
-    /// already subscribed can't orphan a duplicate webhook.
-    async fn subscription_exists(&self, guild_id: GuildId, channel_id: ChannelId) -> bool;
+    /// Looks up the `SubscriptionId` for a `(guild_id, channel_id)`
+    /// subscription *without* deleting it. Used by `bot`'s `/spoilers`
+    /// handler two ways: `subscribe` checks `.is_some()` before asking
+    /// `SpoilerSubscription` to create a Discord webhook, so re-subscribing
+    /// an already-subscribed channel can't orphan a duplicate webhook;
+    /// `unsubscribe` uses the returned id to delete the Discord webhook
+    /// *before* deciding whether to remove the DB record (see
+    /// `delete_subscription`'s docs).
+    async fn subscription_id(
+        &self,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+    ) -> Option<SubscriptionId>;
     async fn pending_cards(
         &self,
         guild_id: GuildId,
@@ -59,10 +66,13 @@ pub trait SpoilerQueue {
         sub_id: SubscriptionId,
         token: &str,
     );
-    /// Deletes the subscription and returns the `webhook_id` it had, if it
-    /// existed — the caller (`bot`'s `/spoilers unsubscribe` handler) needs
-    /// this to also delete the actual Discord webhook via `WebhookRegistrar`,
-    /// since `cards_sdk` has no Discord API access of its own.
+    /// Deletes the subscription and returns the `SubscriptionId` it had, if
+    /// it existed. `bot`'s `/spoilers unsubscribe` handler calls this only
+    /// *after* confirming (via `subscription_id` and
+    /// `SpoilerSubscription::delete_subscription`) that the Discord webhook
+    /// is actually gone — a Discord-side outage or transient error must not
+    /// remove this record, or the webhook would be orphaned with no
+    /// tracking left to retry deleting it.
     async fn delete_subscription(
         &self,
         guild_id: GuildId,

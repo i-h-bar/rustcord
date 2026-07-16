@@ -33,7 +33,11 @@ pub async fn subscribe<S, Sub, I>(
     Sub: SpoilerSubscription,
     I: MessageInteraction,
 {
-    if storage.subscription_exists(guild_id, channel_id).await {
+    if storage
+        .subscription_id(guild_id, channel_id)
+        .await
+        .is_some()
+    {
         let _ = interaction
             .reply_ephemeral(format!(
                 "Spoiler notifications are already enabled for <#{}>.",
@@ -80,15 +84,47 @@ pub async fn unsubscribe<S, Sub, I>(
     Sub: SpoilerSubscription,
     I: MessageInteraction,
 {
-    if let Some(sub_id) = storage.delete_subscription(guild_id, channel_id).await {
-        if let Err(e) = sub.delete_subscription(sub_id).await {
-            log::warn!(
-                "Failed to delete Discord webhook {sub_id} for guild {guild_id} channel {channel_id}: {e}"
+    let Some(sub_id) = storage.subscription_id(guild_id, channel_id).await else {
+        let _ = interaction
+            .reply_ephemeral(format!(
+                "Spoiler notifications disabled for <#{}>.",
+                u64::from(channel_id)
+            ))
+            .await;
+        return;
+    };
+
+    // The DB record is only removed once Discord confirms the webhook is
+    // actually gone (deleted just now, or already gone with a 404) — a
+    // Discord-side outage or other transient error must leave the
+    // subscription intact, or the webhook would be orphaned with nothing
+    // left tracking it for a retry.
+    match sub.delete_subscription(sub_id).await {
+        Ok(()) => {
+            storage.delete_subscription(guild_id, channel_id).await;
+        }
+        Err(e) if e.is_not_found() => {
+            log::info!(
+                "Webhook {sub_id} for guild {guild_id} channel {channel_id} was already gone; removing subscription record"
             );
+            storage.delete_subscription(guild_id, channel_id).await;
+        }
+        Err(e) => {
+            log::warn!(
+                "Failed to delete Discord webhook {sub_id} for guild {guild_id} channel {channel_id}, keeping subscription: {e}"
+            );
+            let _ = interaction
+                .reply_ephemeral(format!(
+                    "Couldn't reach Discord to remove the webhook for <#{}> — nothing changed, please try again shortly.",
+                    u64::from(channel_id)
+                ))
+                .await;
+            return;
         }
     }
+
     let _ = interaction
-        .reply(format!(
+        .reply_ephemeral(format!(
             "Spoiler notifications disabled for <#{}>.",
             u64::from(channel_id)
         ))
@@ -110,10 +146,10 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
 
         storage
-            .expect_subscription_exists()
+            .expect_subscription_id()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
             .times(1)
-            .return_const(false);
+            .return_const(None);
         sub.expect_create_subscription()
             .with(eq(ChannelId::from(42u64)))
             .times(1)
@@ -155,10 +191,10 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
 
         storage
-            .expect_subscription_exists()
+            .expect_subscription_id()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
             .times(1)
-            .return_const(true);
+            .return_const(Some(SubscriptionId::from(99u64)));
         // `sub`/`storage` have no `create_subscription` expectations at all
         // — a second webhook must never be created for an already-subscribed
         // channel.
@@ -187,10 +223,7 @@ mod tests {
         let mut storage = MockSpoilerQueue::new();
         let mut interaction = MockMessageInteraction::new();
 
-        storage
-            .expect_subscription_exists()
-            .times(1)
-            .return_const(false);
+        storage.expect_subscription_id().times(1).return_const(None);
         sub.expect_create_subscription().times(1).returning(|_| {
             Err(crate::ports::services::spoiler_subscription::SpoilerSubError::new("no perms"))
         });
@@ -217,15 +250,23 @@ mod tests {
         let mut interaction = MockMessageInteraction::new();
 
         storage
-            .expect_delete_subscription()
+            .expect_subscription_id()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
             .times(1)
-            .return_once(|_, _| Some(SubscriptionId::from(99u64)));
+            .return_const(Some(SubscriptionId::from(99u64)));
         sub.expect_delete_subscription()
             .with(eq(SubscriptionId::from(99u64)))
             .times(1)
             .returning(|_| Ok(()));
-        interaction.expect_reply().times(1).returning(|_| Ok(()));
+        storage
+            .expect_delete_subscription()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
+            .times(1)
+            .return_once(|_, _| Some(SubscriptionId::from(99u64)));
+        interaction
+            .expect_reply_ephemeral()
+            .times(1)
+            .returning(|_| Ok(()));
 
         unsubscribe(
             &storage,
@@ -238,18 +279,104 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unsubscribe_is_a_no_op_on_the_webhook_when_already_unsubscribed() {
+    async fn unsubscribe_is_a_no_op_when_already_unsubscribed() {
+        let mut storage = MockSpoilerQueue::new();
+        let sub = MockSpoilerSubscription::new();
+        let mut interaction = MockMessageInteraction::new();
+
+        storage
+            .expect_subscription_id()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
+            .times(1)
+            .return_const(None);
+        // `sub`/`storage` have no `delete_subscription` expectations at all
+        // — nothing to delete on either side when there was no subscription.
+        interaction
+            .expect_reply_ephemeral()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        unsubscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_removes_the_record_when_discord_reports_the_webhook_already_gone() {
         let mut storage = MockSpoilerQueue::new();
         let mut sub = MockSpoilerSubscription::new();
         let mut interaction = MockMessageInteraction::new();
 
         storage
+            .expect_subscription_id()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
+            .times(1)
+            .return_const(Some(SubscriptionId::from(99u64)));
+        sub.expect_delete_subscription()
+            .with(eq(SubscriptionId::from(99u64)))
+            .times(1)
+            .returning(|_| {
+                Err(
+                    crate::ports::services::spoiler_subscription::SpoilerSubError::with_status(
+                        "not found",
+                        404,
+                    ),
+                )
+            });
+        // A 404 means the webhook is already gone — safe to drop our record.
+        storage
             .expect_delete_subscription()
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
             .times(1)
-            .return_once(|_, _| None);
-        sub.expect_delete_subscription().times(0);
-        interaction.expect_reply().times(1).returning(|_| Ok(()));
+            .return_once(|_, _| Some(SubscriptionId::from(99u64)));
+        interaction
+            .expect_reply_ephemeral()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        unsubscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_keeps_the_record_when_discord_is_unreachable() {
+        let mut storage = MockSpoilerQueue::new();
+        let mut sub = MockSpoilerSubscription::new();
+        let mut interaction = MockMessageInteraction::new();
+
+        storage
+            .expect_subscription_id()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
+            .times(1)
+            .return_const(Some(SubscriptionId::from(99u64)));
+        sub.expect_delete_subscription()
+            .with(eq(SubscriptionId::from(99u64)))
+            .times(1)
+            .returning(|_| {
+                Err(
+                    crate::ports::services::spoiler_subscription::SpoilerSubError::new(
+                        "connection reset",
+                    ),
+                )
+            });
+        // Must NOT be called — a non-404 failure must leave the subscription
+        // record in place so it can be retried later.
+        storage.expect_delete_subscription().times(0);
+        interaction
+            .expect_reply_ephemeral()
+            .times(1)
+            .returning(|_| Ok(()));
 
         unsubscribe(
             &storage,

@@ -1,9 +1,15 @@
 const BATCH_SIZE: i64 = 10;
 
-/// After this many consecutive `notifier` runs fail to deliver to a guild,
-/// assume its webhook is permanently dead (channel/webhook deleted,
-/// permissions revoked) and unsubscribe it automatically rather than
-/// retrying forever.  The streak resets to `0` on every successful delivery (folded into `ack`).
+/// After this many consecutive *webhook/subscription-specific* failures
+/// (see `SpoilerError::counts_toward_failure_threshold`) — invalid or
+/// revoked webhook token, missing permissions — assume the webhook is
+/// permanently dead and unsubscribe it automatically rather than retrying
+/// forever. A clean 404 skips this threshold entirely (see
+/// `SpoilerError::is_permanently_gone`), and errors that could just as
+/// easily mean Discord itself is having trouble (connection errors, 5xx,
+/// 429) never count towards this at all, so an outage can never push a
+/// healthy subscription toward deletion. The streak resets to `0` on every
+/// successful delivery (folded into `ack`).
 const MAX_CONSECUTIVE_FAILURES: i64 = 5;
 
 pub async fn run(
@@ -52,15 +58,28 @@ pub async fn run(
                     sub.guild_id,
                     sub.channel_id
                 );
-                let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
-                if failures >= MAX_CONSECUTIVE_FAILURES {
+                if e.is_permanently_gone() {
                     log::warn!(
-                        "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
+                        "Webhook for guild {} channel {} is gone (404) — unsubscribing immediately",
                         sub.guild_id,
                         sub.channel_id
                     );
                     repo.delete_subscription(sub.guild_id, sub.channel_id).await;
+                } else if e.counts_toward_failure_threshold() {
+                    let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
+                    if failures >= MAX_CONSECUTIVE_FAILURES {
+                        log::warn!(
+                            "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
+                            sub.guild_id,
+                            sub.channel_id
+                        );
+                        repo.delete_subscription(sub.guild_id, sub.channel_id).await;
+                    }
                 }
+                // else: a connection error, 5xx, or rate limiting — could
+                // just as easily mean Discord itself is having trouble, so
+                // it's neither recorded nor counted toward unsubscribing.
+                // The batch is simply retried next poll.
             }
         }
     }
@@ -197,7 +216,7 @@ mod tests {
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(SpoilerError::Status(404)));
+            .returning(|_, _, _| Err(SpoilerError::Status(403)));
         repo.expect_ack().times(0);
         // Below MAX_CONSECUTIVE_FAILURES (5) — must NOT trigger auto-unsubscribe.
         repo.expect_record_failure()
@@ -235,7 +254,7 @@ mod tests {
         sender
             .expect_send()
             .times(1)
-            .returning(|_, _, _| Err(SpoilerError::Status(404)));
+            .returning(|_, _, _| Err(SpoilerError::Status(403)));
         repo.expect_ack().times(0);
         // Reaches MAX_CONSECUTIVE_FAILURES (5) exactly — must trigger auto-unsubscribe.
         repo.expect_record_failure()
@@ -246,6 +265,80 @@ mod tests {
             .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)))
             .times(1)
             .return_const(Some(SubscriptionId::from(3u64)));
+        repo.expect_prune_queue().times(1).return_const(());
+
+        run(&repo, &images, &sender).await;
+    }
+
+    #[tokio::test]
+    async fn immediately_unsubscribes_on_a_404_without_waiting_for_the_threshold() {
+        let mut repo = MockSpoilerQueue::new();
+        let mut sender = MockSpoilerSender::new();
+        let images = always_returns_image_bytes();
+
+        repo.expect_subscriptions_with_pending()
+            .times(1)
+            .return_once(|| vec![test_subscription()]);
+        repo.expect_pending_cards()
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
+            .times(1)
+            .return_once(|_, _, _| {
+                vec![PendingCard {
+                    queue_id: 1,
+                    card: test_card("Card A"),
+                }]
+            });
+        sender
+            .expect_send()
+            .times(1)
+            .returning(|_, _, _| Err(SpoilerError::Status(404)));
+        repo.expect_ack().times(0);
+        // A 404 skips the failure-counting mechanism entirely.
+        repo.expect_record_failure().times(0);
+        repo.expect_delete_subscription()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)))
+            .times(1)
+            .return_const(Some(SubscriptionId::from(3u64)));
+        repo.expect_prune_queue().times(1).return_const(());
+
+        run(&repo, &images, &sender).await;
+    }
+
+    #[tokio::test]
+    async fn a_transient_error_never_counts_toward_the_failure_threshold() {
+        let mut repo = MockSpoilerQueue::new();
+        let mut sender = MockSpoilerSender::new();
+        let images = always_returns_image_bytes();
+
+        repo.expect_subscriptions_with_pending()
+            .times(1)
+            .return_once(|| vec![test_subscription()]);
+        repo.expect_pending_cards()
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
+            .times(1)
+            .return_once(|_, _, _| {
+                vec![PendingCard {
+                    queue_id: 1,
+                    card: test_card("Card A"),
+                }]
+            });
+        // A 503 (or a connection error) could just as easily mean Discord
+        // itself is down — must never be recorded as this guild's failure.
+        sender
+            .expect_send()
+            .times(1)
+            .returning(|_, _, _| Err(SpoilerError::Status(503)));
+        repo.expect_ack().times(0);
+        repo.expect_record_failure().times(0);
+        repo.expect_delete_subscription().times(0);
         repo.expect_prune_queue().times(1).return_const(());
 
         run(&repo, &images, &sender).await;

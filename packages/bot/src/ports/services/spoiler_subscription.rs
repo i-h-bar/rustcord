@@ -6,13 +6,37 @@ use thiserror::Error;
 use mockall::automock;
 
 #[derive(Debug, Error)]
-#[error("webhook operation failed: {0}")]
-pub struct SpoilerSubError(String);
+#[error("webhook operation failed: {message}")]
+pub struct SpoilerSubError {
+    message: String,
+    status_code: Option<u16>,
+}
 
 impl SpoilerSubError {
     #[must_use]
     pub fn new(msg: impl Into<String>) -> Self {
-        Self(msg.into())
+        Self {
+            message: msg.into(),
+            status_code: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_status(msg: impl Into<String>, status_code: u16) -> Self {
+        Self {
+            message: msg.into(),
+            status_code: Some(status_code),
+        }
+    }
+
+    /// Whether Discord reported this operation as a 404. For
+    /// `delete_subscription`, that means the webhook was already gone (e.g.
+    /// manually removed) — the caller should treat that as a successful
+    /// deletion rather than a transient failure worth keeping the
+    /// subscription record around for.
+    #[must_use]
+    pub fn is_not_found(&self) -> bool {
+        self.status_code == Some(404)
     }
 }
 

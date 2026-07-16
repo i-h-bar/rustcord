@@ -8,6 +8,8 @@ use serenity::all::{
     ChannelId as DiscordChannelId, CreateAttachment, CreateWebhook, Http,
     WebhookId as DiscordWebhookId,
 };
+use serenity::http::HttpError;
+use serenity::Error as SerenityError;
 use std::env;
 
 pub struct DiscordWebhookRegistrar {
@@ -62,6 +64,11 @@ impl SpoilerSubscription for DiscordWebhookRegistrar {
         self.http
             .delete_webhook(DiscordWebhookId::new(sub_id.into()), None)
             .await
-            .map_err(|e| SpoilerSubError::new(e.to_string()))
+            .map_err(|e| match &e {
+                SerenityError::Http(HttpError::UnsuccessfulRequest(response)) => {
+                    SpoilerSubError::with_status(e.to_string(), response.status_code.as_u16())
+                }
+                _ => SpoilerSubError::new(e.to_string()),
+            })
     }
 }
