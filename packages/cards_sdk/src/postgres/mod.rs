@@ -11,7 +11,8 @@ use crate::ingest::{
 use crate::postgres::queries::{
     ALL_PRINTS, CARD_FROM_ID, FUZZY_SEARCH_CARD_AND_ARTIST, FUZZY_SEARCH_CARD_AND_SET_NAME,
     FUZZY_SEARCH_DISTINCT_CARDS, FUZZY_SEARCH_SET_NAME, NORMALISED_SET_NAME, PENDING_CARDS,
-    RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM, SUBSCRIPTIONS_WITH_PENDING,
+    RANDOM_CARD, RANDOM_SET_CARD, SIMILAR_CARDS_FROM, SUBSCRIPTION_EXISTS,
+    SUBSCRIPTIONS_WITH_PENDING,
 };
 use crate::repository::{ReadRepository, SpoilerQueue, WriteRepository};
 use crate::spoiler::{PendingCard, Subscription};
@@ -728,15 +729,40 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn pending_cards(&self, guild_id: GuildId, limit: i64) -> Vec<PendingCard> {
+    async fn subscription_exists(&self, guild_id: GuildId, channel_id: ChannelId) -> bool {
+        match sqlx::query_as::<_, (bool,)>(SUBSCRIPTION_EXISTS)
+            .bind(guild_id)
+            .bind(channel_id)
+            .fetch_one(&self.pool)
+            .await
+        {
+            Ok((exists,)) => exists,
+            Err(e) => {
+                log::warn!(
+                    "Failed to check for an existing subscription for guild {guild_id} channel {channel_id}: {e}"
+                );
+                false
+            }
+        }
+    }
+
+    async fn pending_cards(
+        &self,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+        limit: i64,
+    ) -> Vec<PendingCard> {
         match sqlx::query(PENDING_CARDS)
             .bind(guild_id)
+            .bind(channel_id)
             .bind(limit)
             .fetch_all(&self.pool)
             .await
         {
             Err(why) => {
-                log::warn!("Failed to fetch pending cards for guild {guild_id}: {why}");
+                log::warn!(
+                    "Failed to fetch pending cards for guild {guild_id} channel {channel_id}: {why}"
+                );
                 Vec::new()
             }
             Ok(rows) => rows
@@ -749,18 +775,19 @@ impl SpoilerQueue for Postgres {
         }
     }
 
-    async fn ack(&self, guild_id: GuildId, up_to_queue_id: i64) {
+    async fn ack(&self, guild_id: GuildId, channel_id: ChannelId, up_to_queue_id: i64) {
         if let Err(e) = sqlx::query(
             "UPDATE spoiler_subscription
-             SET cursor = $2, consecutive_failures = 0
-             WHERE guild_id = $1 AND cursor < $2",
+             SET cursor = $3, consecutive_failures = 0
+             WHERE guild_id = $1 AND channel_id = $2 AND cursor < $3",
         )
         .bind(guild_id)
+        .bind(channel_id)
         .bind(up_to_queue_id)
         .execute(&self.pool)
         .await
         {
-            log::warn!("Failed to advance cursor for guild {guild_id}: {e}");
+            log::warn!("Failed to advance cursor for guild {guild_id} channel {channel_id}: {e}");
         }
     }
 
@@ -775,8 +802,7 @@ impl SpoilerQueue for Postgres {
             "INSERT INTO spoiler_subscription
                (guild_id, channel_id, webhook_id, webhook_token, cursor)
              VALUES ($1, $2, $3, $4, COALESCE((SELECT max(id) FROM spoiler_queue), 0))
-             ON CONFLICT (guild_id) DO UPDATE SET
-               channel_id    = EXCLUDED.channel_id,
+             ON CONFLICT (guild_id, channel_id) DO UPDATE SET
                webhook_id    = EXCLUDED.webhook_id,
                webhook_token = EXCLUDED.webhook_token",
         )
@@ -787,41 +813,55 @@ impl SpoilerQueue for Postgres {
         .execute(&self.pool)
         .await
         {
-            log::warn!("Failed to create spoiler subscription for guild {guild_id}: {e}");
+            log::warn!(
+                "Failed to create spoiler subscription for guild {guild_id} channel {channel_id}: {e}"
+            );
         }
     }
 
-    async fn delete_subscription(&self, guild_id: GuildId) -> Option<SubscriptionId> {
+    async fn delete_subscription(
+        &self,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+    ) -> Option<SubscriptionId> {
         match sqlx::query_as::<_, (SubscriptionId,)>(
-            "DELETE FROM spoiler_subscription WHERE guild_id = $1 RETURNING webhook_id",
+            "DELETE FROM spoiler_subscription
+             WHERE guild_id = $1 AND channel_id = $2
+             RETURNING webhook_id",
         )
         .bind(guild_id)
+        .bind(channel_id)
         .fetch_optional(&self.pool)
         .await
         {
             Ok(row) => row.map(|(webhook_id,)| webhook_id),
             Err(e) => {
-                log::warn!("Failed to delete spoiler subscription for guild {guild_id}: {e}");
+                log::warn!(
+                    "Failed to delete spoiler subscription for guild {guild_id} channel {channel_id}: {e}"
+                );
                 None
             }
         }
     }
 
-    async fn record_failure(&self, guild_id: GuildId) -> i64 {
+    async fn record_failure(&self, guild_id: GuildId, channel_id: ChannelId) -> i64 {
         match sqlx::query_as::<_, (i32,)>(
             "UPDATE spoiler_subscription
              SET consecutive_failures = consecutive_failures + 1
-             WHERE guild_id = $1
+             WHERE guild_id = $1 AND channel_id = $2
              RETURNING consecutive_failures",
         )
         .bind(guild_id)
+        .bind(channel_id)
         .fetch_optional(&self.pool)
         .await
         {
             Ok(Some((count,))) => i64::from(count),
             Ok(None) => 0,
             Err(e) => {
-                log::warn!("Failed to record delivery failure for guild {guild_id}: {e}");
+                log::warn!(
+                    "Failed to record delivery failure for guild {guild_id} channel {channel_id}: {e}"
+                );
                 0
             }
         }

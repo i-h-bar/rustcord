@@ -260,6 +260,12 @@ from spoiler_subscription s
 where exists (select 1 from spoiler_queue q where q.id > s.cursor)
 ";
 
+pub const SUBSCRIPTION_EXISTS: &str = r"
+select exists (
+    select 1 from spoiler_subscription where guild_id = $1 and channel_id = $2
+)
+";
+
 pub const PENDING_CARDS: &str = r"
 select q.id                      as queue_id,
        card.id                   as front_id,
@@ -288,7 +294,9 @@ from spoiler_queue q
          left join rule on card.oracle_id = rule.id
          left join artist on card.artist_id = artist.id
          left join set on set.id = card.set_id
-where q.id > (select cursor from spoiler_subscription where guild_id = $1)
+where q.id > (
+    select cursor from spoiler_subscription where guild_id = $1 and channel_id = $2
+)
 order by q.id asc
-limit $2
+limit $3
 ";

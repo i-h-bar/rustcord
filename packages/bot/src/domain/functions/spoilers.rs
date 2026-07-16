@@ -5,7 +5,7 @@ use std::env;
 
 const ISSUES_URL: &str = "https://github.com/i-h-bar/rustcord/issues";
 
-/// URL an admin can visit to re-run the bot's OAuth2 authorize flow for
+/// URL an admin can visit to re-run the bot's `OAuth2` authorize flow for
 /// their server and grant any permissions it's currently missing (e.g.
 /// `Manage Webhooks`), without needing to kick and re-invite it. Discord
 /// re-derives the bot's permissions from the requested scope each time this
@@ -33,6 +33,16 @@ pub async fn subscribe<S, Sub, I>(
     Sub: SpoilerSubscription,
     I: MessageInteraction,
 {
+    if storage.subscription_exists(guild_id, channel_id).await {
+        let _ = interaction
+            .reply_ephemeral(format!(
+                "Spoiler notifications are already enabled for <#{}>.",
+                u64::from(channel_id)
+            ))
+            .await;
+        return;
+    }
+
     match sub.create_subscription(channel_id).await {
         Ok(Subscription { id, token }) => {
             storage
@@ -59,19 +69,29 @@ pub async fn subscribe<S, Sub, I>(
     }
 }
 
-pub async fn unsubscribe<S, Sub, I>(storage: &S, sub: &Sub, interaction: &I, guild_id: GuildId)
-where
+pub async fn unsubscribe<S, Sub, I>(
+    storage: &S,
+    sub: &Sub,
+    interaction: &I,
+    guild_id: GuildId,
+    channel_id: ChannelId,
+) where
     S: SpoilerQueue,
     Sub: SpoilerSubscription,
     I: MessageInteraction,
 {
-    if let Some(sub_id) = storage.delete_subscription(guild_id).await {
+    if let Some(sub_id) = storage.delete_subscription(guild_id, channel_id).await {
         if let Err(e) = sub.delete_subscription(sub_id).await {
-            log::warn!("Failed to delete Discord webhook {sub_id} for guild {guild_id}: {e}");
+            log::warn!(
+                "Failed to delete Discord webhook {sub_id} for guild {guild_id} channel {channel_id}: {e}"
+            );
         }
     }
     let _ = interaction
-        .reply("Spoiler notifications disabled for this server.".to_string())
+        .reply(format!(
+            "Spoiler notifications disabled for <#{}>.",
+            u64::from(channel_id)
+        ))
         .await;
 }
 
@@ -89,6 +109,11 @@ mod tests {
         let mut storage = MockSpoilerQueue::new();
         let mut interaction = MockMessageInteraction::new();
 
+        storage
+            .expect_subscription_exists()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
+            .times(1)
+            .return_const(false);
         sub.expect_create_subscription()
             .with(eq(ChannelId::from(42u64)))
             .times(1)
@@ -124,6 +149,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn subscribe_does_not_create_a_webhook_when_the_channel_is_already_subscribed() {
+        let sub = MockSpoilerSubscription::new();
+        let mut storage = MockSpoilerQueue::new();
+        let mut interaction = MockMessageInteraction::new();
+
+        storage
+            .expect_subscription_exists()
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
+            .times(1)
+            .return_const(true);
+        // `sub`/`storage` have no `create_subscription` expectations at all
+        // — a second webhook must never be created for an already-subscribed
+        // channel.
+        interaction
+            .expect_reply_ephemeral()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        subscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
+    }
+
+    #[tokio::test]
     async fn subscribe_does_not_store_subscription_when_webhook_creation_fails() {
         // SAFETY: `reauthorize_url` reads this; tests run single-threaded
         // enough within this module that a fixed test value is safe here.
@@ -133,6 +187,10 @@ mod tests {
         let mut storage = MockSpoilerQueue::new();
         let mut interaction = MockMessageInteraction::new();
 
+        storage
+            .expect_subscription_exists()
+            .times(1)
+            .return_const(false);
         sub.expect_create_subscription().times(1).returning(|_| {
             Err(crate::ports::services::spoiler_subscription::SpoilerSubError::new("no perms"))
         });
@@ -160,16 +218,23 @@ mod tests {
 
         storage
             .expect_delete_subscription()
-            .with(eq(GuildId::from(1u64)))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
             .times(1)
-            .return_once(|_| Some(SubscriptionId::from(99u64)));
+            .return_once(|_, _| Some(SubscriptionId::from(99u64)));
         sub.expect_delete_subscription()
             .with(eq(SubscriptionId::from(99u64)))
             .times(1)
             .returning(|_| Ok(()));
         interaction.expect_reply().times(1).returning(|_| Ok(()));
 
-        unsubscribe(&storage, &sub, &interaction, GuildId::from(1u64)).await;
+        unsubscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -180,12 +245,19 @@ mod tests {
 
         storage
             .expect_delete_subscription()
-            .with(eq(GuildId::from(1u64)))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(42u64)))
             .times(1)
-            .return_once(|_| None);
+            .return_once(|_, _| None);
         sub.expect_delete_subscription().times(0);
         interaction.expect_reply().times(1).returning(|_| Ok(()));
 
-        unsubscribe(&storage, &sub, &interaction, GuildId::from(1u64)).await;
+        unsubscribe(
+            &storage,
+            &sub,
+            &interaction,
+            GuildId::from(1u64),
+            ChannelId::from(42u64),
+        )
+        .await;
     }
 }

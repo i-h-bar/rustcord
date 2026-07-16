@@ -12,7 +12,9 @@ pub async fn run(
     sender: &impl crate::ports::spoilers::SpoilerSender,
 ) {
     for sub in repo.subscriptions_with_pending().await {
-        let cards = repo.pending_cards(sub.guild_id, BATCH_SIZE).await;
+        let cards = repo
+            .pending_cards(sub.guild_id, sub.channel_id, BATCH_SIZE)
+            .await;
 
         // The cursor is a single scalar, so a card whose image can't be
         // fetched yet can't be skipped over: acking past it would drop it
@@ -43,16 +45,21 @@ pub async fn run(
         };
 
         match sender.send(sub.id, &sub.token, &batch).await {
-            Ok(()) => repo.ack(sub.guild_id, last_queue_id).await,
+            Ok(()) => repo.ack(sub.guild_id, sub.channel_id, last_queue_id).await,
             Err(e) => {
-                log::warn!("Failed to deliver batch to guild {}: {e}", sub.guild_id);
-                let failures = repo.record_failure(sub.guild_id).await;
+                log::warn!(
+                    "Failed to deliver batch to guild {} channel {}: {e}",
+                    sub.guild_id,
+                    sub.channel_id
+                );
+                let failures = repo.record_failure(sub.guild_id, sub.channel_id).await;
                 if failures >= MAX_CONSECUTIVE_FAILURES {
                     log::warn!(
-                        "Auto-unsubscribing guild {} after {failures} consecutive webhook failures",
-                        sub.guild_id
+                        "Auto-unsubscribing guild {} channel {} after {failures} consecutive webhook failures",
+                        sub.guild_id,
+                        sub.channel_id
                     );
-                    repo.delete_subscription(sub.guild_id).await;
+                    repo.delete_subscription(sub.guild_id, sub.channel_id).await;
                 }
             }
         }
@@ -127,9 +134,13 @@ mod tests {
             .times(1)
             .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
-            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
             .times(1)
-            .return_once(|_, _| {
+            .return_once(|_, _, _| {
                 vec![
                     PendingCard {
                         queue_id: 1,
@@ -147,7 +158,7 @@ mod tests {
             .times(1)
             .returning(|_, _, _| Ok(()));
         repo.expect_ack()
-            .with(eq(GuildId::from(1u64)), eq(2i64))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(2i64))
             .times(1)
             .return_const(());
         repo.expect_prune_queue().times(1).return_const(());
@@ -165,9 +176,13 @@ mod tests {
             .times(1)
             .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
-            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
             .times(1)
-            .return_once(|_, _| {
+            .return_once(|_, _, _| {
                 vec![
                     PendingCard {
                         queue_id: 1,
@@ -186,9 +201,9 @@ mod tests {
         repo.expect_ack().times(0);
         // Below MAX_CONSECUTIVE_FAILURES (5) — must NOT trigger auto-unsubscribe.
         repo.expect_record_failure()
-            .with(eq(GuildId::from(1u64)))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)))
             .times(1)
-            .return_once(|_| 2);
+            .return_once(|_, _| 2);
         repo.expect_delete_subscription().times(0);
         repo.expect_prune_queue().times(1).return_const(());
 
@@ -205,9 +220,13 @@ mod tests {
             .times(1)
             .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
-            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
             .times(1)
-            .return_once(|_, _| {
+            .return_once(|_, _, _| {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Card A"),
@@ -220,11 +239,11 @@ mod tests {
         repo.expect_ack().times(0);
         // Reaches MAX_CONSECUTIVE_FAILURES (5) exactly — must trigger auto-unsubscribe.
         repo.expect_record_failure()
-            .with(eq(GuildId::from(1u64)))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)))
             .times(1)
-            .return_once(|_| 5);
+            .return_once(|_, _| 5);
         repo.expect_delete_subscription()
-            .with(eq(GuildId::from(1u64)))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)))
             .times(1)
             .return_const(Some(SubscriptionId::from(3u64)));
         repo.expect_prune_queue().times(1).return_const(());
@@ -242,9 +261,13 @@ mod tests {
             .times(1)
             .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
-            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
             .times(1)
-            .return_once(|_, _| {
+            .return_once(|_, _, _| {
                 vec![
                     PendingCard {
                         queue_id: 1,
@@ -277,7 +300,7 @@ mod tests {
             .times(1)
             .returning(|_, _, _| Ok(()));
         repo.expect_ack()
-            .with(eq(GuildId::from(1u64)), eq(1i64))
+            .with(eq(GuildId::from(1u64)), eq(ChannelId::from(2u64)), eq(1i64))
             .times(1)
             .return_const(());
         repo.expect_prune_queue().times(1).return_const(());
@@ -295,9 +318,13 @@ mod tests {
             .times(1)
             .return_once(|| vec![test_subscription()]);
         repo.expect_pending_cards()
-            .with(eq(GuildId::from(1u64)), eq(10i64))
+            .with(
+                eq(GuildId::from(1u64)),
+                eq(ChannelId::from(2u64)),
+                eq(10i64),
+            )
             .times(1)
-            .return_once(|_, _| {
+            .return_once(|_, _, _| {
                 vec![PendingCard {
                     queue_id: 1,
                     card: test_card("Missing Image"),

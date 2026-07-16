@@ -71,12 +71,23 @@ where
                 .await;
             }
             "unsubscribe" => {
+                let ResolvedValue::SubCommand(sub_options) = &sub.value else {
+                    return;
+                };
+                let Some(channel_opt) = sub_options.iter().find(|o| o.name == "channel") else {
+                    return;
+                };
+                let ResolvedValue::Channel(channel) = channel_opt.value else {
+                    return;
+                };
+                let channel_id = ChannelId::from(channel.id.get());
                 let interaction = DiscordCommand::new(ctx, command);
                 functions::spoilers::unsubscribe(
                     &self.card_store,
                     &self.sub,
                     &interaction,
                     GuildId::from(guild_id.get()),
+                    channel_id,
                 )
                 .await;
             }

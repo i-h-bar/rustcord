@@ -10,7 +10,7 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 "subscribe",
-                "Start posting new-card spoilers to a channel",
+                "[Beta] Start posting new-card spoilers to a channel",
             )
             .add_sub_option(
                 CreateCommandOption::new(
@@ -22,9 +22,20 @@ pub fn register() -> CreateCommand {
                 .required(true),
             ),
         )
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::SubCommand,
-            "unsubscribe",
-            "Stop posting spoilers to this server",
-        ))
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "unsubscribe",
+                "Stop posting spoilers to a channel",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::Channel,
+                    "channel",
+                    "Channel to stop posting spoilers in",
+                )
+                .channel_types(vec![ChannelType::Text])
+                .required(true),
+            ),
+        )
 }

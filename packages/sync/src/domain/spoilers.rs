@@ -20,9 +20,12 @@ pub async fn sync(
         return;
     }
 
-    let upsert_result = storage.upsert_cards(&cards).await;
-
+    // Images are saved to disk before the DB write that makes the card (and,
+    // for new cards, its `spoiler_queue` row) visible — otherwise `notifier`
+    // could poll a freshly-enqueued card before its image file exists.
     save_images(&cards, &image_store, &source).await;
+
+    let upsert_result = storage.upsert_cards(&cards).await;
 
     let deleted_images = storage
         .delete_orphaned_images(&upsert_result.orphaned_images)

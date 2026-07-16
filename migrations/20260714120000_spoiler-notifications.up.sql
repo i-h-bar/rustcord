@@ -12,11 +12,16 @@ CREATE TABLE IF NOT EXISTS spoiler_subscription (
     -- BIGINT — Postgres has no unsigned integer type, and BIGINT would need
     -- a sign-reinterpreting cast on every read/write. See
     -- cards_sdk::ids for the Rust-side newtypes and the round-trip logic.
-    guild_id UUID PRIMARY KEY,
+    guild_id UUID NOT NULL,
     channel_id UUID NOT NULL,
     webhook_id UUID NOT NULL,
     webhook_token TEXT NOT NULL,
     cursor BIGINT NOT NULL,
     consecutive_failures INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- A guild may subscribe multiple channels independently, each with its
+    -- own webhook/cursor/failure count — guild_id leads the key so
+    -- guild-scoped lookups (e.g. deleting every subscription for a guild
+    -- the bot has left) still use this index as a prefix.
+    PRIMARY KEY (guild_id, channel_id)
 );
