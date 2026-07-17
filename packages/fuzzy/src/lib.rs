@@ -17,80 +17,74 @@ impl ToBytes for String {
 }
 
 #[allow(clippy::cast_precision_loss)]
-pub fn jaro_winkler_ascii_bitmask<A: ToBytes + PartialEq<B>, B: ToBytes>(a: &A, b: &B) -> f32 {
-    let a_chars = a.to_bytes();
-    let b_chars = b.to_bytes();
+pub fn jaro_winkler_ascii_bitmask<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
+    // The u64 match masks can only track 64 positions; longer inputs
+    // degrade to a comparison of their first 64 bytes.
+    let a_bytes = a.to_bytes();
+    let b_bytes = b.to_bytes();
+    let a_chars = &a_bytes[..a_bytes.len().min(64)];
+    let b_chars = &b_bytes[..b_bytes.len().min(64)];
     let len_a = a_chars.len();
     let len_b = b_chars.len();
 
-    if a == b {
+    if a_chars == b_chars {
         return 1.0;
     }
 
     let max_dist = (len_a.max(len_b) / 2).saturating_sub(1);
-    let mut matches = 0.0;
+    let mut matches: u32 = 0;
     let mut hash_a: u64 = 0;
     let mut hash_b: u64 = 0;
 
-    for (i, a_char) in a_chars.iter().enumerate().take(len_a) {
-        let start = i.saturating_sub(max_dist);
+    for (i, a_char) in a_chars.iter().enumerate() {
         let end = (i + max_dist + 1).min(len_b);
+        let start = i.saturating_sub(max_dist).min(end);
 
         for (j, b_char) in b_chars.iter().enumerate().take(end).skip(start) {
             if (hash_b & (1 << j)) == 0 && a_char == b_char {
                 hash_a |= 1 << i;
                 hash_b |= 1 << j;
-                matches += 1.0;
+                matches += 1;
                 break;
             }
         }
     }
 
-    if matches == 0.0 {
+    if matches == 0 {
         return 0.0;
     }
 
-    let mut transpositions = 0.0;
-    let mut b_ptr = 0;
+    let mut transpositions: u32 = 0;
+    let mut b_matches = hash_b;
 
-    for (i, &a_char) in a_chars.iter().enumerate().take(len_a) {
+    for (i, &a_char) in a_chars.iter().enumerate() {
         if (hash_a & (1 << i)) != 0 {
-            while (hash_b & (1 << b_ptr)) == 0 {
-                b_ptr += 1;
+            let j = b_matches.trailing_zeros() as usize;
+            b_matches &= b_matches - 1;
+            if a_char != b_chars[j] {
+                transpositions += 1;
             }
-            if a_char != b_chars[b_ptr] {
-                transpositions += 1.0;
-            }
-            b_ptr += 1;
         }
     }
 
+    let matches = matches as f32;
     let jaro_similarity = (1.0 / 3.0)
         * (matches / len_a as f32
             + matches / len_b as f32
-            + (matches - transpositions / 2.0) / matches);
+            + (matches - transpositions as f32 / 2.0) / matches);
 
-    let mut prefix_len = 0;
-    for (c1, c2) in a_chars.iter().zip(b_chars) {
-        if c1 == c2 {
-            prefix_len += 1;
-        } else {
-            break;
-        }
-    }
-
-    #[allow(clippy::cast_sign_loss)]
-    let prefix_len = (prefix_len as usize).min(4) as f32;
+    let prefix_len = a_chars
+        .iter()
+        .zip(b_chars)
+        .take_while(|(c1, c2)| c1 == c2)
+        .count()
+        .min(4) as f32;
     let scaling_factor = 0.1;
 
     jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity))
 }
 
-pub fn winkliest_match<
-    A: PartialEq<B> + ToBytes,
-    B: ToBytes,
-    I: AsRef<[B]> + IntoIterator<Item = B>,
->(
+pub fn winkliest_match<A: ToBytes, B: ToBytes, I: AsRef<[B]> + IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Option<B> {
@@ -105,7 +99,7 @@ pub fn winkliest_match<
     Some(closest_match)
 }
 
-pub fn winkliest_sort<A: PartialEq<B> + ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
+pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Vec<B> {
@@ -336,6 +330,18 @@ mod tests {
     fn test_to_bytes_trait_str() {
         let s = "test";
         assert_eq!(s.to_bytes(), b"test");
+    }
+
+    #[test]
+    fn test_jaro_winkler_over_64_bytes_truncates() {
+        // Inputs longer than 64 bytes are truncated to their first 64 bytes,
+        // so strings identical up to byte 64 score as an exact match.
+        let a = "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffffgggg1234567890";
+        let b = "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffffgggg0987654321";
+        assert_eq!(a.len(), 74);
+        assert_eq!(b.len(), 74);
+
+        assert_eq!(jaro_winkler_ascii_bitmask(&a, &b), 1.0);
     }
 
     #[test]
