@@ -7,6 +7,7 @@ edition = "2024"
 
 [dev-dependencies]
 criterion = "0.7"
+strsim = "0.11"
 
 [[bench]]
 name= "jw_bench"

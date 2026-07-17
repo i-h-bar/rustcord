@@ -1,5 +1,9 @@
 use std::cmp::Ordering;
 
+mod simd;
+
+pub use simd::jaro_winkler_ascii_simd;
+
 pub trait ToBytes {
     fn to_bytes(&self) -> &[u8];
 }
@@ -22,8 +26,15 @@ pub fn jaro_winkler_ascii_bitmask<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
     // degrade to a comparison of their first 64 bytes.
     let a_bytes = a.to_bytes();
     let b_bytes = b.to_bytes();
-    let a_chars = &a_bytes[..a_bytes.len().min(64)];
-    let b_chars = &b_bytes[..b_bytes.len().min(64)];
+    jaro_winkler_bytes(
+        &a_bytes[..a_bytes.len().min(64)],
+        &b_bytes[..b_bytes.len().min(64)],
+    )
+}
+
+#[inline]
+#[allow(clippy::cast_precision_loss)]
+pub(crate) fn jaro_winkler_bytes(a_chars: &[u8], b_chars: &[u8]) -> f32 {
     let len_a = a_chars.len();
     let len_b = b_chars.len();
 
