@@ -20,6 +20,11 @@ impl ToBytes for String {
     }
 }
 
+/// Scalar Jaro-Winkler over ASCII bytes (u64-bitmask implementation).
+///
+/// Kept public as the pure-scalar reference used by the benches and the
+/// SIMD equivalence tests. For the fastest available implementation, use
+/// [`jaro_winkler_ascii_simd`] — it returns bit-identical scores.
 #[allow(clippy::cast_precision_loss)]
 pub fn jaro_winkler_ascii_bitmask<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
     // The u64 match masks can only track 64 positions; longer inputs
@@ -95,14 +100,19 @@ pub(crate) fn jaro_winkler_bytes(a_chars: &[u8], b_chars: &[u8]) -> f32 {
     jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity))
 }
 
-pub fn winkliest_match<A: ToBytes, B: ToBytes, I: AsRef<[B]> + IntoIterator<Item = B>>(
+/// Return the candidate from `heap` with the highest Jaro-Winkler similarity
+/// to `target`, or `None` if `heap` is empty.
+///
+/// Scoring uses the same accelerated dispatch as [`jaro_winkler_ascii_simd`].
+pub fn winkliest_match<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Option<B> {
+    let target_bytes = target.to_bytes();
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let distance = jaro_winkler_ascii_bitmask(target, &needle);
+            let distance = simd::jaro_winkler_slices(target_bytes, needle.to_bytes());
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
@@ -110,16 +120,26 @@ pub fn winkliest_match<A: ToBytes, B: ToBytes, I: AsRef<[B]> + IntoIterator<Item
     Some(closest_match)
 }
 
+/// Sort candidates by descending Jaro-Winkler similarity to `target`.
+///
+/// The relative order of equal-scored candidates is unspecified.
+/// Scoring uses the same accelerated dispatch as [`jaro_winkler_ascii_simd`].
 pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Vec<B> {
+    let target_bytes = target.to_bytes();
     let mut scored: Vec<_> = heap
         .into_iter()
-        .map(|needle| (jaro_winkler_ascii_bitmask(target, &needle), needle))
+        .map(|needle| {
+            (
+                simd::jaro_winkler_slices(target_bytes, needle.to_bytes()),
+                needle,
+            )
+        })
         .collect();
 
-    scored.sort_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
+    scored.sort_unstable_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
     scored.into_iter().map(|(_, item)| item).collect()
 }
 
@@ -356,6 +376,18 @@ mod tests {
     }
 
     #[test]
+    fn test_winkliest_match_accepts_plain_iterator() {
+        // Iterator adapters (here: filter) implement IntoIterator but not
+        // AsRef<[&str]>, so this only compiles once the dead bound is gone.
+        let a = "CRATE";
+        let candidates = ["TRACE", "zzz", "sdasda"];
+
+        let result = winkliest_match(&a, candidates.into_iter().filter(|s| s.len() > 3));
+
+        assert_eq!(result, Some("TRACE"));
+    }
+
+    #[test]
     fn test_jaro_winkler_unicode_safe() {
         // Should handle UTF-8 safely (even if not ideal for non-ASCII)
         let a = "café";
@@ -363,5 +395,31 @@ mod tests {
 
         let score = jaro_winkler_ascii_bitmask(&a, &b);
         assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_winkliest_sort_order_matches_bitmask_scores() {
+        // Pinning test: winkliest_sort's ordering must always agree with
+        // sorting by jaro_winkler_ascii_bitmask scores directly. Candidates
+        // are chosen with strictly distinct scores so the assertion is
+        // insensitive to tie-ordering.
+        let target = "lightning bolt";
+        let candidates = [
+            "chain lightning",
+            "lightning strike",
+            "lightning bolt",
+            "bolt",
+        ];
+
+        let sorted = winkliest_sort(&target, candidates);
+
+        let mut expected: Vec<(f32, &str)> = candidates
+            .iter()
+            .map(|c| (jaro_winkler_ascii_bitmask(&target, c), *c))
+            .collect();
+        expected.sort_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
+        let expected: Vec<&str> = expected.into_iter().map(|(_, c)| c).collect();
+
+        assert_eq!(sorted, expected);
     }
 }

@@ -137,10 +137,15 @@ pub(crate) mod avx2 {
 /// longer than 64 bytes are truncated to their first 64 bytes.
 #[must_use]
 pub fn jaro_winkler_ascii_simd<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
-    let a_bytes = a.to_bytes();
-    let b_bytes = b.to_bytes();
-    let a_chars = &a_bytes[..a_bytes.len().min(64)];
-    let b_chars = &b_bytes[..b_bytes.len().min(64)];
+    jaro_winkler_slices(a.to_bytes(), b.to_bytes())
+}
+
+/// Slice-level entry point for the same dispatch: safe for slices of any
+/// length (truncates to 64 bytes internally before the kernel).
+#[must_use]
+pub(crate) fn jaro_winkler_slices(a: &[u8], b: &[u8]) -> f32 {
+    let a_chars = &a[..a.len().min(64)];
+    let b_chars = &b[..b.len().min(64)];
 
     #[cfg(target_arch = "x86_64")]
     if is_x86_feature_detected!("avx2") {
