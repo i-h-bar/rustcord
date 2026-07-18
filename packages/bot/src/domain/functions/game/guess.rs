@@ -38,7 +38,7 @@ where
         };
         game_state.add_guess();
 
-        if fuzzy::jaro_winkler_ascii_bitmask(
+        if fuzzy::jaro_winkler_ascii_simd(
             &normalise_card_name(&guess),
             &game_state.card().normalised_name(),
         ) > 0.75
