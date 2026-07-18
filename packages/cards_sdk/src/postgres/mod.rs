@@ -589,13 +589,9 @@ impl WriteRepository for Postgres {
             bar
         };
 
-        let mut orphaned_images: Vec<Uuid> = Vec::new();
-        let mut orphaned_illustrations: Vec<Uuid> = Vec::new();
-        let mut new_card_ids: Vec<Uuid> = Vec::new();
-
         let card_futs: Vec<_> = cards
             .iter()
-            .map(|info| self.upsert_card_info(info))
+            .map(|info| async move { (info.card.id, self.upsert_card_info(info).await) })
             .collect();
         let results: Vec<_> = futures::stream::iter(card_futs)
             .buffer_unordered(self.pool_size)
@@ -606,17 +602,8 @@ impl WriteRepository for Postgres {
             .collect()
             .await;
 
-        for (info, (orphaned_img, orphaned_ill, is_new)) in cards.iter().zip(results) {
-            if let Some(id) = orphaned_img {
-                orphaned_images.push(id);
-            }
-            if let Some(id) = orphaned_ill {
-                orphaned_illustrations.push(id);
-            }
-            if is_new {
-                new_card_ids.push(info.card.id);
-            }
-        }
+        let (orphaned_images, orphaned_illustrations, new_card_ids) =
+            collect_upsert_results(results);
 
         #[cfg(feature = "local-dev")]
         pb.finish_with_message("done");
@@ -911,6 +898,36 @@ fn connection_uri() -> String {
     format!("postgresql://{user}:{password}@{host}/{db}")
 }
 
+/// Per-card outcome of `upsert_card_info`: the orphaned image id, orphaned
+/// illustration id, and whether the card was newly inserted.
+type CardUpsertOutcome = (Option<Uuid>, Option<Uuid>, bool);
+
+/// `buffer_unordered` yields upsert results in completion order, not
+/// submission order, so each result carries the id of the card it belongs
+/// to — pairing them back to the input list by position would attribute
+/// `is_new` (and hence a `spoiler_queue` entry) to an arbitrary card.
+fn collect_upsert_results(
+    results: Vec<(Uuid, CardUpsertOutcome)>,
+) -> (Vec<Uuid>, Vec<Uuid>, Vec<Uuid>) {
+    let mut orphaned_images = Vec::new();
+    let mut orphaned_illustrations = Vec::new();
+    let mut new_card_ids = Vec::new();
+
+    for (card_id, (orphaned_img, orphaned_ill, is_new)) in results {
+        if let Some(id) = orphaned_img {
+            orphaned_images.push(id);
+        }
+        if let Some(id) = orphaned_ill {
+            orphaned_illustrations.push(id);
+        }
+        if is_new {
+            new_card_ids.push(card_id);
+        }
+    }
+
+    (orphaned_images, orphaned_illustrations, new_card_ids)
+}
+
 fn card_from(row: &PgRow) -> Card {
     Card::new(
         row.get::<Uuid, &str>("front_id"),
@@ -934,4 +951,37 @@ fn card_from(row: &PgRow) -> Card {
         row.get::<String, &str>("set_abbreviation"),
         row.get::<Date, &str>("release_date"),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_card_flag_stays_with_its_own_card_regardless_of_result_order() {
+        let new_card = Uuid::new_v4();
+        let existing_card = Uuid::new_v4();
+        let orphaned_img = Uuid::new_v4();
+        let orphaned_ill = Uuid::new_v4();
+
+        // Results arrive in completion order (buffer_unordered), which need
+        // not match the order the cards were submitted in — here the new
+        // card's result comes back first even though positional pairing
+        // against a submission order of [existing, new] would attribute its
+        // `is_new` flag to the existing card.
+        let results = vec![
+            (new_card, (None, None, true)),
+            (
+                existing_card,
+                (Some(orphaned_img), Some(orphaned_ill), false),
+            ),
+        ];
+
+        let (orphaned_images, orphaned_illustrations, new_card_ids) =
+            collect_upsert_results(results);
+
+        assert_eq!(new_card_ids, vec![new_card]);
+        assert_eq!(orphaned_images, vec![orphaned_img]);
+        assert_eq!(orphaned_illustrations, vec![orphaned_ill]);
+    }
 }
