@@ -5,8 +5,17 @@ edition = "2024"
 
 [dependencies]
 
+[features]
+# Assume the target CPU supports AVX2 and skip the runtime
+# `is_x86_feature_detected!` check in favour of an unconditional call.
+# Only enable this when the deployment hardware is known to support AVX2 —
+# every x86_64 CPU from roughly the last decade does, but a binary built
+# with this feature will crash (illegal instruction) on one that doesn't.
+avx2 = []
+
 [dev-dependencies]
 criterion = "0.7"
+strsim = "0.11"
 
 [[bench]]
 name= "jw_bench"

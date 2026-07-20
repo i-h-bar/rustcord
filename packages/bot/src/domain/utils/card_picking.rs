@@ -1,18 +1,23 @@
 use contracts::card::Card;
-use std::cmp::Ordering;
+use fuzzy::ToBytes;
+
+/// Local wrapper letting `Card` plug into `fuzzy::winkliest_sort`'s
+/// `ToBytes` bound without giving `contracts` a dependency on `fuzzy` (or
+/// vice versa) just for this one trait impl.
+struct CardByName(Card);
+
+impl ToBytes for CardByName {
+    fn to_bytes(&self) -> &[u8] {
+        self.0.normalised_name().as_bytes()
+    }
+}
 
 #[must_use]
 pub fn fuzzy_sort(needle: &str, haystack: Vec<Card>) -> Vec<Card> {
-    let mut scored: Vec<(f32, Card)> = haystack
+    fuzzy::winkliest_sort(&needle, haystack.into_iter().map(CardByName))
         .into_iter()
-        .map(|card| {
-            let score = fuzzy::jaro_winkler_ascii_bitmask(&needle, &card.normalised_name());
-            (score, card)
-        })
-        .collect();
-
-    scored.sort_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
-    scored.into_iter().map(|(_, card)| card).collect()
+        .map(|CardByName(card)| card)
+        .collect()
 }
 
 #[must_use]
@@ -73,6 +78,36 @@ mod tests {
             String::new(),
             time::Date::from_calendar_date(1993, time::Month::August, 5).unwrap(),
         )
+    }
+
+    #[test]
+    fn fuzzy_sort_orders_by_descending_similarity() {
+        // Pinning test: fuzzy_sort must order candidates by descending
+        // Jaro-Winkler similarity to the needle, regardless of internal
+        // implementation (hand-rolled scalar sort vs. fuzzy::winkliest_sort).
+        let bolt = make_card(
+            uuid!("00000000-0000-0000-0000-000000000001"),
+            "Lightning Bolt",
+            None,
+        );
+        let strike = make_card(
+            uuid!("00000000-0000-0000-0000-000000000002"),
+            "Lightning Strike",
+            None,
+        );
+        let chain = make_card(
+            uuid!("00000000-0000-0000-0000-000000000003"),
+            "Chain Lightning",
+            None,
+        );
+
+        let sorted = fuzzy_sort("lightning bolt", vec![chain, strike, bolt]);
+
+        let names: Vec<&str> = sorted.iter().map(Card::name).collect();
+        assert_eq!(
+            names,
+            vec!["Lightning Bolt", "Lightning Strike", "Chain Lightning"]
+        );
     }
 
     #[test]

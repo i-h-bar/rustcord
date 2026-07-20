@@ -1135,6 +1135,7 @@ name = "fuzzy"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "strsim",
 ]
 
 [[package]]
