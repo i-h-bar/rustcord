@@ -1,7 +1,9 @@
 use std::cmp::Ordering;
 
+mod bmask;
 mod simd;
 
+pub use bmask::jaro_winkler_ascii_bitmask;
 pub use simd::jaro_winkler_ascii_simd;
 
 pub trait ToBytes {
@@ -20,83 +22,30 @@ impl ToBytes for String {
     }
 }
 
-/// Scalar Jaro-Winkler over ASCII bytes (u64-bitmask implementation).
+/// AVX2/scalar dispatch, skipping the length truncation `jaro_winkler_ascii_simd` does.
 ///
-/// Kept public as the pure-scalar reference used by the benches and the
-/// SIMD equivalence tests. For the fastest available implementation, use
-/// [`jaro_winkler_ascii_simd`] — it returns bit-identical scores.
-#[allow(clippy::cast_precision_loss)]
-pub fn jaro_winkler_ascii_bitmask<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
-    // The u64 match masks can only track 64 positions; longer inputs
-    // degrade to a comparison of their first 64 bytes.
-    let a_bytes = a.to_bytes();
-    let b_bytes = b.to_bytes();
-    jaro_winkler_bytes(
-        &a_bytes[..a_bytes.len().min(64)],
-        &b_bytes[..b_bytes.len().min(64)],
-    )
-}
-
+/// # Safety
+/// `a` and `b` must each be at most 64 bytes. Violating this panics on the
+/// AVX2 path (bounds-checked buffer copy), but on the scalar fallback in a
+/// release build it silently returns a wrong score instead of panicking —
+/// the match-bit shift (`1 << i`) overflows a `u64` and wraps once
+/// overflow checks are off.
 #[inline]
-#[allow(clippy::cast_precision_loss)]
-pub(crate) fn jaro_winkler_bytes(a_chars: &[u8], b_chars: &[u8]) -> f32 {
-    let len_a = a_chars.len();
-    let len_b = b_chars.len();
+pub(crate) unsafe fn jaro_winkler_unchecked(a: &[u8], b: &[u8]) -> f32 {
+    debug_assert!(a.len() <= 64 && b.len() <= 64);
 
-    if a_chars == b_chars {
-        return 1.0;
+    #[cfg(all(not(feature = "avx2"), target_arch = "x86_64"))]
+    if is_x86_feature_detected!("avx2") {
+        // SAFETY: AVX2 availability just checked; caller guarantees length <= 64.
+        return unsafe { simd::avx2::jaro_winkler(a, b) };
     }
 
-    let max_dist = (len_a.max(len_b) / 2).saturating_sub(1);
-    let mut matches: u32 = 0;
-    let mut hash_a: u64 = 0;
-    let mut hash_b: u64 = 0;
+    #[cfg(feature = "avx2")]
+    // SAFETY: the `avx2` feature asserts AVX2 is available; caller guarantees length <= 64.
+    return unsafe { simd::avx2::jaro_winkler(a, b) };
 
-    for (i, a_char) in a_chars.iter().enumerate() {
-        let end = (i + max_dist + 1).min(len_b);
-        let start = i.saturating_sub(max_dist).min(end);
-
-        for (j, b_char) in b_chars.iter().enumerate().take(end).skip(start) {
-            if (hash_b & (1 << j)) == 0 && a_char == b_char {
-                hash_a |= 1 << i;
-                hash_b |= 1 << j;
-                matches += 1;
-                break;
-            }
-        }
-    }
-
-    if matches == 0 {
-        return 0.0;
-    }
-
-    let mut transpositions: u32 = 0;
-    let mut b_matches = hash_b;
-
-    for (i, &a_char) in a_chars.iter().enumerate() {
-        if (hash_a & (1 << i)) != 0 {
-            let j = b_matches.trailing_zeros() as usize;
-            b_matches &= b_matches - 1;
-            if a_char != b_chars[j] {
-                transpositions += 1;
-            }
-        }
-    }
-
-    let matches = matches as f32;
-    let jaro_similarity = (1.0 / 3.0)
-        * (matches / len_a as f32
-            + matches / len_b as f32
-            + (matches - transpositions as f32 / 2.0) / matches);
-
-    let prefix_len = a_chars
-        .iter()
-        .zip(b_chars)
-        .take_while(|(c1, c2)| c1 == c2)
-        .count()
-        .min(4) as f32;
-
-    jaro_similarity + (prefix_len * 0.1 * (1.0 - jaro_similarity))
+    #[cfg(not(feature = "avx2"))]
+    bmask::jaro_winkler_bytes(a, b)
 }
 
 /// Return the candidate from `heap` with the highest Jaro-Winkler similarity
@@ -119,9 +68,8 @@ pub fn winkliest_match<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
                 &needle_bytes[..needle_bytes.len().min(64)]
             };
 
-            let distance = unsafe {
-                simd::jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked)
-            };
+            let distance =
+                unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) };
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
@@ -150,7 +98,7 @@ pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
             };
 
             (
-                unsafe { simd::jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) },
+                unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) },
                 needle,
             )
         })
