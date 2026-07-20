@@ -68,9 +68,8 @@ pub fn winkliest_match<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
                 &needle_bytes[..needle_bytes.len().min(64)]
             };
 
-            let distance =
-                unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) };
-            (distance, needle)
+            // SAFETY: truncated to <= 64 bytes above.
+            (unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) }, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
 
@@ -98,6 +97,7 @@ pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
             };
 
             (
+                // SAFETY: truncated to <= 64 bytes above.
                 unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) },
                 needle,
             )
