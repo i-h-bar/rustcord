@@ -9,12 +9,7 @@ use crate::ToBytes;
 pub fn jaro_winkler_ascii_bitmask<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
     // The u64 match masks can only track 64 positions; longer inputs
     // degrade to a comparison of their first 64 bytes.
-    let a_bytes = a.to_bytes();
-    let b_bytes = b.to_bytes();
-    jaro_winkler_bytes(
-        &a_bytes[..a_bytes.len().min(64)],
-        &b_bytes[..b_bytes.len().min(64)],
-    )
+    jaro_winkler_bytes(crate::truncate_bytes64(a), crate::truncate_bytes64(b))
 }
 
 #[inline]

@@ -1,3 +1,43 @@
+//! Fast Jaro-Winkler string similarity over ASCII bytes.
+//!
+//! This crate scores similarity between short, already-normalised strings —
+//! card names, set names, artist names — for fuzzy search and guess matching.
+//! It is not a general-purpose Unicode similarity library; see the assumptions
+//! below.
+//!
+//! # Input assumptions
+//!
+//! - **Pre-normalised ASCII.** Scoring compares bytes, so it is case- and
+//!   accent-sensitive. Callers are expected to have lower-cased and stripped
+//!   diacritics beforehand (`"Café"` and `"cafe"` do *not* score as equal).
+//! - **First 64 bytes only.** Every entry point truncates each input to its
+//!   first 64 bytes before scoring — the algorithm tracks match positions in a
+//!   `u64` bitmask. Strings that are identical up to byte 64 score as an exact
+//!   match. This is ample for the card/set/artist names this crate targets.
+//!
+//! # Public API
+//!
+//! - [`jaro_winkler_ascii_simd`] — the fast path; dispatches to an AVX2 kernel
+//!   when available and falls back to the scalar implementation otherwise.
+//!   Prefer this for scoring a single pair.
+//! - [`jaro_winkler_ascii_bitmask`] — the pure scalar reference. Returns
+//!   scores bit-identical to the SIMD path; kept public for benches and tests.
+//! - [`winkliest_match`] / [`winkliest_sort`] — pick the closest candidate, or
+//!   order a set of candidates, against one target. Both use the same
+//!   accelerated dispatch.
+//! - [`ToBytes`] — the trait inputs implement to expose their bytes. Provided
+//!   for `&str` and `String`; implement it on a newtype to score other types.
+//!
+//! # The `avx2` feature
+//!
+//! By default the SIMD path performs a (cached) runtime `is_x86_feature_detected!`
+//! check per process and stays portable across `x86_64` CPUs. Enabling the
+//! `avx2` feature **asserts** AVX2 is present and skips that check, calling the
+//! AVX2 kernel unconditionally. Only enable it when the deployment CPU is known
+//! to support AVX2 — a binary built with the feature will execute an illegal
+//! instruction on a CPU without it. The feature is rejected at compile time on
+//! non-`x86_64` targets.
+
 use std::cmp::Ordering;
 
 mod bmask;
@@ -51,25 +91,25 @@ pub(crate) unsafe fn jaro_winkler_unchecked(a: &[u8], b: &[u8]) -> f32 {
 /// Return the candidate from `heap` with the highest Jaro-Winkler similarity
 /// to `target`, or `None` if `heap` is empty.
 ///
-/// Scoring uses the same accelerated dispatch as [`jaro_winkler_ascii_simd`].
+/// If several candidates tie for the highest score, the last one in iteration
+/// order is returned. Scoring uses the same accelerated dispatch as
+/// [`jaro_winkler_ascii_simd`].
+#[must_use]
 pub fn winkliest_match<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Option<B> {
-    let target_bytes_checked = {
-        let target_bytes = target.to_bytes();
-        &target_bytes[..target_bytes.len().min(64)]
-    };
+    let target_bytes_checked = truncate_bytes64(target);
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let needle_bytes_checked = {
-                let needle_bytes = needle.to_bytes();
-                &needle_bytes[..needle_bytes.len().min(64)]
-            };
+            let needle_bytes_checked = truncate_bytes64(&needle);
 
             // SAFETY: truncated to <= 64 bytes above.
-            (unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) }, needle)
+            (
+                unsafe { jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) },
+                needle,
+            )
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
 
@@ -80,21 +120,16 @@ pub fn winkliest_match<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
 ///
 /// The relative order of equal-scored candidates is unspecified.
 /// Scoring uses the same accelerated dispatch as [`jaro_winkler_ascii_simd`].
+#[must_use]
 pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Vec<B> {
-    let target_bytes_checked = {
-        let target_bytes = target.to_bytes();
-        &target_bytes[..target_bytes.len().min(64)]
-    };
+    let target_bytes_checked = truncate_bytes64(target);
     let mut scored: Vec<_> = heap
         .into_iter()
         .map(|needle| {
-            let needle_bytes_checked = {
-                let needle_bytes = needle.to_bytes();
-                &needle_bytes[..needle_bytes.len().min(64)]
-            };
+            let needle_bytes_checked = truncate_bytes64(&needle);
 
             (
                 // SAFETY: truncated to <= 64 bytes above.
@@ -104,13 +139,41 @@ pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
         })
         .collect();
 
-    scored.sort_unstable_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Equal));
+    scored.sort_unstable_by(|(x, _), (y, _)| y.partial_cmp(x).unwrap_or(Ordering::Less));
     scored.into_iter().map(|(_, item)| item).collect()
+}
+
+/// Truncate a value's bytes to the first 64 (the length the kernels can score).
+#[must_use]
+#[inline]
+pub(crate) fn truncate_bytes64(target: &impl ToBytes) -> &[u8] {
+    truncate64(target.to_bytes())
+}
+
+/// Truncate a byte slice to its first 64 bytes.
+#[must_use]
+#[inline]
+pub(crate) fn truncate64(target: &[u8]) -> &[u8] {
+    &target[..target.len().min(64)]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "assertion failed")]
+    fn jaro_winkler_unchecked_debug_asserts_length_contract() {
+        // The unsafe contract (each slice <= 64 bytes) is guarded by a
+        // debug_assert that fires before any unchecked access. Callers only
+        // reach the kernel through `truncate_bytes64`, so this cannot happen in
+        // practice — this test is the tripwire if that guard ever regresses.
+        let over = [b'a'; 65];
+        // SAFETY: intentionally violating the length precondition to prove the
+        // debug_assert catches it; in a debug (test) build the assert panics
+        // before the kernel performs any unsafe read.
+        let _ = unsafe { jaro_winkler_unchecked(&over, &over) };
+    }
 
     #[test]
     fn test_jaro_winkler_bitmask() {
@@ -277,12 +340,26 @@ mod tests {
 
     #[test]
     fn test_winkliest_match_tie_breaker() {
-        // When scores are equal, should return first max found
+        // Two candidates that score identically against the target: each is
+        // "test" plus one trailing digit that matches nothing in "test", so
+        // the scores tie. `max_by` returns the last equal-max element, so the
+        // later candidate in iteration order must win.
         let target = "test";
-        let candidates = ["test1", "test2"];
+        let first = "test1";
+        let last = "test2";
 
-        let result = winkliest_match(&target, candidates);
-        assert!(result.is_some());
+        // Premise: the two candidates really do tie.
+        assert_eq!(
+            jaro_winkler_ascii_simd(&target, &first),
+            jaro_winkler_ascii_simd(&target, &last),
+            "candidates must tie for this to exercise tie-breaking",
+        );
+
+        // The last equal-max candidate wins...
+        assert_eq!(winkliest_match(&target, [first, last]), Some(last));
+        // ...and swapping the order flips which one wins, confirming the
+        // choice is by iteration order, not by value.
+        assert_eq!(winkliest_match(&target, [last, first]), Some(first));
     }
 
     #[test]

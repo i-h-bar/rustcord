@@ -36,6 +36,7 @@ pub(crate) mod avx2 {
     /// The caller must ensure the CPU supports AVX2 and that both slices are
     /// at most 64 bytes long.
     #[target_feature(enable = "avx2")]
+    #[inline]
     #[allow(clippy::cast_precision_loss, clippy::cast_possible_wrap)]
     pub(crate) unsafe fn jaro_winkler(a: &[u8], b: &[u8]) -> f32 {
         debug_assert!(a.len() <= 64 && b.len() <= 64);
@@ -139,15 +140,8 @@ pub(crate) mod avx2 {
 /// longer than 64 bytes are truncated to their first 64 bytes.
 #[must_use]
 pub fn jaro_winkler_ascii_simd<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
-    let a_bytes = {
-        let bytes = a.to_bytes();
-        &bytes[..bytes.len().min(64)]
-    };
-
-    let b_bytes = {
-        let bytes = b.to_bytes();
-        &bytes[..bytes.len().min(64)]
-    };
+    let a_bytes = crate::truncate_bytes64(a);
+    let b_bytes = crate::truncate_bytes64(b);
 
     // SAFETY: truncated to <= 64 bytes above.
     unsafe { crate::jaro_winkler_unchecked(a_bytes, b_bytes) }

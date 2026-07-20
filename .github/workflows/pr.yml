@@ -26,3 +26,10 @@ jobs:
 
       - name: Run tests
         run: cargo test
+
+      # The deployed bot builds with fuzzy's `avx2` feature (see
+      # packages/bot/Dockerfile), which uses a different dispatch branch than
+      # the default build above. Exercise that path too. Safe here because
+      # GitHub's ubuntu-latest x86_64 runners support AVX2.
+      - name: Run tests (avx2 feature — deployed fuzzy code path)
+        run: cargo test -p fuzzy --features avx2

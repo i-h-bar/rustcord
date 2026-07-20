@@ -5,6 +5,12 @@ edition = "2021"
 
 [features]
 local-dev = ["dotenv"]
+# Opt into fuzzy's AVX2 kernel, skipping its per-call runtime CPU check.
+# Only build with this when the *deployment* CPU is known to expose AVX2 — a
+# binary built with it will execute an illegal instruction (SIGILL) on a CPU,
+# or VM (e.g. a Proxmox `kvm64` guest), that lacks AVX2. Build with
+# `cargo build --release -p rustcord --features avx2`.
+avx2 = ["fuzzy/avx2"]
 
 [dependencies]
 regex = "1.11.1"

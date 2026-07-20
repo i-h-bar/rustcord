@@ -6,7 +6,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY packages ./packages
 
 RUN cargo fetch
-RUN cargo build --release -p rustcord
+RUN cargo build --release -p rustcord --features avx2
 
 FROM debian:bullseye-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
