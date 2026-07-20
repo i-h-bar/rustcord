@@ -1,5 +1,8 @@
 use crate::ToBytes;
 
+#[cfg(all(feature = "avx2", not(target_arch = "x86_64")))]
+compile_error!("fuzzy's `avx2` feature requires target_arch = \"x86_64\"");
+
 #[cfg(target_arch = "x86_64")]
 pub(crate) mod avx2 {
     use std::arch::x86_64::{
@@ -125,8 +128,7 @@ pub(crate) mod avx2 {
                 + matches / len_b as f32
                 + (matches - transpositions as f32 / 2.0) / matches);
 
-        let scaling_factor = 0.1;
-        jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity))
+        jaro_similarity + (prefix_len * 0.1 * (1.0 - jaro_similarity))
     }
 }
 
@@ -142,18 +144,44 @@ pub fn jaro_winkler_ascii_simd<A: ToBytes, B: ToBytes>(a: &A, b: &B) -> f32 {
 
 /// Slice-level entry point for the same dispatch: safe for slices of any
 /// length (truncates to 64 bytes internally before the kernel).
+///
+/// With the `avx2` feature enabled, the runtime `is_x86_feature_detected!`
+/// check is skipped and the AVX2 kernel is called unconditionally — only
+/// enable that feature when the deployment CPU is known to support AVX2
+/// (see `fuzzy/Cargo.toml`).
 #[must_use]
+#[inline]
 pub(crate) fn jaro_winkler_slices(a: &[u8], b: &[u8]) -> f32 {
     let a_chars = &a[..a.len().min(64)];
     let b_chars = &b[..b.len().min(64)];
+    // SAFETY: truncated to <= 64 bytes above.
+    unsafe { jaro_winkler_unchecked(a_chars, b_chars) }
+}
 
-    #[cfg(target_arch = "x86_64")]
+/// AVX2/scalar dispatch, skipping the length truncation `jaro_winkler_slices` does.
+///
+/// # Safety
+/// `a` and `b` must each be at most 64 bytes. Violating this panics on the
+/// AVX2 path (bounds-checked buffer copy), but on the scalar fallback in a
+/// release build it silently returns a wrong score instead of panicking —
+/// the match-bit shift (`1 << i`) overflows a `u64` and wraps once
+/// overflow checks are off.
+#[inline]
+pub(crate) unsafe fn jaro_winkler_unchecked(a: &[u8], b: &[u8]) -> f32 {
+    debug_assert!(a.len() <= 64 && b.len() <= 64);
+
+    #[cfg(all(not(feature = "avx2"), target_arch = "x86_64"))]
     if is_x86_feature_detected!("avx2") {
-        // SAFETY: AVX2 availability just checked; slices truncated to <= 64 bytes above.
-        return unsafe { avx2::jaro_winkler(a_chars, b_chars) };
+        // SAFETY: AVX2 availability just checked; caller guarantees length <= 64.
+        return unsafe { avx2::jaro_winkler(a, b) };
     }
 
-    crate::jaro_winkler_bytes(a_chars, b_chars)
+    #[cfg(feature = "avx2")]
+    // SAFETY: the `avx2` feature asserts AVX2 is available; caller guarantees length <= 64.
+    return unsafe { avx2::jaro_winkler(a, b) };
+
+    #[cfg(not(feature = "avx2"))]
+    crate::jaro_winkler_bytes(a, b)
 }
 
 #[cfg(test)]

@@ -95,9 +95,8 @@ pub(crate) fn jaro_winkler_bytes(a_chars: &[u8], b_chars: &[u8]) -> f32 {
         .take_while(|(c1, c2)| c1 == c2)
         .count()
         .min(4) as f32;
-    let scaling_factor = 0.1;
 
-    jaro_similarity + (prefix_len * scaling_factor * (1.0 - jaro_similarity))
+    jaro_similarity + (prefix_len * 0.1 * (1.0 - jaro_similarity))
 }
 
 /// Return the candidate from `heap` with the highest Jaro-Winkler similarity
@@ -108,11 +107,21 @@ pub fn winkliest_match<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Option<B> {
-    let target_bytes = target.to_bytes();
+    let target_bytes_checked = {
+        let target_bytes = target.to_bytes();
+        &target_bytes[..target_bytes.len().min(64)]
+    };
     let (_, closest_match) = heap
         .into_iter()
         .map(|needle| {
-            let distance = simd::jaro_winkler_slices(target_bytes, needle.to_bytes());
+            let needle_bytes_checked = {
+                let needle_bytes = needle.to_bytes();
+                &needle_bytes[..needle_bytes.len().min(64)]
+            };
+
+            let distance = unsafe {
+                simd::jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked)
+            };
             (distance, needle)
         })
         .max_by(|&(x, _), (y, _)| x.partial_cmp(y).unwrap_or(Ordering::Less))?;
@@ -128,12 +137,20 @@ pub fn winkliest_sort<A: ToBytes, B: ToBytes, I: IntoIterator<Item = B>>(
     target: &A,
     heap: I,
 ) -> Vec<B> {
-    let target_bytes = target.to_bytes();
+    let target_bytes_checked = {
+        let target_bytes = target.to_bytes();
+        &target_bytes[..target_bytes.len().min(64)]
+    };
     let mut scored: Vec<_> = heap
         .into_iter()
         .map(|needle| {
+            let needle_bytes_checked = {
+                let needle_bytes = needle.to_bytes();
+                &needle_bytes[..needle_bytes.len().min(64)]
+            };
+
             (
-                simd::jaro_winkler_slices(target_bytes, needle.to_bytes()),
+                unsafe { simd::jaro_winkler_unchecked(target_bytes_checked, needle_bytes_checked) },
                 needle,
             )
         })
