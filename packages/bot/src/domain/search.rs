@@ -1,13 +1,8 @@
-use crate::domain::app::App;
 use crate::domain::query::QueryParams;
 use crate::domain::utils::card_picking::{extract_match, fuzzy_sort};
 use crate::domain::utils::REGEX_COLLECTION;
+use crate::impl_app;
 use crate::ports::drivers::client::MessageInteraction;
-use crate::ports::services::cache::Cache;
-use crate::ports::services::card_store::CardStore;
-use crate::ports::services::image_store::ImageStore;
-use crate::ports::services::spoiler_subscription::SpoilerSubscription;
-use cards_sdk::SpoilerQueue;
 use contracts::card::Card;
 use contracts::search_result::SearchResultDto;
 use fuzzy;
@@ -15,13 +10,7 @@ use serenity::futures::future::join_all;
 use tokio::time::Instant;
 use uuid::Uuid;
 
-impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
-where
-    IS: ImageStore + Send + Sync,
-    CS: CardStore + SpoilerQueue + Send + Sync,
-    C: Cache + Send + Sync,
-    Sub: SpoilerSubscription + Send + Sync,
-{
+impl_app! {
     pub async fn parse_message(&self, msg: &str) -> Vec<Option<SearchResultDto>> {
         join_all(
             REGEX_COLLECTION
@@ -172,6 +161,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::app::App;
     use crate::ports::drivers::client::MockMessageInteraction;
     use crate::ports::services::cache::MockCache;
     use crate::ports::services::card_store::{MockCardStore, TestCardStore};

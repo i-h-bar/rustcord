@@ -1,8 +1,4 @@
-use crate::ports::services::cache::Cache;
-use crate::ports::services::card_store::CardStore;
-use crate::ports::services::image_store::ImageStore;
-use crate::ports::services::spoiler_subscription::SpoilerSubscription;
-use cards_sdk::SpoilerQueue;
+use crate::impl_app;
 
 pub struct App<IS, CS, C, Sub> {
     pub image_store: IS,
@@ -11,13 +7,7 @@ pub struct App<IS, CS, C, Sub> {
     pub sub: Sub,
 }
 
-impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
-where
-    IS: ImageStore + Send + Sync,
-    CS: CardStore + SpoilerQueue + Send + Sync,
-    C: Cache + Send + Sync,
-    Sub: SpoilerSubscription + Send + Sync,
-{
+impl_app! {
     pub fn new(image_store: IS, card_store: CS, cache: C, sub: Sub) -> Self {
         Self {
             image_store,
