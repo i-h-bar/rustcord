@@ -1,19 +1,8 @@
-use crate::domain::app::App;
 use crate::domain::functions::game::state;
+use crate::impl_app;
 use crate::ports::drivers::client::GameInteraction;
-use crate::ports::services::cache::Cache;
-use crate::ports::services::card_store::CardStore;
-use crate::ports::services::image_store::ImageStore;
-use crate::ports::services::spoiler_subscription::SpoilerSubscription;
-use cards_sdk::SpoilerQueue;
 
-impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
-where
-    IS: ImageStore + Send + Sync,
-    CS: CardStore + SpoilerQueue + Send + Sync,
-    C: Cache + Send + Sync,
-    Sub: SpoilerSubscription + Send + Sync,
-{
+impl_app! {
     pub async fn give_up_command<I: GameInteraction>(&self, interaction: &I) {
         let Some(game_state) = state::fetch(interaction.id(), &self.cache).await else {
             return;

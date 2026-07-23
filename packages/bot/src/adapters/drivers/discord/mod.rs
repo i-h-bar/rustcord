@@ -14,16 +14,11 @@ use crate::adapters::drivers::discord::components::interaction::{
 };
 use crate::adapters::drivers::discord::messages::interaction::DiscordMessageInteration;
 use crate::adapters::drivers::discord::utils::help::HELP;
-use crate::domain::app::App;
 use crate::domain::functions::game::play::PlayOptions;
 use crate::domain::query::QueryParams;
 use crate::domain::{card, functions};
-use crate::ports::services::cache::Cache;
-use crate::ports::services::card_store::CardStore;
-use crate::ports::services::image_store::ImageStore;
-use crate::ports::services::spoiler_subscription::SpoilerSubscription;
-use async_trait::async_trait;
-use cards_sdk::{ChannelId, GuildId, SpoilerQueue};
+use crate::{impl_app, impl_async_for_app};
+use cards_sdk::{ChannelId, GuildId};
 use discord_embeds::warmup_emoji;
 use serenity::all::{
     Command, CommandInteraction, ComponentInteractionDataKind, Context, EventHandler, Interaction,
@@ -32,13 +27,7 @@ use serenity::all::{
 use utils::parse;
 use uuid::Uuid;
 
-impl<IS, CS, C, Sub> App<IS, CS, C, Sub>
-where
-    IS: ImageStore + Send + Sync,
-    CS: CardStore + SpoilerQueue + Send + Sync,
-    C: Cache + Send + Sync,
-    Sub: SpoilerSubscription + Send + Sync,
-{
+impl_app! {
     async fn dispatch_spoilers_command(&self, ctx: Context, command: CommandInteraction) {
         let Some(guild_id) = command.guild_id else {
             return;
@@ -96,15 +85,8 @@ where
     }
 }
 
-#[async_trait]
-impl<IS, CS, C, Sub> EventHandler for App<IS, CS, C, Sub>
-where
-    IS: ImageStore + Send + Sync,
-    CS: CardStore + SpoilerQueue + Send + Sync,
-    C: Cache + Send + Sync,
-    Sub: SpoilerSubscription + Send + Sync,
-{
-    async fn message(&self, ctx: Context, msg: Message) {
+impl_async_for_app!( EventHandler {
+     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.id == ctx.cache.current_user().id || msg.author.bot {
             return;
         } else if msg.content == "!help" {
@@ -260,4 +242,4 @@ where
             _ => {}
         }
     }
-}
+});
