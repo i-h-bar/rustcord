@@ -18,7 +18,7 @@ The more you get the card wrong the more of the card is revealed.
 \x1b[1;10;4;31mSearching for cards:\x1b[0m
 You can use the \x1b[1;34m/search\x1b[0m command to search a card or do the following.
 
-To search a card simply put your desired card in double square brackets: \x1b[1;34m[[lightning bolt]]\x1b[0m — slight misspellings are forgiven.
+To search a card simply put your desired card in double square brackets and mention the bot: \x1b[1;34m[[lightning bolt]]\x1b[0m — slight misspellings are forgiven.
 
 To refine your search you can specify artist/set (both set abbreviation and full name): \x1b[1;34m[[lightning bolt | set=m11]]\x1b[0m or \x1b[1;34m[[relentless rats | artist = thomas m baxa]]\x1b[0m
 

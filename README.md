@@ -36,15 +36,17 @@ If you invited the bot without `Manage Webhooks` and later want spoiler notifica
 
 ## Card Search
 
-Use the `/search` command or wrap a card name in double square brackets anywhere in a message:
+Use the `/search` command or wrap a card name in double square brackets anywhere in a message and mention the bot:
 
 ```
+@CardBot
 [[lightning bolt]]
 ```
 
 Refine by set or artist:
 
 ```
+@CardBot
 [[lightning bolt | set=m11]]
 [[relentless rats | artist=thomas m baxa]]
 [[gitrog monster | set=shadows over innistrad]]
@@ -53,6 +55,7 @@ Refine by set or artist:
 You can use inline queries mid-sentence and stack multiple in one message:
 
 ```
+@CardBot
 I really love [[the gitrog monster | set=bloomburrow commander]], the classic [[gitrog monster | set=soi]] is not as cool.
 ```
 
