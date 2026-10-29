@@ -44,13 +44,12 @@ async fn main() {
     let cli = Cli::parse();
 
     if let Command::MigrateImages { from, to } = cli.command {
-        if let Err(why) =
-            tokio::task::spawn_blocking(move || migrate::migrate_images(&from, &to)).await
-        {
-            log::error!("Image migration panicked: {why}");
-            std::process::exit(1);
+        match tokio::task::spawn_blocking(move || migrate::migrate_images(&from, &to)).await {
+            Ok(Ok(_)) => return,
+            Ok(Err(why)) => log::error!("Image migration failed: {why}"),
+            Err(why) => log::error!("Image migration panicked: {why}"),
         }
-        return;
+        std::process::exit(1);
     }
 
     let source = card_source_init();

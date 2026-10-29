@@ -21,6 +21,19 @@ pub struct MigrationReport {
     pub failed: usize,
 }
 
+/// Conditions that mean the migration can't be trusted, as opposed to
+/// individual bad files. These fail the Job so a wrong source path or an
+/// unwritable volume is never mistaken for a successful (empty) migration.
+#[derive(Debug, thiserror::Error)]
+pub enum MigrateError {
+    #[error("cannot read source directory {path}: {err}", path = .0.display(), err = .1)]
+    Source(PathBuf, std::io::Error),
+    #[error("no card images found under {}", .0.display())]
+    NoImages(PathBuf),
+    #[error("cannot create target directory {path}: {err}", path = .0.display(), err = .1)]
+    Target(PathBuf, std::io::Error),
+}
+
 enum Outcome {
     Converted,
     Copied,
@@ -35,17 +48,24 @@ enum Outcome {
 /// write goes through a `.tmp` file + rename so a killed run never leaves a
 /// partial file that looks finished. Unreadable or undecodable sources are
 /// logged and counted as failed; the normal sync re-downloads them later.
-pub fn migrate_images(from: &Path, to: &Path) -> MigrationReport {
-    let mut jobs = sources(&from.join("images"), ImageFile::card);
+///
+/// # Errors
+/// Fails without writing anything if either source directory can't be read,
+/// if no card images are found, or if the target directories can't be
+/// created.
+pub fn migrate_images(from: &Path, to: &Path) -> Result<MigrationReport, MigrateError> {
+    let mut jobs = sources(&from.join("images"), ImageFile::card)?;
+    if jobs.is_empty() {
+        return Err(MigrateError::NoImages(from.join("images")));
+    }
     jobs.extend(sources(
         &from.join("illustrations"),
         ImageFile::illustration,
-    ));
+    )?);
 
     for dir in ["images", "illustrations"] {
-        if let Err(why) = fs::create_dir_all(to.join(dir)) {
-            log::error!("Failed to create {}: {why}", to.join(dir).display());
-        }
+        let dir = to.join(dir);
+        fs::create_dir_all(&dir).map_err(|why| MigrateError::Target(dir, why))?;
     }
 
     let total = jobs.len();
@@ -79,7 +99,7 @@ pub fn migrate_images(from: &Path, to: &Path) -> MigrationReport {
     }
 
     log::info!("Migration finished: {report:?}");
-    report
+    Ok(report)
 }
 
 fn target_path(to: &Path, file: ImageFile) -> PathBuf {
@@ -91,16 +111,13 @@ fn target_path(to: &Path, file: ImageFile) -> PathBuf {
 }
 
 /// `*.png` files in `dir` whose stem is a UUID. Anything else is ignored.
-fn sources(dir: &Path, file: fn(Uuid) -> ImageFile) -> Vec<(PathBuf, ImageFile)> {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(why) => {
-            log::warn!("Skipping {}: {why}", dir.display());
-            return Vec::new();
-        }
-    };
+fn sources(
+    dir: &Path,
+    file: fn(Uuid) -> ImageFile,
+) -> Result<Vec<(PathBuf, ImageFile)>, MigrateError> {
+    let entries = fs::read_dir(dir).map_err(|why| MigrateError::Source(dir.to_path_buf(), why))?;
 
-    entries
+    Ok(entries
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "png"))
@@ -108,7 +125,7 @@ fn sources(dir: &Path, file: fn(Uuid) -> ImageFile) -> Vec<(PathBuf, ImageFile)>
             let id = Uuid::parse_str(path.file_stem()?.to_str()?).ok()?;
             Some((path, file(id)))
         })
-        .collect()
+        .collect())
 }
 
 fn migrate_one(src: &Path, target: &Path, kind: ImageKind) -> Outcome {
@@ -212,7 +229,7 @@ mod tests {
             b"\xFF\xD8jpeg",
         );
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(
             report,
@@ -235,7 +252,7 @@ mod tests {
         let a = Uuid::new_v4();
         write(d.from.join(format!("images/{a}.png")), &fixture_jpeg());
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(report.images_converted, 1);
         assert!(starts_with_riff(d.to.join(format!("images/{a}.webp"))));
@@ -248,7 +265,7 @@ mod tests {
         write(d.from.join(format!("images/{a}.png")), &fixture_png());
         write(d.to.join(format!("images/{a}.webp")), b"keep");
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(report.skipped_existing, 1);
         assert_eq!(report.images_converted, 0);
@@ -267,7 +284,7 @@ mod tests {
         write(d.to.join(format!("images/{a}.webp")), b"");
         write(d.to.join(format!("images/{c}.webp.tmp")), b"junk");
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(report.images_converted, 2);
         assert!(starts_with_riff(d.to.join(format!("images/{a}.webp"))));
@@ -293,7 +310,7 @@ mod tests {
         write(d.from.join(format!("images/{b}.png")), b"garbage");
         write(d.from.join(format!("images/{ok}.png")), &fixture_png());
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(report.failed, 2);
         assert_eq!(report.images_converted, 1);
@@ -305,9 +322,10 @@ mod tests {
     fn skips_empty_illustration_sources() {
         let d = dirs();
         let a = Uuid::new_v4();
+        write(d.from.join(format!("images/{a}.png")), &fixture_png());
         write(d.from.join(format!("illustrations/{a}.png")), b"");
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(report.failed, 1);
         assert!(!d.to.join(format!("illustrations/{a}.jpg")).exists());
@@ -316,15 +334,67 @@ mod tests {
     #[test]
     fn ignores_sets_and_non_png_files() {
         let d = dirs();
+        let a = Uuid::new_v4();
+        write(d.from.join(format!("images/{a}.png")), &fixture_png());
         write(d.from.join("sets/x.png"), &fixture_png());
         write(d.from.join("images/readme.txt"), b"hi");
         write(d.from.join("images/not-a-uuid.png"), &fixture_png());
 
-        let report = migrate_images(&d.from, &d.to);
+        let report = migrate_images(&d.from, &d.to).unwrap();
 
-        assert_eq!(report, MigrationReport::default());
+        assert_eq!(
+            report,
+            MigrationReport {
+                images_converted: 1,
+                ..Default::default()
+            }
+        );
         assert!(!d.to.join("sets").exists());
-        assert!(snapshot(&d.to).is_empty());
+        assert_eq!(
+            snapshot(&d.to).into_keys().collect::<Vec<_>>(),
+            vec![PathBuf::from(format!("images/{a}.webp"))]
+        );
+    }
+
+    #[test]
+    fn errors_when_source_missing() {
+        let d = dirs();
+        let missing = d.from.join("nope");
+
+        assert!(matches!(
+            migrate_images(&missing, &d.to),
+            Err(MigrateError::Source(..))
+        ));
+    }
+
+    #[test]
+    fn errors_when_no_card_images() {
+        let d = dirs();
+        write(
+            d.from.join(format!("illustrations/{}.png", Uuid::new_v4())),
+            b"\xFF\xD8jpeg",
+        );
+
+        assert!(matches!(
+            migrate_images(&d.from, &d.to),
+            Err(MigrateError::NoImages(_))
+        ));
+    }
+
+    #[test]
+    fn errors_when_target_cannot_be_created() {
+        let d = dirs();
+        write(
+            d.from.join(format!("images/{}.png", Uuid::new_v4())),
+            &fixture_png(),
+        );
+        // A file where the target root should be makes create_dir_all fail.
+        write(d.to.clone(), b"not a dir");
+
+        assert!(matches!(
+            migrate_images(&d.from, &d.to),
+            Err(MigrateError::Target(..))
+        ));
     }
 
     #[test]
@@ -342,7 +412,7 @@ mod tests {
         write(d.from.join("sets/x.png"), b"set");
         let before = snapshot(&d.from);
 
-        migrate_images(&d.from, &d.to);
+        migrate_images(&d.from, &d.to).unwrap();
 
         assert_eq!(snapshot(&d.from), before);
     }

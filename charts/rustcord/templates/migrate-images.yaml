@@ -28,6 +28,8 @@ spec:
         - name: old-images
           hostPath:
             path: {{ .Values.migrateImages.hostPath }}
+            # Fail pod start rather than silently mounting an empty new dir
+            type: Directory
         - name: images
           persistentVolumeClaim:
             claimName: card-images
