@@ -121,7 +121,7 @@ spec:
                       name: {{ .Values.secretName }}
                       key: POSTGRES_HOST
                 - name: IMAGES_DIR
-                  value: /var/mtg_cards
+                  value: /mtg_cards
                 - name: BOT_TOKEN
                   valueFrom:
                     secretKeyRef:
@@ -141,7 +141,7 @@ spec:
                   value: warn,sync=info,cards_sdk=info
               volumeMounts:
                 - name: images
-                  mountPath: /var/mtg_cards
+                  mountPath: /mtg_cards
           volumes:
             - name: images
               persistentVolumeClaim:
@@ -205,7 +205,7 @@ spec:
                       name: {{ .Values.secretName }}
                       key: POSTGRES_HOST
                 - name: IMAGES_DIR
-                  value: /var/mtg_cards
+                  value: /mtg_cards
                 - name: BOT_TOKEN
                   valueFrom:
                     secretKeyRef:
@@ -225,7 +225,7 @@ spec:
                   value: warn,sync=info
               volumeMounts:
                 - name: images
-                  mountPath: /var/mtg_cards
+                  mountPath: /mtg_cards
           volumes:
             - name: images
               persistentVolumeClaim:
