@@ -1,4 +1,4 @@
-use crate::domain::utils::webp::png_to_webp;
+use crate::domain::utils::webp::to_webp;
 use crate::ports::image_store::{Illustration, Image, ImageStore};
 use async_trait::async_trait;
 use cards_sdk::CardInfo;
@@ -78,7 +78,7 @@ impl ImageStore for FileSystem {
     async fn save_image(&self, image: Image) {
         let Image(id, png) = image;
 
-        let webp = match tokio::task::spawn_blocking(move || png_to_webp(&png)).await {
+        let webp = match tokio::task::spawn_blocking(move || to_webp(&png)).await {
             Ok(Ok(webp)) => webp,
             Ok(Err(why)) => {
                 log::error!("Failed to convert image {id} to WebP: {why}");

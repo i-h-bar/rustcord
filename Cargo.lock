@@ -1670,6 +1670,8 @@ dependencies = [
  "moxcms",
  "num-traits",
  "png",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -3702,6 +3704,7 @@ dependencies = [
  "indicatif",
  "log",
  "normalise",
+ "rayon",
  "regex",
  "reqwest 0.13.4",
  "resvg",

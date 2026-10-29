@@ -2,8 +2,9 @@ use crate::adapters::services::{
     card_source_init, card_storage_init, emoji_store_init, image_store_init,
 };
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
-use crate::domain::{bulk, spoilers};
+use crate::domain::{bulk, migrate, spoilers};
 #[cfg(feature = "local-dev")]
 use dotenv::dotenv;
 
@@ -21,6 +22,16 @@ struct Cli {
 enum Command {
     Spoilers,
     Bulk,
+    /// One-off: convert a legacy PNG image library into the WebP layout.
+    /// Needs no database, Scryfall or Discord access.
+    MigrateImages {
+        /// Legacy library root (read-only), containing images/ and illustrations/
+        #[arg(long)]
+        from: PathBuf,
+        /// Target library root (the card-images volume)
+        #[arg(long)]
+        to: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -32,6 +43,16 @@ async fn main() {
 
     let cli = Cli::parse();
 
+    if let Command::MigrateImages { from, to } = cli.command {
+        if let Err(why) =
+            tokio::task::spawn_blocking(move || migrate::migrate_images(&from, &to)).await
+        {
+            log::error!("Image migration panicked: {why}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let source = card_source_init();
     let storage = card_storage_init().await;
     let image_store = image_store_init();
@@ -40,5 +61,6 @@ async fn main() {
     match cli.command {
         Command::Spoilers => spoilers::sync(source, storage, image_store, emoji_store).await,
         Command::Bulk => bulk::sync(source, storage, image_store, emoji_store).await,
+        Command::MigrateImages { .. } => unreachable!("handled before adapter init"),
     }
 }
