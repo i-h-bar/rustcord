@@ -69,6 +69,7 @@ metadata:
   name: bulk-sync
 spec:
   schedule: "0 6 * * 3"
+  suspend: {{ .Values.migrationMode }}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   jobTemplate:
@@ -143,8 +144,8 @@ spec:
                   mountPath: /var/mtg_cards
           volumes:
             - name: images
-              hostPath:
-                path: {{ .Values.imagesHostPath }}
+              persistentVolumeClaim:
+                claimName: card-images
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -152,6 +153,7 @@ metadata:
   name: spoiler-sync
 spec:
   schedule: "0 */4 * * *"
+  suspend: {{ .Values.migrationMode }}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   jobTemplate:
@@ -226,5 +228,5 @@ spec:
                   mountPath: /var/mtg_cards
           volumes:
             - name: images
-              hostPath:
-                path: {{ .Values.imagesHostPath }}
+              persistentVolumeClaim:
+                claimName: card-images

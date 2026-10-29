@@ -1,6 +1,15 @@
 secretName: app-secrets
 
-imagesHostPath: /var/mtg_cards/
+# true for the cut-over merge: bot+notifier at 0 replicas, CronJobs suspended,
+# migrate-images Job rendered. Flip to false in the follow-up merge.
+migrationMode: true
+
+cardImages:
+  storage: 60Gi
+
+migrateImages:
+  # Read-only source for the one-off migration; removed once the host folder is deleted
+  hostPath: /var/mtg_cards/
 
 images:
   postgres:

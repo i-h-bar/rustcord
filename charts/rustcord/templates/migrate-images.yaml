@@ -1,0 +1,34 @@
+{{- if .Values.migrationMode }}
+# One-off: converts the legacy hostPath PNG library into the card-images PVC.
+# Resumable; re-run with
+#   kubectl get job migrate-images -o yaml | kubectl replace --force -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate-images
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate-images
+          image: "{{ .Values.images.sync.repository }}:{{ .Values.images.sync.tag }}"
+          command: ["/app/sync", "migrate-images", "--from", "/old", "--to", "/var/mtg_cards"]
+          env:
+            - name: RUST_LOG
+              value: warn,sync=info
+          volumeMounts:
+            - name: old-images
+              mountPath: /old
+              readOnly: true
+            - name: images
+              mountPath: /var/mtg_cards
+      volumes:
+        - name: old-images
+          hostPath:
+            path: {{ .Values.migrateImages.hostPath }}
+        - name: images
+          persistentVolumeClaim:
+            claimName: card-images
+{{- end }}

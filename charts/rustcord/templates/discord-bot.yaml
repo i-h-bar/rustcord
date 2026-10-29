@@ -6,7 +6,7 @@ metadata:
     type: bot
     app: discord
 spec:
-  replicas: 1
+  replicas: {{ if .Values.migrationMode }}0{{ else }}1{{ end }}
   selector:
     matchLabels:
       type: bot
@@ -75,5 +75,5 @@ spec:
           {{- end }}
       volumes:
         - name: images
-          hostPath:
-            path: {{ .Values.imagesHostPath }}
+          persistentVolumeClaim:
+            claimName: card-images
