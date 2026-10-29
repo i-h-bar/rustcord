@@ -1,3 +1,4 @@
+use crate::image::ImageFile;
 use serde::{Deserialize, Serialize};
 use time::Date;
 use uuid::Uuid;
@@ -111,6 +112,16 @@ impl Card {
     }
 
     #[must_use]
+    pub fn image_file(&self) -> ImageFile {
+        ImageFile::card(self.image_id)
+    }
+
+    #[must_use]
+    pub fn illustration_file(&self) -> Option<ImageFile> {
+        self.illustration_id.map(ImageFile::illustration)
+    }
+
+    #[must_use]
     pub fn set_name(&self) -> &str {
         &self.set_name
     }
@@ -221,6 +232,30 @@ mod tests {
             card.image_id(),
             &Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap()
         );
+    }
+
+    #[test]
+    fn test_image_file() {
+        let card = create_test_card();
+        assert_eq!(card.image_file(), ImageFile::card(*card.image_id()));
+    }
+
+    #[test]
+    fn test_illustration_file() {
+        let card = create_test_card();
+        assert_eq!(
+            card.illustration_file(),
+            Some(ImageFile::illustration(
+                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_illustration_file_none() {
+        let mut card = create_test_card();
+        card.illustration_id = None;
+        assert!(card.illustration_file().is_none());
     }
 
     #[test]
