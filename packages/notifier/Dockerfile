@@ -1,4 +1,4 @@
-FROM rust:1.96-bullseye AS builder
+FROM rust:1.96-bookworm AS builder
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ COPY packages ./packages
 RUN cargo fetch
 RUN cargo build --release -p notifier
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/target/release/notifier /app/notifier
