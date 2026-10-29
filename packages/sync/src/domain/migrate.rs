@@ -81,7 +81,7 @@ pub fn migrate_images(from: &Path, to: &Path) -> Result<MigrationReport, Migrate
         .map(|(src, file)| {
             let outcome = migrate_one(src, &target_path(to, *file), file.kind());
             let done = processed.fetch_add(1, Ordering::Relaxed) + 1;
-            if done % PROGRESS_EVERY == 0 {
+            if done.is_multiple_of(PROGRESS_EVERY) {
                 log::info!("Migrated {done}/{total} files");
             }
             outcome

@@ -6,6 +6,10 @@ use contracts::image::{ImageFile, ImageKind};
 use std::env;
 use uuid::Uuid;
 
+/// Scryfall `art_crop` illustrations are always JPEG. Anything else (empty,
+/// an HTTP error body) is rejected so it isn't stored as a permanent `.jpg`.
+const JPEG_MAGIC: [u8; 3] = [0xFF, 0xD8, 0xFF];
+
 pub struct FileSystem {
     image_dir: String,
     illustration_dir: String,
@@ -42,9 +46,26 @@ impl FileSystem {
         format!("{dir}{file}")
     }
 
+    /// A 0-byte file (e.g. from an interrupted write before saves were
+    /// atomic) counts as missing, so the next sync re-downloads it.
+    async fn file_exists(&self, file: ImageFile) -> bool {
+        tokio::fs::metadata(self.path(file))
+            .await
+            .is_ok_and(|meta| meta.len() > 0)
+    }
+
+    /// Writes to `{path}.tmp` then renames, so a killed sync never leaves a
+    /// truncated file that `file_exists` would accept.
     pub async fn save(&self, path: &str, bytes: Vec<u8>) {
-        if let Err(why) = tokio::fs::write(&path, bytes).await {
+        let tmp = format!("{path}.tmp");
+        let result = match tokio::fs::write(&tmp, bytes).await {
+            Ok(()) => tokio::fs::rename(&tmp, path).await,
+            Err(why) => Err(why),
+        };
+
+        if let Err(why) = result {
             log::error!("Failed to save file: {why}");
+            let _ = tokio::fs::remove_file(&tmp).await;
         }
     }
 
@@ -58,9 +79,7 @@ impl FileSystem {
 #[async_trait]
 impl ImageStore for FileSystem {
     async fn card_image_exists(&self, card: &CardInfo) -> bool {
-        let path = self.path(ImageFile::card(card.image.id));
-
-        tokio::fs::try_exists(&path).await.unwrap_or(false)
+        self.file_exists(ImageFile::card(card.image.id)).await
     }
 
     async fn card_illustration_exists(&self, card: &CardInfo) -> bool {
@@ -68,9 +87,8 @@ impl ImageStore for FileSystem {
             return true;
         };
 
-        let path = self.path(ImageFile::illustration(illustration.id));
-
-        tokio::fs::try_exists(&path).await.unwrap_or(false)
+        self.file_exists(ImageFile::illustration(illustration.id))
+            .await
     }
 
     /// Converts the downloaded PNG to WebP before saving. Writes nothing if
@@ -96,8 +114,8 @@ impl ImageStore for FileSystem {
     async fn save_illustration(&self, illustration: Illustration) {
         let Illustration(id, bytes) = illustration;
 
-        if bytes.is_empty() {
-            log::error!("Downloaded illustration {id} was empty, not saving");
+        if !bytes.starts_with(&JPEG_MAGIC) {
+            log::error!("Downloaded illustration {id} is not a JPEG, not saving");
             return;
         }
 
@@ -157,11 +175,11 @@ mod tests {
         let id = Uuid::new_v4();
 
         store(dir.path())
-            .save_illustration(Illustration(id, b"\xFF\xD8jpeg".to_vec()))
+            .save_illustration(Illustration(id, b"\xFF\xD8\xFFjpeg".to_vec()))
             .await;
 
         let bytes = std::fs::read(dir.path().join(format!("illustrations/{id}.jpg"))).unwrap();
-        assert_eq!(bytes, b"\xFF\xD8jpeg");
+        assert_eq!(bytes, b"\xFF\xD8\xFFjpeg");
     }
 
     #[tokio::test]
@@ -174,6 +192,46 @@ mod tests {
             .await;
 
         assert!(!dir.path().join(format!("illustrations/{id}.jpg")).exists());
+    }
+
+    #[tokio::test]
+    async fn save_illustration_rejects_non_jpeg() {
+        // e.g. a Scryfall JSON error body saved as an illustration
+        let dir = tempfile::tempdir().unwrap();
+        let id = Uuid::new_v4();
+
+        store(dir.path())
+            .save_illustration(Illustration(id, br#"{"object":"error"}"#.to_vec()))
+            .await;
+
+        assert!(!dir.path().join(format!("illustrations/{id}.jpg")).exists());
+    }
+
+    #[tokio::test]
+    async fn file_exists_treats_empty_file_as_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (empty, full) = (Uuid::new_v4(), Uuid::new_v4());
+        let fs = store(dir.path());
+        std::fs::write(dir.path().join(format!("images/{empty}.webp")), b"").unwrap();
+        std::fs::write(dir.path().join(format!("images/{full}.webp")), b"x").unwrap();
+
+        assert!(!fs.file_exists(ImageFile::card(empty)).await);
+        assert!(fs.file_exists(ImageFile::card(full)).await);
+        assert!(!fs.file_exists(ImageFile::card(Uuid::new_v4())).await);
+    }
+
+    #[tokio::test]
+    async fn save_writes_via_tmp_and_leaves_no_tmp_behind() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = Uuid::new_v4();
+        let fs = store(dir.path());
+        // A stale tmp from a killed run must not survive or block the save.
+        std::fs::write(dir.path().join(format!("images/{id}.webp.tmp")), b"junk").unwrap();
+
+        fs.save_image(Image(id, fixture_png())).await;
+
+        assert!(dir.path().join(format!("images/{id}.webp")).exists());
+        assert!(!dir.path().join(format!("images/{id}.webp.tmp")).exists());
     }
 
     #[tokio::test]
