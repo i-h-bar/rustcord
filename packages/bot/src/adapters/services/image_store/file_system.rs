@@ -8,20 +8,26 @@ pub struct FileSystem {
     illustration_dir: String,
 }
 
+impl FileSystem {
+    #[must_use]
+    pub fn from_base_dir(base_dir: &str) -> Self {
+        Self {
+            image_dir: format!("{base_dir}/images/"),
+            illustration_dir: format!("{base_dir}/illustrations/"),
+        }
+    }
+}
+
 #[async_trait]
 impl ImageStore for FileSystem {
     fn create() -> Self {
         let base_dir = env::var("IMAGES_DIR").expect("Images dir wasn't in env vars");
-        Self {
-            image_dir: format!("{}/images/", &base_dir),
-            illustration_dir: format!("{}/illustrations/", &base_dir),
-        }
+        Self::from_base_dir(&base_dir)
     }
 
     async fn fetch(&self, card: &Card) -> Result<Image, ImageRetrievalError> {
-        let id = card.image_id();
-
-        let bytes = match tokio::fs::read(format!("{}{id}.png", self.image_dir)).await {
+        let bytes = match tokio::fs::read(format!("{}{}", self.image_dir, card.image_file())).await
+        {
             Err(why) => {
                 log::warn!("Error getting image {why:?}");
                 return Err(ImageRetrievalError::new(format!(
@@ -36,13 +42,13 @@ impl ImageStore for FileSystem {
     }
 
     async fn fetch_illustration(&self, card: &Card) -> Result<Image, ImageRetrievalError> {
-        let Some(illustration_id) = card.illustration_id() else {
+        let Some(illustration_file) = card.illustration_file() else {
             return Err(ImageRetrievalError::new(String::from(
                 "Card had no illustration id",
             )));
         };
 
-        let bytes = tokio::fs::read(format!("{}{}.png", self.illustration_dir, illustration_id))
+        let bytes = tokio::fs::read(format!("{}{illustration_file}", self.illustration_dir))
             .await
             .map_err(|_| {
                 ImageRetrievalError::new(format!("No illustration found for {}", card.name()))
@@ -195,5 +201,58 @@ mod tests {
             front_ill,
             Some(&Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap())
         );
+    }
+
+    fn write_file(base: &std::path::Path, dir: &str, name: &str, bytes: &[u8]) {
+        std::fs::create_dir_all(base.join(dir)).unwrap();
+        std::fs::write(base.join(dir).join(name), bytes).unwrap();
+    }
+
+    #[tokio::test]
+    async fn fetch_reads_webp_card_image() {
+        let dir = tempfile::tempdir().unwrap();
+        let card = create_test_card_single_face();
+        write_file(
+            dir.path(),
+            "images",
+            &card.image_file().to_string(),
+            b"webp",
+        );
+
+        let store = FileSystem::from_base_dir(dir.path().to_str().unwrap());
+
+        assert_eq!(store.fetch(&card).await.unwrap().bytes(), b"webp");
+    }
+
+    #[tokio::test]
+    async fn fetch_illustration_reads_jpg() {
+        let dir = tempfile::tempdir().unwrap();
+        let card = create_test_card_single_face();
+        let name = card.illustration_file().unwrap().to_string();
+        assert!(name.ends_with(".jpg"));
+        write_file(dir.path(), "illustrations", &name, b"jpg");
+
+        let store = FileSystem::from_base_dir(dir.path().to_str().unwrap());
+
+        assert_eq!(
+            store.fetch_illustration(&card).await.unwrap().bytes(),
+            b"jpg"
+        );
+    }
+
+    #[tokio::test]
+    async fn fetch_ignores_legacy_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let card = create_test_card_single_face();
+        write_file(
+            dir.path(),
+            "images",
+            &format!("{}.png", card.image_id()),
+            b"png",
+        );
+
+        let store = FileSystem::from_base_dir(dir.path().to_str().unwrap());
+
+        assert!(store.fetch(&card).await.is_err());
     }
 }

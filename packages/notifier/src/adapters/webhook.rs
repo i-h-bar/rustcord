@@ -39,7 +39,7 @@ impl SpoilerSender for DiscordWebhookSender {
         image: Vec<u8>,
     ) -> Result<(), SpoilerError> {
         let embed = create_embed(card).await;
-        let attachment = CreateAttachment::bytes(image, format!("{}.png", card.image_id()));
+        let attachment = CreateAttachment::bytes(image, card.image_file().to_string());
         let builder = ExecuteWebhook::new().embed(embed).add_file(attachment);
 
         builder

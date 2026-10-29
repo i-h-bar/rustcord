@@ -34,6 +34,7 @@ named_lock = { workspace = true }
 normalise = { workspace = true }
 
 [dev-dependencies]
+tempfile = "3"
 cards_sdk = { workspace = true, features = ["test-util"] }
 mockall = "0.13.1"
 time = { version = "0.3", features = ["serde"] }

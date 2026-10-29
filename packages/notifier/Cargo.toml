@@ -22,6 +22,7 @@ serenity = { version = "0.12.4", default-features = false, features = ["builder"
 uuid = "1.18.0"
 
 [dev-dependencies]
+tempfile = "3"
 cards_sdk = { workspace = true, features = ["test-util"] }
 mockall = "0.13.1"
 time = { version = "0.3", features = ["macros"] }

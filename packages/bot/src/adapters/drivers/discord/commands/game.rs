@@ -2,13 +2,21 @@ use crate::domain::functions::game::state::{Difficulty, GameState};
 use crate::ports::drivers::client::{GameInteraction, MessageInteractionError};
 use async_trait::async_trait;
 use contracts::card::Card;
-use contracts::image::Image;
+use contracts::image::{Image, ImageFile};
 use discord_embeds::{add_emoji, create_embed, get_colour_identity, italicise_reminder_text};
 use serenity::all::{
     CommandInteraction, Context, CreateAttachment, CreateEmbed, CreateEmbedFooter,
     CreateInteractionResponse, CreateInteractionResponseMessage, MessageBuilder,
 };
 use uuid::Uuid;
+
+/// The illustration attachment name for the game embed. Falls back to a nil
+/// id when the card has no illustration, matching the attachment the game
+/// commands send (they refuse to send one in that case).
+fn illustration_file(card: &Card) -> ImageFile {
+    card.illustration_file()
+        .unwrap_or(ImageFile::illustration(Uuid::default()))
+}
 
 /// The guessing game's progressive-reveal embed — distinct from `/search`'s
 /// `discord_embeds::create_embed`, since it hides the card name/mana
@@ -17,10 +25,7 @@ use uuid::Uuid;
 /// logic, not something `notifier` or any other consumer needs.
 pub async fn create_game_embed(card: &Card, multiplier: usize, guesses: usize) -> CreateEmbed {
     let mut embed = CreateEmbed::default()
-        .attachment(format!(
-            "{}.png",
-            card.illustration_id().unwrap_or(&Uuid::default())
-        ))
+        .attachment(illustration_file(card).to_string())
         .title("????")
         .description("????")
         .footer(CreateEmbedFooter::new(format!("🖌️ - {}", card.artist())));
@@ -73,8 +78,8 @@ impl GameInteraction for DiscordCommandInteraction {
         images: Image,
         guess: String,
     ) -> Result<(), MessageInteractionError> {
-        let illustration = if let Some(illustration_id) = state.card().illustration_id() {
-            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png"))
+        let illustration = if let Some(illustration_file) = state.card().illustration_file() {
+            CreateAttachment::bytes(images.bytes(), illustration_file.to_string())
         } else {
             log::warn!("Card had no illustration id");
             return Err(MessageInteractionError::new(String::from(
@@ -111,14 +116,13 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Image,
     ) -> Result<(), MessageInteractionError> {
-        let Some(illustration_id) = state.card().illustration_id() else {
+        let Some(illustration_file) = state.card().illustration_file() else {
             return Err(MessageInteractionError::new(String::from(
                 "Failed to get image id",
             )));
         };
 
-        let illustration =
-            CreateAttachment::bytes(images.bytes(), format!("{illustration_id}.png"));
+        let illustration = CreateAttachment::bytes(images.bytes(), illustration_file.to_string());
         let difficulty = state.difficulty();
         let set_name = state.card().set_name();
         let message = match difficulty {
@@ -145,8 +149,7 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Image,
     ) -> Result<(), MessageInteractionError> {
-        let image =
-            CreateAttachment::bytes(images.bytes(), format!("{}.png", state.card().image_id()));
+        let image = CreateAttachment::bytes(images.bytes(), state.card().image_file().to_string());
 
         let number_of_guesses = state.number_of_guesses();
         let guess_plural = if number_of_guesses > 1 {
@@ -189,8 +192,7 @@ impl GameInteraction for DiscordCommandInteraction {
         state: GameState,
         images: Image,
     ) -> Result<(), MessageInteractionError> {
-        let image =
-            CreateAttachment::bytes(images.bytes(), format!("{}.png", state.card().image_id()));
+        let image = CreateAttachment::bytes(images.bytes(), state.card().image_file().to_string());
         let number_of_guesses = state.number_of_guesses();
         let guess_plural = if number_of_guesses > 1 {
             "guesses"
