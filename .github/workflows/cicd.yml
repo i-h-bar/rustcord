@@ -81,8 +81,10 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy via Helm
-        # --force-conflicts: helm owns these objects; take over fields last set by a manual `kubectl apply`
-        run: helm upgrade --install rustcord charts/rustcord --force-conflicts
+        # Client-side 3-way merge: these objects were first created by `kubectl apply` and later
+        # adopted by helm, so server-side apply can't remove fields helm never owned (it left the
+        # old hostPath next to the new PVC).
+        run: helm upgrade --install rustcord charts/rustcord --server-side=false
 
       - name: Restart Bot Deployment
         run: kubectl rollout restart deployment/discord-bot
