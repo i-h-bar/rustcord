@@ -7,10 +7,6 @@ migrationMode: false
 cardImages:
   storage: 60Gi
 
-migrateImages:
-  # Read-only source for the one-off migration; removed once the host folder is deleted
-  hostPath: /var/mtg_cards/
-
 images:
   postgres:
     repository: postgres
