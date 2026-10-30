@@ -81,7 +81,8 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy via Helm
-        run: helm upgrade --install rustcord charts/rustcord
+        # --force-conflicts: helm owns these objects; take over fields last set by a manual `kubectl apply`
+        run: helm upgrade --install rustcord charts/rustcord --force-conflicts
 
       - name: Restart Bot Deployment
         run: kubectl rollout restart deployment/discord-bot

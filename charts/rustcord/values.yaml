@@ -2,7 +2,7 @@ secretName: app-secrets
 
 # true for the cut-over merge: bot+notifier at 0 replicas, CronJobs suspended,
 # migrate-images Job rendered. Flip to false in the follow-up merge.
-migrationMode: true
+migrationMode: false
 
 cardImages:
   storage: 60Gi
