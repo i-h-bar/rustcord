@@ -6,7 +6,7 @@ metadata:
     type: notifier
     app: discord
 spec:
-  replicas: 1
+  replicas: {{ if .Values.migrationMode }}0{{ else }}1{{ end }}
   selector:
     matchLabels:
       type: notifier
@@ -47,12 +47,12 @@ spec:
                   name: {{ .Values.secretName }}
                   key: BOT_TOKEN
             - name: IMAGES_DIR
-              value: /var/mtg_cards
+              value: /mtg_cards
             - name: RUST_LOG
               value: warn,notifier=info,cards_sdk=info
           volumeMounts:
             - name: images
-              mountPath: /var/mtg_cards/
+              mountPath: /mtg_cards/
               readOnly: true
           {{- with .Values.notifier.resources }}
           resources:
@@ -60,5 +60,5 @@ spec:
           {{- end }}
       volumes:
         - name: images
-          hostPath:
-            path: {{ .Values.imagesHostPath }}
+          persistentVolumeClaim:
+            claimName: card-images

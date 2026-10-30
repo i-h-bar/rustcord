@@ -69,7 +69,7 @@ impl MessageInteraction for DiscordMessageInteration {
     async fn send_card(&self, result: SearchResultDto) -> Result<(), MessageInteractionError> {
         let card = result.card();
         let front_image =
-            CreateAttachment::bytes(result.image().bytes(), format!("{}.png", card.image_id()));
+            CreateAttachment::bytes(result.image().bytes(), card.image_file().to_string());
 
         let mut components: Vec<CreateActionRow> = Vec::with_capacity(2);
 

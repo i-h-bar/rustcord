@@ -192,11 +192,11 @@ IMAGES_DIR=<path to card images directory>
 RUST_LOG=warn,rustcord=info  # Logging level
 ```
 
-**Image Storage Structure:**
+**Image Storage Structure** (on the `card-images` PVC in k8s; names come from `contracts::image::ImageFile`):
 ```
 IMAGES_DIR/
-  images/           # Full card images (UUID.png)
-  illustrations/    # Cropped illustrations (UUID.png)
+  images/           # Full card images (UUID.webp, lossy q85)
+  illustrations/    # Cropped illustrations (UUID.jpg)
 ```
 
 ## Database Schema Notes

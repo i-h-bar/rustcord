@@ -60,11 +60,11 @@ async fn build_embed(card: &Card) -> CreateEmbed {
 
 /// Used by `bot`'s `/search`: attaches a local image file from `IMAGES_DIR`
 /// (the caller is expected to also attach a `CreateAttachment` named
-/// `{image_id}.png` to the outgoing message).
+/// `card.image_file()` to the outgoing message).
 pub async fn create_embed(card: &Card) -> CreateEmbed {
     build_embed(card)
         .await
-        .attachment(format!("{}.png", card.image_id()))
+        .attachment(card.image_file().to_string())
 }
 
 /// Used by `notifier`: sets the embed image directly to a remote URL (the

@@ -69,6 +69,7 @@ metadata:
   name: bulk-sync
 spec:
   schedule: "0 6 * * 3"
+  suspend: {{ .Values.migrationMode }}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   jobTemplate:
@@ -120,7 +121,7 @@ spec:
                       name: {{ .Values.secretName }}
                       key: POSTGRES_HOST
                 - name: IMAGES_DIR
-                  value: /var/mtg_cards
+                  value: /mtg_cards
                 - name: BOT_TOKEN
                   valueFrom:
                     secretKeyRef:
@@ -140,11 +141,11 @@ spec:
                   value: warn,sync=info,cards_sdk=info
               volumeMounts:
                 - name: images
-                  mountPath: /var/mtg_cards
+                  mountPath: /mtg_cards
           volumes:
             - name: images
-              hostPath:
-                path: {{ .Values.imagesHostPath }}
+              persistentVolumeClaim:
+                claimName: card-images
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -152,6 +153,7 @@ metadata:
   name: spoiler-sync
 spec:
   schedule: "0 */4 * * *"
+  suspend: {{ .Values.migrationMode }}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   jobTemplate:
@@ -203,7 +205,7 @@ spec:
                       name: {{ .Values.secretName }}
                       key: POSTGRES_HOST
                 - name: IMAGES_DIR
-                  value: /var/mtg_cards
+                  value: /mtg_cards
                 - name: BOT_TOKEN
                   valueFrom:
                     secretKeyRef:
@@ -223,8 +225,8 @@ spec:
                   value: warn,sync=info
               volumeMounts:
                 - name: images
-                  mountPath: /var/mtg_cards
+                  mountPath: /mtg_cards
           volumes:
             - name: images
-              hostPath:
-                path: {{ .Values.imagesHostPath }}
+              persistentVolumeClaim:
+                claimName: card-images
